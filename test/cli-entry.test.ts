@@ -69,3 +69,18 @@ test('the owner\'s own terminal is never stopped by the other-author check', () 
   const r = decsResult(root, ['done', '1'], { DECS_LANG: 'en', CLAUDECODE: '', DECS_ROLE: 'human', DECS_AUTHOR: 'owner' })
   assert.equal(r.code, 0, r.stderr)
 })
+
+test('the owner\'s words typed in the bench and relayed again by an agent are recorded once — regression: replies showed up twice', () => {
+  const root = scratch()
+  decsResult(root, ['init', '--no-register'], { DECS_LANG: 'en' })
+  decsResult(root, ['add', 'colours', '--task', '--author', 'lane-o · mail'], { DECS_LANG: 'en' })
+  const owner = { DECS_LANG: 'en', CLAUDECODE: '', DECS_ROLE: 'human' }
+  assert.equal(decsResult(root, ['note', '1', 'not this red, use blue'], owner).code, 0)
+  const relay = decsResult(root, ['note', '1', '--human', '--by', 'owner (said in chat, lane-o relayed)', 'not this red, use blue'], { DECS_LANG: 'en', DECS_AUTHOR: 'lane-o · mail' })
+  assert.equal(relay.code, 0)
+  assert.match(relay.stdout, /already has these exact words/)
+  const body = decsResult(root, ['get', '1'], { DECS_LANG: 'en' }).stdout
+  assert.equal(body.split('not this red, use blue').length - 1, 1)
+  assert.equal(decsResult(root, ['note', '1', 'a different reply'], owner).code, 0)
+  assert.equal(decsResult(root, ['get', '1'], { DECS_LANG: 'en' }).stdout.split('a different reply').length - 1, 1)
+})

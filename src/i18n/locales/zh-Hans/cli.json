@@ -277,7 +277,8 @@
     "holdHint": "提示：如果 {{ref}} 是卡在别人或外部服务上，用 nod hold {{id}} --on \"<谁/什么>\"，看板才会把它显示成「等待」⏸；等到了 nod start {{id}}。",
     "appended": "{{ref}} 已追加「{{kind}}」（{{role}}）",
     "revived": "，并从 archived/ 拉回 active/，标了「归档后有新回复」",
-    "queued": "，已进队列"
+    "queued": "，已进队列",
+    "alreadyRecorded": "{{ref}} 上已经有负责人这句原话（{{by}}，10 分钟内），没有重复写入。"
   },
   "archive": {
     "whichOne": "哪一条？例如 `nod archive 415`",

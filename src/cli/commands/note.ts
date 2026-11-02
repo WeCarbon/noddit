@@ -47,6 +47,11 @@ export async function run(args: Args): Promise<number> {
         : shellRole()
   const author = explicitBy ?? (role === 'human' ? one(args, 'author', 'a') ?? 'owner' : resolveAuthor(args))
 
+  const same = role === 'human' ? store.recentSameHumanNote(d, text) : undefined
+  if (same) {
+    console.log(t('cli.note.alreadyRecorded', { ref: refOf(d), by: same.author }))
+    return 0
+  }
   const next = store.note(d, { text, role, author, kind: one(args, 'heading') })
   // A note like 「等 Dave 推新版」 leaves the node 执行中, and the bench
   // never shows it is held up outside. Point at hold.

@@ -517,8 +517,19 @@ export class Store {
 
   /** A follow-up/execution note with an auto-generated heading; `append` takes a pre-written one. */
   note(d: Decision, n: { text: string; role: NoteRole; author: string; kind?: string }): Decision {
+    if (n.role === 'human' && this.recentSameHumanNote(d, n.text)) return d
     const kind = n.kind ?? (n.role === 'human' ? NOTE_KIND.reply : NOTE_KIND.addendum)
     return this.append(d, noteHeading(kind, n.role, n.author, nowStamp()), n.text, n.author, n.role)
+  }
+
+  /**
+   * The owner's words often arrive twice: typed in the bench or app, then
+   * relayed by an agent that saw them come through its monitor. The same
+   * text from the owner within ten minutes is the same message.
+   */
+  recentSameHumanNote(d: Decision, text: string, withinMs = 10 * 60_000, now = Date.now()): DecisionNote | undefined {
+    const want = text.trim()
+    return d.notes.find((x) => x.role === 'human' && x.text.trim() === want && now - Date.parse(x.at) <= withinMs)
   }
 
   /**

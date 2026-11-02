@@ -281,7 +281,8 @@
     "holdHint": "note: if {{ref}} is blocked on someone or something external, use nod hold {{id}} --on \"<who/what>\" so the bench shows it as waiting ⏸; resume with nod start {{id}}.",
     "appended": "{{ref}} appended \"{{kind}}\" ({{role}})",
     "revived": ", and pulled back from archived/ into active/, flagged \"new reply after archiving\"",
-    "queued": ", queued"
+    "queued": ", queued",
+    "alreadyRecorded": "{{ref}} already has these exact words from the owner ({{by}}, within the last 10 minutes) — not recorded twice."
   },
   "archive": {
     "whichOne": "Which one? e.g. `nod archive 415`",

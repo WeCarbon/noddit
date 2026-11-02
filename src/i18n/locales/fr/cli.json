@@ -285,7 +285,8 @@
     "holdHint": "remarque : si {{ref}} est bloqué sur quelqu’un ou quelque chose d’externe, utilisez nod hold {{id}} --on \"<qui/quoi>\" pour que le tableau l’affiche comme en attente ⏸ ; reprenez avec nod start {{id}}.",
     "appended": "{{ref}} a reçu « {{kind}} » ({{role}})",
     "revived": ", et ramené de archived/ dans active/, marqué « nouvelle réponse après archivage »",
-    "queued": ", mis en file"
+    "queued": ", mis en file",
+    "alreadyRecorded": "{{ref}} contient déjà ces mots exacts du responsable ({{by}}, dans les 10 dernières minutes) — pas enregistré deux fois."
   },
   "archive": {
     "whichOne": "Lequel ? ex. `nod archive 415`",
