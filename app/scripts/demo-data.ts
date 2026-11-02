@@ -4,7 +4,7 @@
  * runs in a plain browser (screenshots, design work). Mock data only.
  */
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -86,6 +86,7 @@ decs(web, docs, ['push', '7', '2', '--note', 'system stack, keep it light', '--h
 decs(web, docs, ['add', 'Publish the API reference', '--task'])
 decs(web, docs, ['start', '8'])
 decs(web, docs, ['hold', '8', '--on', 'Carol to send the staging keys once the vendor security review (ticket SEC-4471) signs off on the new API scopes'])
+decs(web, docs, ['attach', '8', '--label', 'reference-landing-page-desktop', OLD_SHOT, '--label', 'reference-landing-page-tablet', SHOT, '--label', 'reference-search-results-with-a-very-long-file-name', OLD_SHOT])
 decs(web, docs, ['add', 'Clean up old feature flags', '--task'])
 decs(web, docs, ['defer', '9', '--human'])
 decs(web, docs, ['add', 'Release notes are ready', '--body', 'Drafted from the merged PRs; 6 items, nothing breaking.'])
@@ -120,7 +121,10 @@ for (const lang of ['en', 'zh-Hans', 'zh-Hant', 'fr', 'ar']) {
   })
   writeFileSync(join(OUT, lang === 'en' ? 'bench.json' : `bench.${lang}.json`), json.split(realpathSync(scratch)).join(FAKE_HOME).split(scratch).join(FAKE_HOME))
 }
-copyFileSync(SHOT, join(OUT, 'signin-preview.png'))
-copyFileSync(OLD_SHOT, join(OUT, 'signin-old.png'))
+// Every attached file, under the name the window asks for (its basename).
+for (const dir of [web, api]) {
+  const root = join(dir, 'decisions', 'attachments')
+  for (const node of existsSync(root) ? readdirSync(root) : []) for (const f of readdirSync(join(root, node))) copyFileSync(join(root, node, f), join(OUT, f))
+}
 rmSync(scratch, { recursive: true, force: true })
 console.log(`wrote ${join(OUT, 'bench.json')}`)

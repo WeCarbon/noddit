@@ -1879,3 +1879,53 @@ figcaption {
 .scope-clear:hover {
   background: var(--hover);
 }
+
+/* Image captions and compare labels stay on one line; long names end in an ellipsis. */
+.shot figcaption,
+.compare figcaption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.cap-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shot figcaption .chip,
+.compare figcaption .chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cap-text {
+  flex: 1 1 auto;
+  min-width: 6em;
+}
+
+.compare .seg {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.compare .seg button {
+  min-width: 0;
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
+.compare .seg button:last-child {
+  flex: none;
+}
+
+.seg-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

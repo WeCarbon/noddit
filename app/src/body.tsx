@@ -199,27 +199,34 @@ function Blocks({ list, images, onImage }: { list: Block[]; images: Image[]; onI
               </div>
             )
           case 'compare':
+            // A before/after pair flips; more than two are simply shown one after another.
+            if (b.indices.length !== 2) return b.indices.map((ix) => <Shot key={`${i}-${ix}`} index={ix} images={images} onImage={onImage} />)
             return <Compare key={i} indices={b.indices} images={images} onImage={onImage} />
-          case 'image': {
-            const im = images[b.index]
-            if (!im) return null
-            return (
-              <figure key={i} class="shot" data-ctx="image" data-index={b.index} onClick={() => onImage(b.index)}>
-                <img src={imageSrc(im.path)} alt={im.name} loading="lazy" decoding="async" />
-                <figcaption>
-                  {im.group && <span class="chip">{im.group}</span>}
-                  {im.caption ?? im.name}
-                </figcaption>
-              </figure>
-            )
-          }
+          case 'image':
+            return <Shot key={i} index={b.index} images={images} onImage={onImage} />
         }
       })}
     </>
   )
 }
 
-/** Grouped images shown one at a time, flipped by their group names — side by side when there is room. */
+/** One image at full width, its name or caption under it; a click opens the viewer. */
+function Shot({ index, images, onImage }: { index: number; images: Image[]; onImage: (i: number) => void }) {
+  const im = images[index]
+  if (!im) return null
+  const text = im.caption ?? im.name
+  return (
+    <figure class="shot" data-ctx="image" data-index={index} onClick={() => onImage(index)}>
+      <img src={imageSrc(im.path)} alt={im.name} loading="lazy" decoding="async" />
+      <figcaption title={text}>
+        {im.group && <span class="chip">{im.group}</span>}
+        <span class="cap-text">{text}</span>
+      </figcaption>
+    </figure>
+  )
+}
+
+/** A labelled pair (before / after) shown one at a time, flipped by the labels — side by side on request. */
 function Compare({ indices, images, onImage }: { indices: number[]; images: Image[]; onImage: (i: number) => void }) {
   const [at, setAt] = useState(0)
   const [side, setSide] = useState(false)
@@ -235,8 +242,8 @@ function Compare({ indices, images, onImage }: { indices: number[]; images: Imag
     >
       <div class="seg">
         {indices.map((ix, k) => (
-          <button key={ix} class={!side && k === at ? 'on' : ''} onClick={() => (setSide(false), setAt(k))}>
-            {images[ix].group}
+          <button key={ix} class={!side && k === at ? 'on' : ''} onClick={() => (setSide(false), setAt(k))} title={images[ix].group ?? undefined}>
+            <span class="seg-text">{images[ix].group}</span>
           </button>
         ))}
         <button class={side ? 'on' : ''} onClick={() => setSide(!side)} title="⇆">
@@ -246,10 +253,10 @@ function Compare({ indices, images, onImage }: { indices: number[]; images: Imag
       <div class="frames">
         {shown.map((ix) => (
           <div key={ix} class="frame" data-ctx="image" data-index={ix} onClick={() => onImage(ix)}>
-            <img src={imageSrc(images[ix].path)} alt={images[ix].name} decoding="async" />
-            <figcaption>
+            <img src={imageSrc(images[ix].path)} alt={images[ix].name} loading="lazy" decoding="async" />
+            <figcaption title={images[ix].caption ?? images[ix].name}>
               {side && <span class="chip">{images[ix].group}</span>}
-              {images[ix].caption ?? images[ix].name}
+              <span class="cap-text">{images[ix].caption ?? images[ix].name}</span>
             </figcaption>
           </div>
         ))}
