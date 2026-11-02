@@ -23,10 +23,19 @@ export function run(args: Args): number {
     return 0
   }
   const [ref, ...sources] = args._
-  if (!ref || !sources.length) throw new Error(`${t('cli.attach.usage')}\n\n${help()}`)
+  const move = one(args, 'move')
+  if (!ref || (!sources.length && !move)) throw new Error(`${t('cli.attach.usage')}\n\n${help()}`)
 
   const store = resolveStore(args, { allowRegistry: true })
   const d = requireDecision(store, ref, args)
+  // --move <file> --to <section>: list an attachment under another section; the file and its approval stay.
+  if (move) {
+    const to = one(args, 'to')
+    if (!to) throw new Error(t('cli.attach.moveNeedsTo'))
+    store.moveAttachment(d, move, to)
+    console.log(t('cli.attach.moved', { ref: refOf(d), name: basename(move), to }))
+    return 0
+  }
   const groups = many(args, 'label')
   const captions = many(args, 'caption')
   const approvalContent = bool(args, 'approval-content')

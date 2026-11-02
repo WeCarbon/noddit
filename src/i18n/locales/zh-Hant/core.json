@@ -103,7 +103,8 @@
     "humanTaskNoClaim": "{{ref}} 是負責人自己的事，不是派給 AI 的活",
     "editStale": "{{ref}} 在你開啟之後有人改過——重新載入再改",
     "noSuchNote": "{{ref}} 沒有第 {{n}} 條（一共 {{count}} 條）",
-    "notYourNote": "{{ref}}：第 {{n}} 條是別人寫的——確實要改，加 --force"
+    "notYourNote": "{{ref}}：第 {{n}} 條是別人寫的——確實要改，加 --force",
+    "attachmentNotFound": "{{ref}} 沒有叫 {{name}} 的附件"
   },
   "duration": {
     "notADuration": "「{{value}}」不是一個時長——例如 90s、30m、1h、2d"

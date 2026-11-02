@@ -11,7 +11,7 @@ import { projectDisplayName, projectLetter, readProjectConfig } from './project.
 import { parseBodyRefs, parseRef, refOf } from './ref.ts'
 import { dequeue, enqueue, readQueue } from './queue.ts'
 import { DEFAULT_MARK, HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
-import { OPTIONS_HEADING_RE, parseDecision, parseNoteHeading, parseOptions } from './parse.ts'
+import { OPTIONS_HEADING_RE, parseDecision, parseNoteHeading, parseNotes, parseOptions, sectionAttachments } from './parse.ts'
 import { deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
 import { isHumanTask } from './assignee.ts'
 import { untilDay } from './fuzzy-date.ts'
@@ -88,22 +88,39 @@ export interface AttachOpts {
  * Resolves `AttachOpts.to` to a `DecisionNote.heading` string (the section
  * `upsertSectionScoped` writes into), or `undefined` for the body.
  */
-function resolveAttachAnchor(d: Decision, to: string | undefined, by: string | undefined): string | undefined {
+function resolveAttachAnchor(d: Decision, to: string | undefined, by: string | undefined): number | undefined | typeof NEW_SECTION {
   const notes = d.notes
   if (to === undefined) {
-    if (by) for (let i = notes.length - 1; i >= 0; i--) if (sameAgent(notes[i].author, by) || sameAgent(by, notes[i].author)) return notes[i].heading
-    return undefined
+    if (!by) return undefined
+    const mine = notes.findLastIndex((n) => sameAgent(n.author, by) || sameAgent(by, n.author))
+    const human = notes.findLastIndex((n) => n.role === 'human')
+    // Still this round: the author's own latest section.
+    if (mine !== -1 && mine > human) return mine
+    // Nobody has answered yet and the author wrote nothing since: the body, as when it was filed.
+    if (human === -1) return undefined
+    // A new round began after the author last wrote: a section of its own, never the body.
+    return NEW_SECTION
   }
   if (to === 'body') return undefined
-  if (to === 'last') return notes.length ? notes[notes.length - 1].heading : undefined
+  if (to === 'last') return notes.length ? notes.length - 1 : undefined
   if (/^\d+$/.test(to)) {
     const idx = Number(to) - 1
     if (idx < 0 || idx >= notes.length) throw new Error(t('core.store.attachToOutOfRange', { n: to, count: notes.length }))
-    return notes[idx].heading
+    return idx
   }
-  const hit = notes.find((n) => n.heading.includes(to) || n.at.startsWith(to))
-  if (!hit) throw new Error(t('core.store.attachToNotFound', { to }))
-  return hit.heading
+  const hit = notes.findIndex((n) => n.heading.includes(to) || n.at.startsWith(to))
+  if (hit === -1) throw new Error(t('core.store.attachToNotFound', { to }))
+  return hit
+}
+
+/** `resolveAttachAnchor`'s answer when the files need a new section by the attaching author. */
+const NEW_SECTION = Symbol('new section')
+
+/** Where note `idx` is, as upsertSectionScoped finds it: its heading, which of the same headings, and the next note's. */
+function sectionAt(d: Decision, idx: number | undefined): { anchor: string | undefined; nth: number; stop: string | undefined } {
+  if (idx === undefined) return { anchor: undefined, nth: 0, stop: d.notes[0]?.heading }
+  const anchor = d.notes[idx].heading
+  return { anchor, nth: d.notes.slice(0, idx).filter((n) => n.heading === anchor).length, stop: d.notes[idx + 1]?.heading }
 }
 
 /** The attachments already in the section `anchor` names (see `resolveAttachAnchor`). */
@@ -595,10 +612,46 @@ export class Store {
     const layout = this.layoutOf(d)
 
     return this.mutate(d, (d) => {
-      const anchor = resolveAttachAnchor(d, opts.to, opts.by)
-      const { attachments, approvals } = resolveAttachments(d, layout, sources, opts, sectionAttachmentsOf(d, anchor))
-      const body = upsertSectionScoped(d.body, anchor, sectionStopBefore(d, anchor), HEADING.attachments, renderAttachmentsBlock(attachments))
+      const found = resolveAttachAnchor(d, opts.to, opts.by)
+      let base = d.body
+      let at: { anchor: string | undefined; nth: number; stop: string | undefined }
+      let own: Attachment[]
+      if (found === NEW_SECTION) {
+        // A short section by the attaching author, written now, so the files sit with this round.
+        const anchor = noteHeading(NOTE_KIND.addendum, roleOf(opts.by!), opts.by!, nowStamp())
+        base = appendSection(d.body, anchor, NOTE_TEXT.attachedHere)
+        at = { anchor, nth: d.notes.filter((n) => n.heading === anchor).length, stop: undefined }
+        own = []
+      } else {
+        at = sectionAt(d, found)
+        own = found === undefined ? d.bodyAttachments : (d.notes[found].attachments ?? [])
+      }
+      const { attachments, approvals } = resolveAttachments(d, layout, sources, opts, own)
+      const body = upsertSectionScoped(base, at.anchor, at.stop, HEADING.attachments, renderAttachmentsBlock(attachments), at.nth)
       return { next: { ...d, approvals, body } }
+    })
+  }
+
+  /**
+   * Moves one attachment (matched by file name) to another section — `to` as `attach --to`
+   * takes it. The file and its approval stay as they are; only where it is listed changes.
+   */
+  moveAttachment(d: Decision, name: string, to: string): Decision {
+    return this.mutate(d, (d) => {
+      const want = basename(name)
+      const sections: { idx: number | undefined; list: Attachment[] }[] = [{ idx: undefined, list: d.bodyAttachments }, ...d.notes.map((n, i) => ({ idx: i as number | undefined, list: n.attachments ?? [] }))]
+      const from = sections.find((x) => x.list.some((a) => basename(a.target) === want || a.label === want))
+      if (!from) throw new Error(t('core.store.attachmentNotFound', { name, ref: refOf(d) }))
+      const item = from.list.find((a) => basename(a.target) === want || a.label === want)!
+      const target = resolveAttachAnchor(d, to, undefined)
+      if (target === NEW_SECTION || target === from.idx) return { next: d }
+      const a = sectionAt(d, from.idx)
+      let body = upsertSectionScoped(d.body, a.anchor, a.stop, HEADING.attachments, renderAttachmentsBlock(from.list.filter((x) => x !== item)), a.nth)
+      const reread = parseBodyFor(d, body)
+      const b = sectionAt(reread, target)
+      const there = target === undefined ? reread.bodyAttachments : (reread.notes[target].attachments ?? [])
+      body = upsertSectionScoped(body, b.anchor, b.stop, HEADING.attachments, renderAttachmentsBlock([...there, item]), b.nth)
+      return { next: { ...d, body } }
     })
   }
 
@@ -1604,4 +1657,9 @@ export function optionDiff(body: DecisionOption[], given: Pick<DecisionOption, '
   const givenKeys = given.map((o) => o.key).join(',')
   if (!out.length && bodyKeys !== givenKeys) out.push(`order differs: body ${bodyKeys}, -o ${givenKeys}`)
   return out.join('; ')
+}
+
+/** `d` with `body` read again — its notes and their attachments — without touching the file. */
+function parseBodyFor(d: Decision, body: string): Decision {
+  return { ...d, notes: parseNotes(body), bodyAttachments: sectionAttachments(body).body }
 }

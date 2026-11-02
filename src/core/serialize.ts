@@ -171,11 +171,19 @@ export function upsertSection(body: string, heading: string, block: string): str
  * someone else's boundary. `anchor`/`stopBefore` are `DecisionNote.heading`
  * strings, found verbatim — see `core/store.ts#sectionStopBefore`.
  */
-export function upsertSectionScoped(body: string, anchor: string | undefined, stopBefore: string | undefined, heading: string, block: string): string {
+export function upsertSectionScoped(body: string, anchor: string | undefined, stopBefore: string | undefined, heading: string, block: string, nth = 0): string {
   const lines = body.split('\n')
   let start = 0
   if (anchor !== undefined) {
-    const hi = lines.findIndex((l) => l === `## ${anchor}`)
+    // Two notes written in the same second by the same author share a heading: `nth` says which.
+    let hi = -1
+    for (let i = 0, seen = 0; i < lines.length; i++) {
+      if (lines[i] !== `## ${anchor}`) continue
+      if (seen++ === nth) {
+        hi = i
+        break
+      }
+    }
     if (hi === -1) throw new Error(`no such section: ${anchor}`)
     start = hi + 1
   }

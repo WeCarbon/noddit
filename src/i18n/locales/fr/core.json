@@ -109,7 +109,8 @@
     "humanTaskNoClaim": "{{ref}} est une tâche du responsable, pas une demande pour une IA",
     "editStale": "{{ref}} a changé depuis que vous l’avez ouvert — rechargez et recommencez",
     "noSuchNote": "{{ref}} n’a pas de note {{n}} (il en a {{count}})",
-    "notYourNote": "{{ref}} : la note {{n}} a été écrite par quelqu’un d’autre — --force pour la modifier quand même"
+    "notYourNote": "{{ref}} : la note {{n}} a été écrite par quelqu’un d’autre — --force pour la modifier quand même",
+    "attachmentNotFound": "{{ref}} n’a pas de pièce jointe nommée {{name}}"
   },
   "duration": {
     "notADuration": "« {{value}} » n’est pas une durée — ex. 90s, 30m, 1h, 2d"

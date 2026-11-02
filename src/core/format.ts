@@ -84,6 +84,7 @@ export const NOTE_TEXT = {
   supersededBy: (ref: string, title: string) => `被 ${ref} 取代：${title}`,
   declinedTextOnly: '只写了文字，没选选项',
   claimed: '接了。展开、拆成子节点后请负责人确认，确认前不开工。',
+  attachedHere: '附件见下。',
   editedDescription: '改了描述。',
   editedNote: (n: number) => `改了第 ${n} 条。`,
 } as const

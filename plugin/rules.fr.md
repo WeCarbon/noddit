@@ -54,7 +54,9 @@ suite — tout est dans `nod bench`. Hors nod, invisible. Détails :
 - **Une pièce jointe suit le message qui l'a jointe, pas tout à la fin** :
   `nod attach` sans `--to` tombe sur votre propre dernière note, sinon le
   corps ; `nod note <id> "…" --attach a.png` écrit une réponse et sa preuve
-  ensemble. `--to body|last|<n>` choisit la section explicitement.
+  ensemble — faites toujours ainsi (ou `nod ask … --attach`) ; un attach
+  seul après que le responsable a écrit ouvre sa propre courte section.
+  `--to body|last|<n>` choisit la section explicitement.
 - **Sources externes** : la session principale enregistre un suivi de
   tickets, une boîte mail ou un formulaire avec `nod source register` ;
   le script ne synchronise qu'identifiants et titres. Nouveautés via

@@ -118,7 +118,8 @@
     "humanTaskNoClaim": "{{ref}} مهمة المالك نفسه، لا مهمة مُسندة لذكاء اصطناعي",
     "editStale": "تغيّرت {{ref}} منذ أن فتحتها — أعد التحميل وعدّل من جديد",
     "noSuchNote": "لا توجد في {{ref}} ملاحظة رقم {{n}} (فيها {{count}})",
-    "notYourNote": "{{ref}}: الملاحظة {{n}} كتبها غيرك — ‎--force لتعديلها رغم ذلك"
+    "notYourNote": "{{ref}}: الملاحظة {{n}} كتبها غيرك — ‎--force لتعديلها رغم ذلك",
+    "attachmentNotFound": "لا يوجد في {{ref}} مرفق اسمه {{name}}"
   },
   "duration": {
     "notADuration": "\"{{value}}\" ليست مدة — مثل 90s أو 30m أو 1h أو 2d"

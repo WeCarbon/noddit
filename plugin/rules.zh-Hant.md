@@ -30,7 +30,7 @@
   收走負責人的回覆用 `nod read`，問題解決了或不需要再解決才 `done`。
 - **要發出去的內容**：發之前 `nod attach <id> 草稿 --approval-content --approve-on <選項>`，發送前 `nod approved <id> --check 草稿` 必須通過。
   不要用 `--human` 替負責人核准。
-- **附件跟著它所附的那條訊息，不是堆在最後一塊**：`nod attach` 不給 `--to` 預設落你自己最新那條，沒有就落正文；
+- **附件跟著它所附的那條訊息，不是堆在最後一塊**：附件和介紹它的那條訊息一起寫：`nod note <編號> "…" --attach 檔案`（或 `nod ask … --attach`）；單獨 `nod attach` 不給 `--to` 預設落你自己最新那條，負責人在那之後寫過就先另起一條你的短段落，都沒有才落正文；
   `nod note <id> "…" --attach a.png` 把回覆和證據一起寫。`--to body|last|<n>` 明確指定段落。
 - **外部來源**：專案有 issue 追蹤、信箱、意見表單要跟的，主控工作階段用 `nod source register` 登記，寫後端同步腳本只同步 id 和標題，
   新項目會從 nod monitor 來（見下），處理完 `nod source ack`。

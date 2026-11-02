@@ -3,7 +3,7 @@ import { untilDay } from '../../core/fuzzy-date.ts'
 import { nowStamp } from '../../core/store.ts'
 import { dayText } from '../../i18n/time.ts'
 import { statusLabel } from '../../core/status.ts'
-import { bool, one, optionsAndDefault, type Args } from '../args.ts'
+import { bool, many, one, optionsAndDefault, type Args } from '../args.ts'
 import { guardOtherAuthor, readStdin, requireDecision, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
 import { isHumanTask } from '../../core/assignee.ts'
 import { refOf } from '../../core/ref.ts'
@@ -41,7 +41,23 @@ export async function run(args: Args, verb = ''): Promise<number> {
     guardOtherAuthor(store, d, args)
     const { options, default: def } = optionsAndDefault(args)
     const text = one(args, 'text') ?? ((await readStdin()).trim() || undefined)
-    const next = store.ask(d, { options, default: def, text, author: resolveAuthor(args) })
+    let next = store.ask(d, { options, default: def, text, author: resolveAuthor(args) })
+    // --attach: the draft goes with the question that presents it (its own section when there is text).
+    const sources = many(args, 'attach')
+    if (sources.length) {
+      const groups = many(args, 'label')
+      const captions = many(args, 'caption')
+      const approveOn = many(args, 'approve-on').flatMap((v) => v.split(/[,，\s]+/)).filter(Boolean)
+      next = store.attach(next, sources, {
+        link: bool(args, 'link'),
+        groups: groups.length ? groups : undefined,
+        captions: captions.length ? captions : undefined,
+        approvalContent: bool(args, 'approval-content'),
+        approveOn: approveOn.length ? approveOn : undefined,
+        to: text ? 'last' : undefined,
+        by: resolveAuthor(args),
+      })
+    }
     warnOtherAuthor(next.author, refOf(next), next.claimedBy)
     report(args, next, t('cli.lifecycle.waitingOnOwner', { count: next.options.length }))
     return 0

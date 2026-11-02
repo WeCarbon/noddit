@@ -53,8 +53,9 @@ load the decs skill.
   behalf.
 - **Attachments follow the message, not one block at the end**: `nod
   attach` with no `--to` lands on your own latest note, else the body;
-  `nod note <id> "…" --attach a.png` writes a reply and its evidence
-  together. `--to body|last|<n>` picks a section explicitly.
+  `nod note <id> "…" --attach a.png` (or `nod ask … --attach`) writes a
+  message and what it presents together — always do it that way; a bare
+  attach after the owner wrote starts its own short section. `--to body|last|<n>` picks a section explicitly.
 - **External sources**: the lead registers an issue tracker, inbox, or
   feedback form with `nod source register`; sync scripts sync ids and
   titles only. New items arrive via nod monitor; `nod source ack` once
