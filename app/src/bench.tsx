@@ -1199,16 +1199,10 @@ function ListRow(p: { row: Row; selected: boolean; open: boolean; hidden: number
           ⚑
         </span>
       )}
-      {r.touch?.text && r.touch.text.trim() !== r.title ? (
-        <span class="title-stack">
-          <span class="title">{r.title}</span>
-          <span class="excerpt" dir="auto" title={r.touch.text}>
-            {r.touch.text.replace(/\s+/g, ' ')}
-          </span>
-        </span>
-      ) : (
-        <span class="title">{r.title}</span>
-      )}
+      <span class="title" title={r.touch?.text && r.touch.text.trim() !== r.title ? r.touch.text : undefined}>
+        {r.title}
+        {r.touch?.text && r.touch.text.trim() !== r.title && <span class="excerpt-inline"> {r.touch.text.replace(/\s+/g, ' ')}</span>}
+      </span>
       {p.hidden > 0 && <span class="hidden-count">+{p.hidden}</span>}
       <span class="badge full">
         <Segs segs={badge} trim />

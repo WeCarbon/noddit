@@ -2682,3 +2682,10 @@ figcaption {
   border: 0;
   background: #fff;
 }
+
+/* Recent: the owner's words follow the title on the same line, dimmed, cut with an ellipsis. */
+.excerpt-inline {
+  color: var(--text-3);
+  font-size: 12px;
+  margin-inline-start: 6px;
+}
