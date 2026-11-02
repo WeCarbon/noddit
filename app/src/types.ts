@@ -29,6 +29,12 @@ export interface Row {
   progress?: number | null
   badge?: Seg[]
   badge_short?: Seg[]
+  /** Who does it: the owner's own to-do (`human`) or an AI's. */
+  assignee?: 'human' | 'ai'
+  human_task?: boolean
+  deferred_until?: string | null
+  /** A decision an AI is stuck on. */
+  blocks_ai?: boolean
   /** The owner's mark: ★ important, ⚑ a milestone counted down to `due`. */
   flag?: 'important' | 'milestone' | null
   due?: string | null
@@ -128,6 +134,9 @@ export interface Node {
   updated_at: string | null
   due: string | null
   /** The owner's marks (nod flag). */
+  assignee?: 'human' | 'ai'
+  human_task?: boolean
+  deferred_until?: string | null
   important?: boolean
   milestone?: boolean
   if_no_answer: string | null
@@ -180,6 +189,10 @@ export interface Bench {
   projects: Project[]
   views: View[]
   nodes: Record<string, Node>
+  /** One per project: its live tree, shown when the project is picked in the sidebar. */
+  project_views?: { project: string; count: number; empty: string; rows: Row[] }[]
+  /** Deferrals this read ended: each says so once. */
+  back_from_deferral?: { key: string; ref: string; title: string; text: string }[]
 }
 
 export interface ShellEnv {

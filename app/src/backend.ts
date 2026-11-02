@@ -389,3 +389,80 @@ export const sharedSettings = async (): Promise<SharedSetting[]> =>
 /** Sets one (`null`: back to its default) and returns it as it now stands. */
 export const setSharedSetting = async (key: string, value: string | null): Promise<SharedSetting | null> =>
   inDesktop ? (JSON.parse(await ok(['config', key, ...(value === null ? ['--off'] : [value]), '--json'])) as SharedSetting) : null
+
+/** What `nod date "<text>" --json` read: a loose date, as the owner types it. */
+export interface DateSuggestion {
+  key: string
+  label: string
+  date: string
+  text: string
+  relative: string
+}
+export interface DateRead {
+  ok: boolean
+  date: string | null
+  text: string | null
+  relative: string | null
+  hint?: string
+  suggestions: DateSuggestion[]
+}
+
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/** The browser demo's stand-in: a few English words and YYYY-MM-DD. */
+function demoDate(text: string): DateRead {
+  const day = (n: number) => isoDay(new Date(Date.now() + n * 86_400_000))
+  const picks: DateSuggestion[] = [
+    { key: 'tomorrow', label: 'tomorrow', date: day(1), text: day(1), relative: 'in a day' },
+    { key: 'week', label: 'next week', date: day(7), text: day(7), relative: 'in 7 days' },
+    { key: 'month', label: 'next month', date: day(30), text: day(30), relative: 'in a month' },
+  ]
+  const t = text.trim().toLowerCase()
+  if (!t) return { ok: true, date: null, text: null, relative: null, suggestions: picks }
+  const hit = picks.find((p) => p.label === t) ?? (/^\d{4}-\d{2}-\d{2}$/.test(t) ? { date: t, text: t, relative: '' } : null)
+  return hit ? { ok: true, date: hit.date, text: hit.text, relative: hit.relative, suggestions: picks } : { ok: false, date: null, text: null, relative: null, suggestions: picks }
+}
+
+export async function readDate(text: string): Promise<DateRead> {
+  if (!inDesktop) return demoDate(text)
+  const out = await run(['date', text, '--json'])
+  try {
+    return JSON.parse(out.stdout) as DateRead
+  } catch {
+    return { ok: false, date: null, text: null, relative: null, hint: (out.stderr || '').trim(), suggestions: [] }
+  }
+}
+
+export type Who = 'me' | 'ai' | 'brief'
+
+export interface NewNode {
+  title: string
+  who: Who
+  parentRef?: string
+  important: boolean
+  /** YYYY-MM-DD, or a loose date nod reads. */
+  milestone?: string
+  start: boolean
+}
+
+/** `nod add`, then `nod start` if it is to begin now. Returns the new node as `nod add --json` prints it. */
+export async function addNode(root: string, n: NewNode): Promise<{ id: number; ref: string; project: string }> {
+  const args = [
+    'add', n.title,
+    ...(n.who === 'me' ? ['--for', 'me'] : n.who === 'ai' ? ['--task'] : ['--brief']),
+    ...(n.parentRef ? ['--parent', n.parentRef] : []),
+    ...(n.important ? ['--important'] : []),
+    ...(n.milestone ? ['--milestone', '--due', n.milestone] : []),
+    '--dir', root, '--json',
+  ]
+  if (!inDesktop) return { id: 12, ref: 'W12', project: 'web' }
+  const made = JSON.parse(await ok(args)) as { id: number; ref: string; project: string }
+  if (n.start && n.who !== 'brief') await ok(['start', String(made.id), '--dir', root])
+  return made
+}
+
+/** Defer until a day (the node comes back on its own then), or indefinitely with `null`. */
+export const deferUntil = (root: string, id: number, date: string | null) =>
+  ok(['defer', String(id), ...(date ? ['--until', date] : []), ...human, '--dir', root])
+
+export const assign = (root: string, id: number, who: 'me' | 'ai') => ok(['assign', String(id), who, '--dir', root])

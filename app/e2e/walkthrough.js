@@ -119,9 +119,16 @@
     await shot('replied')
 
     log('STEP defer')
+    // d asks until when; Enter on an empty date defers indefinitely.
+    const deferNow = async () => {
+      key('d')
+      const when = await until('defer dialog', () => $('.defer-dialog input'))
+      await focused('defer date', '.defer-dialog input')
+      when.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    }
     $$('.row.node').find((r) => r.textContent.includes('Tidy the logs')).click()
     await sleep(200)
-    key('d')
+    await deferNow()
     await toast('Deferred')
 
     log('STEP pin')
@@ -172,16 +179,18 @@
     await sleep(300)
     await pick('Pick a database')
     await invoke('e2e_cli_fault', { fault: { command: 'defer', delayMs: 2500, fail: false } })
-    const asked = performance.now()
     key('d')
+    const when = await until('defer dialog', () => $('.defer-dialog input'))
+    const asked = performance.now()
+    when.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await until('row gone at once', () => !$$('.row.node').some((r) => r.textContent.includes('Pick a database')), 1000)
-    log(`optimistic: row gone ${Math.round(performance.now() - asked)} ms after d`)
+    log(`optimistic: row gone ${Math.round(performance.now() - asked)} ms after Enter`)
     await sleep(3200)
     if ($$('.row.node').some((r) => r.textContent.includes('Pick a database'))) throw new Error('the deferred row came back after the CLI finished')
     // A failing CLI puts the row back and says why.
     await invoke('e2e_cli_fault', { fault: { command: 'defer', delayMs: 300, fail: true } })
     await pick('Write the schema')
-    key('d')
+    await deferNow()
     await until('row gone before the failure', () => !$$('.row.node').some((r) => r.textContent.includes('Write the schema')), 1000)
     await toast('Not saved')
     await until('row back after the failure', () => $$('.row.node').some((r) => r.textContent.includes('Write the schema')))

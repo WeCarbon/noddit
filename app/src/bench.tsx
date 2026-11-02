@@ -3,10 +3,11 @@ import * as api from './backend.ts'
 import { Body } from './body.tsx'
 import { NodeHeader } from './header.tsx'
 import { QuickEntry, StartSession } from './quick.tsx'
+import { DeferDialog, NewNode } from './newnode.tsx'
 import {
   ArrowDownToLine, ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Pin, PinOff, Play, Plus, RotateCcw,
-  Flag, RefreshCcw, Settings as SettingsIcon, Star, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
+  Bot, Flag, RefreshCcw, Settings as SettingsIcon, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -90,10 +91,12 @@ export function Bench(props: {
   const scopeName = scope ? (bench.projects.find((p) => p.project === scope)?.name ?? scope) : null
   const view = useMemo((): View => {
     if (!scope) return views.find((v) => v.view === prefs.view) ?? views[0]
+    const own = bench.project_views?.find((p) => p.project === scope)
+    if (own) return { view: 'all', label: scopeName ?? scope, count: own.count, empty: own.empty, rows: own.rows }
     const tree = scopeView(views.find((v) => v.view === 'all') ?? views[0], scope)
     const live = tree.rows.filter((r) => r.kind === 'node' && r.state !== 'completed' && r.state !== 'closed').length
     return { ...tree, label: scopeName ?? scope, count: live, empty: s('projectEmpty') }
-  }, [views, scope, scopeName, prefs.view])
+  }, [views, scope, scopeName, prefs.view, bench.project_views])
   const setScope = (project: string | null) => props.setPrefs({ project })
   const rows = useMemo(() => visibleRows(view, prefs.folds), [view, prefs.folds])
   // The composer belongs to the node it was opened on, so moving to another node closes it in the
@@ -332,8 +335,19 @@ export function Bench(props: {
   const startClose = () => {
     if (node && !node.terminal) setComposer({ kind: 'close' })
   }
+  const [deferFor, setDeferFor] = useState<Node | null>(null)
+  /** Put off until `date` (YYYY-MM-DD), or indefinitely with null. */
+  const deferNode = (n: Node, date: string | null) => {
+    setDeferFor(null)
+    optimistic(
+      both(patchNode(n.key, (x) => ({ ...x, deferred_at: now(), deferred_until: date })), dropRows(n.key, ['all', 'waiting', 'recent']), patchRows(n.key, (r) => ({ ...r, deferred: true }))),
+      () => api.deferUntil(rootOf(n), n.id, date),
+      date ? s('deferredUntil', { date }) : s('deferred'),
+    )
+  }
   const toggleDefer = () => {
     if (!node || node.terminal) return
+    if (!node.deferred_at) return setDeferFor(node)
     const off = Boolean(node.deferred_at)
     const key = node.key
     optimistic(
@@ -376,6 +390,28 @@ export function Bench(props: {
       if (node.urgency === 'high') await api.flag(rootOf(node), node.id, 'important')
     }, s('milestoneRemoved'))
   }
+  const reassign = () => {
+    if (!node) return
+    const to = node.assignee === 'human' ? 'ai' : 'me'
+    optimistic(
+      both(
+        patchNode(node.key, (n) => ({ ...n, assignee: to === 'me' ? 'human' : 'ai', human_task: to === 'me' })),
+        patchRows(node.key, (r) => ({ ...r, assignee: to === 'me' ? 'human' : 'ai', human_task: to === 'me' })),
+      ),
+      () => api.assign(rootOf(node), node.id, to),
+      to === 'me' ? s('assignedMe') : s('assignedAi'),
+    )
+  }
+  const [newOpen, setNewOpen] = useState(false)
+  // A deferral that ended with this read: say it once.
+  const backSeen = useRef(new Set<string>())
+  useEffect(() => {
+    for (const b of bench.back_from_deferral ?? []) {
+      if (backSeen.current.has(b.key)) continue
+      backSeen.current.add(b.key)
+      showToast(b.text)
+    }
+  }, [props.bench])
   const markStart = () =>
     node &&
     optimistic(
@@ -391,7 +427,7 @@ export function Bench(props: {
   const isMac = /Mac/.test(navigator.platform)
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
-  latest.current = { startAnswer, pin, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone } as never
+  latest.current = { startAnswer, pin, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign } as never
 
   const nodeMenu = (n: Node | undefined, r: Row): MenuItem[] => {
     const L = () => latest.current as unknown as {
@@ -399,6 +435,7 @@ export function Bench(props: {
       toggleImportant: () => void
       setMilestoneFor: (n: Node) => void
       clearMilestone: () => void
+      reassign: () => void
       pin: (w: 'top' | 'bottom' | 'off') => void
       seen: () => void
       startClose: () => void
@@ -443,7 +480,8 @@ export function Bench(props: {
       items.push({ kind: 'separator' })
       if (n.status === 'not_started') items.push({ label: s('ctxStart'), icon: I(Play), run: () => L().markStart() })
       if (n.status === 'in_progress' || n.status === 'waiting') items.push({ label: s('ctxDone'), icon: I(CircleCheck), run: () => L().markDone() })
-      items.push({ label: n.deferred_at ? s('undefer') : s('defer'), icon: n.deferred_at ? I(TimerOff) : I(Timer), shortcut: 'D', run: () => L().toggleDefer() })
+      items.push({ label: n.deferred_at ? s('undefer') : s('deferMenu'), icon: n.deferred_at ? I(TimerOff) : I(Timer), shortcut: 'D', run: () => L().toggleDefer() })
+      items.push({ label: n.assignee === 'human' ? s('assignAi') : s('assignMe'), icon: n.assignee === 'human' ? I(Bot) : I(User), run: () => L().reassign() })
       items.push({ label: s('seen'), icon: I(Eye), shortcut: 'A', run: () => L().seen() })
       items.push({ label: s('ctxCloseMenu'), icon: I(Ban), shortcut: 'X', danger: true, run: () => L().startClose() })
     }
@@ -627,7 +665,7 @@ export function Bench(props: {
         if (scope) return setScope(null)
         return
       }
-      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || isTyping(e)) return
+      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || milestoneFor || isTyping(e)) return
       if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault()
         return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
@@ -656,6 +694,10 @@ export function Bench(props: {
       if (meta && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         return setQuick(true)
+      }
+      if (meta && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        return setNewOpen(true)
       }
       if (meta && e.key === ',') {
         e.preventDefault()
@@ -948,6 +990,24 @@ export function Bench(props: {
           }}
         />
       )}
+      {newOpen && (
+        <NewNode
+          projects={bench.projects.map(withLive)}
+          project={(() => {
+            const p = bench.projects.find((x) => x.project === (scope ?? node?.project))
+            return p ? withLive(p) : null
+          })()}
+          under={node && !node.terminal ? { ref: node.ref, title: node.title, project: node.project } : null}
+          onClose={() => setNewOpen(false)}
+          onDone={(made) => {
+            setNewOpen(false)
+            showToast(s('added', { ref: made.ref }))
+            pendingJump.current = `${made.project}#${(made as { id?: number }).id ?? ''}`
+            void refresh()
+          }}
+        />
+      )}
+      {deferFor && <DeferDialog title={`${deferFor.ref} ${deferFor.title}`} busy={busy} onClose={() => setDeferFor(null)} onDefer={(date) => deferNode(deferFor, date)} />}
       {startFor && (
         <StartSession
           project={startFor.project}
@@ -1055,6 +1115,11 @@ function ListRow(p: { row: Row; selected: boolean; open: boolean; hidden: number
       </span>
       <Glyph g={r.glyph} />
       <span class="ref">{r.ref}</span>
+      {r.assignee === 'human' && (
+        <span class="me-mark" title={s('forYou')}>
+          <User size={11} strokeWidth={2.25} />
+        </span>
+      )}
       {r.flag === 'important' && <span class="flag-mark important" title={s('important')}>★</span>}
       {r.flag === 'milestone' && (
         <span class={`flag-mark milestone ${r.due && Date.parse(r.due) - Date.now() < 86_400_000 ? 'soon' : ''}`} title={s('milestone')}>
@@ -1400,6 +1465,7 @@ function Help({ onClose }: { onClose: () => void }) {
     ['W', s('keyNext')],
     ['H', s('keyRecent')],
     ['⌘⌥1–9', s('keyProject')],
+    ['⌘N', s('keyNew')],
     ['J K', s('keyScroll')],
     ['⌘O', s('keyAdd')],
     ['⌘K', s('keyQuick')],

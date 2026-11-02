@@ -2020,3 +2020,95 @@ figcaption {
   grid-column: 1 / -1;
   margin: 0;
 }
+
+/* The owner's own to-do: a small person after the ref. */
+.me-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--blue-soft, rgba(59, 130, 246, 0.14));
+  color: var(--blue);
+}
+
+/* ⌘N */
+.new-node .new-title {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 4px 2px;
+}
+
+.new-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.seg-row .who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.seg-row .who.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--sel);
+}
+
+.new-hint {
+  margin: 6px 2px 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.datefield {
+  margin-top: 10px;
+}
+
+.datefield input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.date-read {
+  min-height: 18px;
+  margin: 4px 2px 0;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.date-read.bad {
+  color: var(--text-3);
+}
+
+.date-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.confirm-actions .grow {
+  flex: 1;
+}
