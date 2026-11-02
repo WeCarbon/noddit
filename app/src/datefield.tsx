@@ -57,9 +57,11 @@ export function DateField(p: {
           if (e.key === 'Escape') p.onEscape?.()
         }}
       />
-      <div class={`date-read ${read && !read.ok ? 'bad' : ''}`} aria-live="polite">
-        {read ? (read.ok ? `${read.text} · ${read.relative}` : read.hint || s('dateUnread')) : ' '}
-      </div>
+      {read && (
+        <div class={`date-read ${read.ok ? '' : 'bad'}`} aria-live="polite">
+          {read.ok ? `${read.text} · ${read.relative}` : read.hint || s('dateUnread')}
+        </div>
+      )}
       {picks.length > 0 && (
         <div class="date-picks">
           {picks.map((x) => (

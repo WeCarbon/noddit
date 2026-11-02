@@ -2087,8 +2087,7 @@ figcaption {
 }
 
 .date-read {
-  min-height: 18px;
-  margin: 4px 2px 0;
+  margin: 6px 2px 0;
   font-size: 12px;
   color: var(--accent);
 }
@@ -2101,7 +2100,7 @@ figcaption {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .confirm-actions .grow {
