@@ -7,6 +7,16 @@ runs. Signing (and on macOS, notarisation) removes that.
 `npm run dmg` builds whichever it can: signed and notarised when the Mac has the
 credentials below, unsigned otherwise. Nothing here is needed to develop or test the app.
 
+For CI releases (`.github/workflows/release.yml`, cut with `scripts/release.sh`), the same
+credentials go in as GitHub secrets instead of local keychain/notarytool state — see
+[RELEASING.md](../RELEASING.md) for the exact secret names and what each build type looks
+like unsigned. Unsigned macOS builds, local or CI, still get an ad-hoc signature
+(`bundle.macOS.signingIdentity: "-"` in `tauri.conf.json`) — without even that, Apple
+Silicon refuses to launch a binary downloaded from the browser at all (it reports the app as
+"damaged", which is really Gatekeeper rejecting a completely unsigned arm64 Mach-O). A real
+Developer ID identity, local or via `APPLE_SIGNING_IDENTITY`, always wins over the ad-hoc
+default.
+
 ## macOS: Developer ID signing and notarisation
 
 You need a paid [Apple Developer Program](https://developer.apple.com/programs/) membership

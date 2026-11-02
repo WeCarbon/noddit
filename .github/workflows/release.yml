@@ -1,0 +1,322 @@
+name: release
+
+# Tag push (v1.2.3) builds every platform and opens a draft GitHub Release.
+# workflow_dispatch builds the same matrix without publishing anything — a dry run to
+# prove macOS/Windows/Linux all still build before cutting a real tag.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to check the repo against (X.Y.Z, no leading v). Dry run: builds everything, publishes nothing.'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  # The tag (or the workflow_dispatch input) must match the version recorded in every
+  # package manifest, or whoever cut the tag forgot to run scripts/release.sh first.
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+      macos-signed: ${{ steps.secrets-status.outputs.macos-signed }}
+      macos-notarize-method: ${{ steps.secrets-status.outputs.macos-notarize-method }}
+      npm-token-present: ${{ steps.secrets-status.outputs.npm-token-present }}
+      pypi-token-present: ${{ steps.secrets-status.outputs.pypi-token-present }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+            publish=false
+          else
+            version="${GITHUB_REF_NAME#v}"
+            publish=true
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+      - run: node scripts/check-version.mjs "${{ steps.version.outputs.version }}"
+      # `if:` can't reference the secrets context directly (GitHub Actions restricts which
+      # contexts if: can see — secrets isn't one, see actionlint/the contexts-availability
+      # docs). So secret presence is turned into plain true/false/method strings exactly once,
+      # here, in a run step (where secrets ARE allowed) — every other job and every step in
+      # `build` gates on these outputs (needs.check-version.outputs.*) instead of on secrets.*.
+      # Doing it once also avoids the "last matrix leg to finish wins" hazard of computing the
+      # same-named output independently inside each `build` matrix leg.
+      - id: secrets-status
+        run: |
+          macos_signed=false; [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] && macos_signed=true
+          macos_notarize_method=none
+          if [ -n "${{ secrets.APPLE_ID }}" ]; then macos_notarize_method=apple-id
+          elif [ -n "${{ secrets.APPLE_API_KEY }}" ]; then macos_notarize_method=api-key
+          fi
+          npm_token_present=false; [ -n "${{ secrets.NPM_TOKEN }}" ] && npm_token_present=true
+          pypi_token_present=false; [ -n "${{ secrets.PYPI_API_TOKEN }}" ] && pypi_token_present=true
+          {
+            echo "macos-signed=$macos_signed"
+            echo "macos-notarize-method=$macos_notarize_method"
+            echo "npm-token-present=$npm_token_present"
+            echo "pypi-token-present=$pypi_token_present"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos
+            os: macos-latest
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+            tauri-target: universal-apple-darwin
+            bundles: app,dmg
+          - name: windows
+            os: windows-latest
+            rust-targets: ''
+            tauri-target: ''
+            bundles: nsis,msi
+          - name: linux
+            os: ubuntu-22.04
+            rust-targets: ''
+            tauri-target: ''
+            bundles: deb,appimage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          workspaces: app/src-tauri
+          shared-key: ${{ matrix.name }}
+
+      - name: Install Linux build dependencies
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev
+
+      - run: npm ci
+        working-directory: app
+
+      # macOS Developer ID signing + notarization, only when the Mac has the secrets for it
+      # (see app/SIGNING.md). `cargo tauri build` reads these env vars itself — it imports the
+      # certificate, signs, and notarizes; nothing else below has to call codesign/notarytool.
+      # Unsigned builds still get Tauri's ad-hoc identity ("-" in tauri.conf.json), or Apple
+      # Silicon refuses to launch the binary at all after a browser download (it reports the
+      # app as "damaged", which is really just Gatekeeper on an unsigned arm64 binary).
+      - name: Set up macOS signing
+        if: matrix.name == 'macos' && needs.check-version.outputs.macos-signed == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          keychain_password=$(openssl rand -base64 24)
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$keychain_password" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$keychain_password" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import "$RUNNER_TEMP/certificate.p12" -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" build.keychain
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          if [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          else
+            identity=$(security find-identity -v -p codesigning build.keychain | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
+            echo "APPLE_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up macOS notarization (Apple ID)
+        if: matrix.name == 'macos' && needs.check-version.outputs.macos-notarize-method == 'apple-id'
+        run: |
+          {
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}"
+            echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up macOS notarization (App Store Connect API key)
+        if: matrix.name == 'macos' && needs.check-version.outputs.macos-notarize-method == 'api-key'
+        run: |
+          echo "${{ secrets.APPLE_API_KEY }}" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          {
+            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY=${{ secrets.APPLE_API_KEY_ID }}"
+            echo "APPLE_API_ISSUER=${{ secrets.APPLE_API_ISSUER }}"
+          } >> "$GITHUB_ENV"
+
+      # Windows: no working signing yet, just the documented hook — see RELEASING.md and
+      # app/SIGNING.md. This step is a no-op until WINDOWS_CODESIGN is set up; builds stay
+      # unsigned (SmartScreen warns, see RELEASING.md).
+      - name: Set up Windows signing (hook, unconfigured by default)
+        if: matrix.name == 'windows' && vars.WINDOWS_CODESIGN == 'azure-artifact-signing'
+        shell: bash
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: |
+          cargo install artifact-signing-cli --locked
+          echo "signCommand=artifact-signing-cli -e ${{ vars.AZURE_SIGNING_ENDPOINT }} -a ${{ vars.AZURE_SIGNING_ACCOUNT }} -c ${{ vars.AZURE_SIGNING_CERT_PROFILE }} -d Noddit %1" >> "$GITHUB_ENV"
+
+      - name: Build
+        working-directory: app
+        shell: bash
+        run: |
+          args=(--bundles "${{ matrix.bundles }}")
+          if [ -n "${{ matrix.tauri-target }}" ]; then
+            args+=(--target "${{ matrix.tauri-target }}")
+          fi
+          if [ -n "$signCommand" ]; then
+            args+=(--config "{\"bundle\":{\"windows\":{\"signCommand\":\"$signCommand\"}}}")
+          fi
+          npx tauri build "${args[@]}"
+
+      - name: Collect installers (macOS)
+        if: matrix.name == 'macos'
+        run: |
+          mkdir -p dist
+          cp app/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg dist/
+
+      - name: Collect installers (Windows)
+        if: matrix.name == 'windows'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp app/src-tauri/target/release/bundle/nsis/*.exe dist/
+          cp app/src-tauri/target/release/bundle/msi/*.msi dist/
+
+      - name: Collect installers (Linux)
+        if: matrix.name == 'linux'
+        run: |
+          mkdir -p dist
+          cp app/src-tauri/target/release/bundle/appimage/*.AppImage dist/
+          cp app/src-tauri/target/release/bundle/deb/*.deb dist/
+
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: installers-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  # Only on a real tag push. workflow_dispatch stops here — the build above already proved
+  # the installers come out; nothing gets published or attached to a release.
+  release:
+    needs: [check-version, build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v7.0.2
+        with:
+          pattern: installers-*
+          path: dist
+          merge-multiple: true
+      - name: Release notes header
+        id: notes
+        run: |
+          {
+            echo 'body<<EOF'
+            if [ '${{ needs.check-version.outputs.macos-notarize-method }}' != none ]; then
+              echo '- macOS: signed and notarized.'
+            elif [ '${{ needs.check-version.outputs.macos-signed }}' = true ]; then
+              echo '- macOS: signed, not notarized — Gatekeeper still warns on first open.'
+            else
+              echo '- macOS: unsigned. Gatekeeper blocks it; right-click (or Control-click) the app, choose Open, confirm once.'
+            fi
+            echo '- Windows: unsigned. SmartScreen warns; choose "More info" then "Run anyway".'
+            echo '- Linux: unsigned (AppImage/.deb are not code-signed on Linux).'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v3.0.3
+        with:
+          draft: true
+          generate_release_notes: true
+          body: ${{ steps.notes.outputs.body }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.msi
+            dist/*.AppImage
+            dist/*.deb
+
+  # Optional: off unless NPM_TOKEN is set. See RELEASING.md.
+  npm-publish:
+    needs: [check-version, build]
+    if: github.event_name == 'push' && needs.check-version.outputs.npm-token-present == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Optional: off unless PYPI_API_TOKEN is set, or PyPI trusted publishing is configured for
+  # this repo+workflow and the PYPI_TRUSTED_PUBLISHING repo variable is set to "true". See
+  # RELEASING.md.
+  pypi-publish:
+    needs: [check-version, build]
+    if: >-
+      github.event_name == 'push' &&
+      (needs.check-version.outputs.pypi-token-present == 'true' || vars.PYPI_TRUSTED_PUBLISHING == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.13'
+      - run: python -m pip install --upgrade pip build
+      - run: python -m build
+        working-directory: python
+      - name: Publish to PyPI (API token)
+        if: needs.check-version.outputs.pypi-token-present == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist
+          password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish to PyPI (trusted publishing)
+        if: needs.check-version.outputs.pypi-token-present != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist
