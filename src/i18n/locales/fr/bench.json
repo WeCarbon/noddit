@@ -191,7 +191,7 @@
     "goto": "Aller à : ",
     "submit": "Envoyer {{ref}} : {{summary}}",
     "note": "  Note : ",
-    "answerVerbChange": "Changer la réponse de {{ref}} en",
+    "answerVerbChange": "Changer la réponse de {{ref}} de {{from}} en",
     "answerVerbNew": "Répondre à {{ref}} →",
     "reply": "Répondre à {{ref}} : ",
     "qnote": "Changement pour {{key}} : ",

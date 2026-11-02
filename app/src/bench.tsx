@@ -6,7 +6,7 @@ import { QuickEntry, StartSession } from './quick.tsx'
 import {
   ArrowDownToLine, ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Pin, PinOff, Play, Plus, RotateCcw,
-  Settings as SettingsIcon, SquareTerminal, Timer, TimerOff, Unlink, type LucideIcon,
+  RefreshCcw, Settings as SettingsIcon, SquareTerminal, Timer, TimerOff, Unlink, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -219,8 +219,13 @@ export function Bench(props: {
   }
 
   const canAnswer = (n: Node) => !n.terminal && (n.options.length > 0 || n.status === 'needs_decision')
+  /** An answered decision keeps its answer until the owner asks to change it. */
+  const [unlocked, setUnlocked] = useState<string | null>(null)
+  useEffect(() => setUnlocked(null), [node?.key])
+  const answerLocked = (n: Node) => Boolean(n.answer) && n.status !== 'needs_decision' && unlocked !== n.key
   const startAnswer = (key: string) => {
     if (!node || !canAnswer(node)) return
+    if (answerLocked(node) && node.options.length) return showToast(s('answerLockedHint', { key: node.answer?.choice ?? '' }))
     if (node.questions.length) {
       if (key === '1') return act(() => api.answerDefaults(rootOf(node), node.id), s('sent'))
       return detailRef.current?.querySelector<HTMLButtonElement>('.question .pick')?.focus()
@@ -234,7 +239,7 @@ export function Bench(props: {
     if (!node || !composer) return
     const text = typed.trim()
     const root = rootOf(node)
-    if (composer.kind === 'answer') return act(() => api.answer(root, node.id, composer.key, text || undefined), s('sent'))
+    if (composer.kind === 'answer') return act(() => api.answer(root, node.id, composer.key, text || undefined), s('sent')).then(() => setUnlocked(null))
     if (composer.kind === 'free' && text) return act(() => api.answerFreeText(root, node.id, text), s('sent'))
     if (composer.kind === 'reply' && text) return act(() => api.reply(root, node.id, text), s('replied'))
     if (composer.kind === 'close') return act(() => api.close(root, node.id, text || 'obsolete'), s('closed'))
@@ -289,9 +294,12 @@ export function Bench(props: {
             label: `${o.key} · ${o.label}${n.default === o.key ? `  (${s('defaultOption')})` : ''}`,
             shortcut: n.default === o.key ? '⏎' : /^[1-9]$/.test(o.key) ? o.key : undefined,
             checked: n.answer?.choice === o.key,
+            disabled: answerLocked(n),
             run: () => L().startAnswer(o.key),
           })),
         })
+      if (n.options.length && !n.questions.length && answerLocked(n))
+        items.push({ label: s('changeAnswer'), icon: I(RefreshCcw), run: () => setUnlocked(n.key) })
       else if (n.status === 'needs_decision') items.push({ label: s('ctxAnswer'), icon: I(PenLine), shortcut: '⏎', run: () => L().setComposer({ kind: 'free' }) })
     }
     if (n) items.push({ label: s('ctxReplyMenu'), icon: I(MessageSquareReply), shortcut: 'N', run: () => L().setComposer({ kind: 'reply' }) })
@@ -710,6 +718,8 @@ export function Bench(props: {
             busy={busy}
             error={error}
             canAnswer={canAnswer(node)}
+            locked={answerLocked(node)}
+            onUnlock={() => setUnlocked(unlocked === node.key ? null : node.key)}
             onAnswer={startAnswer}
             onSend={send}
             onCancel={() => setComposer(null)}
@@ -894,6 +904,9 @@ function Detail(p: {
   busy: boolean
   error: string | null
   canAnswer: boolean
+  /** Answered: the cards are read-only until "Change answer". */
+  locked: boolean
+  onUnlock: () => void
   onAnswer: (key: string) => void
   onSend: (typed?: string) => void
   onCancel: () => void
@@ -925,12 +938,13 @@ function Detail(p: {
                 const isDefault = n.default === o.key
                 const isChosen = chosen === o.key
                 const pending = p.composer?.kind === 'answer' && p.composer.key === o.key
+                const open = p.canAnswer && !p.locked
                 return (
                   <button
                     key={o.key}
-                    class={`option ${isChosen ? 'chosen' : ''} ${pending ? 'pending' : ''} ${p.canAnswer ? '' : 'locked'}`}
+                    class={`option ${isChosen ? 'chosen' : ''} ${pending ? 'pending' : ''} ${open ? '' : 'locked'}`}
                     onClick={() => p.onAnswer(o.key)}
-                    disabled={!p.canAnswer}
+                    disabled={!open}
                   >
                     <span class="key">{o.key}</span>
                     <span class="opt-main">
@@ -957,6 +971,15 @@ function Detail(p: {
                 )
               })}
             </div>
+            {p.canAnswer && chosen && n.status !== 'needs_decision' && (
+              <div class="answer-actions">
+                <button class={`ghost change-answer ${p.locked ? '' : 'on'}`} onClick={p.onUnlock} disabled={p.busy}>
+                  {p.locked ? <RefreshCcw size={14} strokeWidth={1.75} /> : <Lock size={14} strokeWidth={1.75} />}
+                  <span>{p.locked ? s('changeAnswer') : s('keepAnswer')}</span>
+                </button>
+                {!p.locked && <span class="d small">{s('changeAnswerHint')}</span>}
+              </div>
+            )}
           </section>
         )}
 

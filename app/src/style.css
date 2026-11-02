@@ -1748,3 +1748,34 @@ figcaption {
   text-overflow: ellipsis;
   unicode-bidi: plaintext;
 }
+
+/* An answered decision: the cards are read-only until "Change answer". */
+.answer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  white-space: nowrap;
+}
+
+.answer-actions .d {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.change-answer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.change-answer.on {
+  color: var(--accent);
+}
+
+.option.locked:not(.chosen) {
+  opacity: 0.6;
+  cursor: default;
+}

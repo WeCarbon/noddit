@@ -1793,7 +1793,7 @@ function promptPrefix(s: FrameInput): Line | null {
       ]
     }
     const opt = d.options.find((o) => o.key === s.pendingKey)
-    const verb = d.status === 'answered' ? t('bench.prompt.answerVerbChange', { ref: refOf(d) }) : t('bench.prompt.answerVerbNew', { ref: refOf(d) })
+    const verb = d.status === 'answered' ? t('bench.prompt.answerVerbChange', { ref: refOf(d), from: d.answer?.choice ?? '—' }) : t('bench.prompt.answerVerbNew', { ref: refOf(d) })
     return [
       { text: `${verb} ${s.pendingKey} ${opt?.label ?? ''}`, color: 'green', bold: true },
       { text: t('bench.prompt.note'), dim: true },

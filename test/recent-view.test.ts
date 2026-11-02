@@ -9,6 +9,7 @@ import { noteHeading } from '../src/core/serialize.ts'
 import { Store } from '../src/core/store.ts'
 import { NOTE_KIND } from '../src/core/format.ts'
 import { benchJson } from '../src/tui/json.ts'
+import { bench, has } from './tui-harness.ts'
 import { RECENT_OLDER_GROUP, VIEWS, inView, lastTouch, recentRows, suffixOf, viewFromArg } from '../src/tui/views.ts'
 
 const A = 'lane-recent · test'
@@ -110,4 +111,16 @@ test('bench --json carries Recent across projects, with what the owner did', (t)
   assert.deepEqual((reply.touch as Record<string, unknown>).kind, 'replied')
   assert.equal((reply.touch as Record<string, unknown>).text, 'looks good, but rename the button')
   assert.match((reply.touch as Record<string, unknown>).label as string, /^Replied$/)
+})
+
+test('App: a digit on an answered node asks to change it, naming the old answer; Esc keeps it', async (t) => {
+  const s = store(t)
+  const d = s.answer(s.create({ title: 'pick one', author: A, options: opt }), { choice: '2', by: 'owner', role: 'human' })
+  const b = bench(t, s, { view: 'all' })
+  await b.until(has(b, /pick one/))
+  await b.press('1')
+  await b.until(has(b, /Change .*answer from 2 to 1/))
+  await b.press('\x1b')
+  await b.quiet()
+  assert.equal(s.get(d.id)!.answer?.choice, '2')
 })

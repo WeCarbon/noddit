@@ -187,7 +187,7 @@
     "goto": "跳到：",
     "submit": "提交 {{ref}}：{{summary}}",
     "note": "  备注：",
-    "answerVerbChange": "改 {{ref}} 的答复为",
+    "answerVerbChange": "改 {{ref}} 的答复：{{from}} 改为",
     "answerVerbNew": "答 {{ref}} →",
     "reply": "回复 {{ref}}：",
     "qnote": "{{key}} 的改法：",

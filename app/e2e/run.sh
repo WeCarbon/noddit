@@ -84,7 +84,7 @@ if [ "$status" -eq 0 ]; then
   cd "$NODDIT_APP_PICK"
   check() { "$NODDIT_BIN" get "$1" --json | CHECK="$2" node -e 'const d = JSON.parse(require("fs").readFileSync(0)); if (!eval(process.env.CHECK)) { console.error("check failed on " + process.argv[1] + ": " + process.env.CHECK + " — " + JSON.stringify({ title: d.title, status: d.status, pin: d.pin, notes: d.notes.map((n) => n.kind) })); process.exit(1) }' "$1"; }
   check 1 "d.answer.choice==='2' && /JSON columns/.test(d.answer.note) && d.answer.by==='owner'"
-  check 3 "d.answer.choice==='1'"
+  check 3 "d.answer.choice==='2' && d.notes.filter((n) => n.kind === '已答').length === 2"
   check 2 "d.notes.some(n=>n.role==='human' && /索引/.test(n.text))"
   check 4 "d.deferred_at"
   check 5 "d.pin === 'top'"

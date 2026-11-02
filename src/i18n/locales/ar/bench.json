@@ -197,7 +197,7 @@
     "goto": "الانتقال إلى: ",
     "submit": "إرسال {{ref}}: {{summary}}",
     "note": "  ملاحظة: ",
-    "answerVerbChange": "تغيير إجابة {{ref}} إلى",
+    "answerVerbChange": "تغيير إجابة {{ref}} من {{from}} إلى",
     "answerVerbNew": "الإجابة على {{ref}} ←",
     "reply": "الرد على {{ref}}: ",
     "qnote": "تغيير {{key}}: ",
