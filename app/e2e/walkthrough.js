@@ -285,6 +285,13 @@
     log('STEP settings')
     key(',', { metaKey: true })
     await until('settings', () => $('.settings'))
+    // The shared settings come from nod config --json; changing one writes it there.
+    const mouse = await until('shared settings', () => $$('.s-shared .s-field').find((f) => f.textContent.includes('Mouse'))?.querySelector('select'))
+    mouse.value = 'off'
+    mouse.dispatchEvent(new Event('change', { bubbles: true }))
+    await sleep(600)
+    const cfg = await invoke('decs', { args: ['config', 'mouse', '--json'], cwd: null, stdin: null })
+    if (JSON.parse(cfg.stdout).value !== 'off') throw new Error(`the app's setting did not reach nod config: ${cfg.stdout}`)
     await shot('settings')
     key('Escape')
     await until('settings closed', () => !$('.settings'))

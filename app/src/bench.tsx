@@ -930,7 +930,7 @@ export function Bench(props: {
 
       {palette && <Palette rows={bench.views.find((v) => v.view === 'all')?.rows ?? []} onPick={(k) => (setPalette(false), jump(k))} onClose={() => setPalette(false)} />}
       {help && <Help onClose={() => setHelp(false)} />}
-      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} onShared={() => void refresh()} />}
       {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
       {quick && (
         <QuickEntry

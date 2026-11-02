@@ -364,3 +364,28 @@ function demoProjects() {
   const empty = new URLSearchParams(location.search).get('screen') === 'onboarding'
   return empty ? [] : [{ name: 'web', root: '/Users/alice/Code/web' }]
 }
+
+/** One shared setting, as `nod config --json` describes it (the terminal bench's `,` dialog shows the same list). */
+export interface SharedSetting {
+  key: string
+  label: string
+  type: 'enum' | 'bool' | 'duration'
+  value: string
+  value_label: string
+  default: string
+  source: 'env' | 'config' | 'default'
+  env: string | null
+  choices: { value: string; label: string }[]
+}
+
+const DEMO_SHARED: SharedSetting[] = [
+  { key: 'lang', label: 'Language', type: 'enum', value: 'auto', value_label: 'automatic', default: 'auto', source: 'default', env: null, choices: [{ value: 'auto', label: 'automatic' }, { value: 'en', label: 'English' }, { value: 'zh-Hans', label: '简体中文' }] },
+  { key: 'mouse', label: 'Mouse', type: 'bool', value: 'on', value_label: 'on', default: 'on', source: 'default', env: null, choices: [{ value: 'on', label: 'on' }, { value: 'off', label: 'off' }] },
+]
+
+export const sharedSettings = async (): Promise<SharedSetting[]> =>
+  inDesktop ? (JSON.parse(await ok(['config', '--json'])) as { settings: SharedSetting[] }).settings : DEMO_SHARED
+
+/** Sets one (`null`: back to its default) and returns it as it now stands. */
+export const setSharedSetting = async (key: string, value: string | null): Promise<SharedSetting | null> =>
+  inDesktop ? (JSON.parse(await ok(['config', key, ...(value === null ? ['--off'] : [value]), '--json'])) as SharedSetting) : null

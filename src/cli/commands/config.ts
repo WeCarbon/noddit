@@ -22,21 +22,26 @@ export function run(args: Args): number {
     return 0
   }
   const [key, value] = args._
-  if (!key) return list()
+  if (!key) return bool(args, 'json') ? listJson() : list()
   if (key === 'letter') return letter(args, value)
   if (key === 'name') return name(args, args._.slice(1).join(' ') || undefined)
   const setting = settingFor(key)
   if (!setting) throw new Error(`${t('cli.config.unknownKey', { key, keys: ['letter', 'name', ...SETTINGS.map((s) => s.key)].join(' ') })}\n\n${help()}`)
   if (bool(args, 'off')) {
     setSetting(key, undefined)
-    console.log(t('cli.config.cleared', { key, path: dim(CONFIG_PATH) }))
+    if (bool(args, 'json')) console.log(JSON.stringify(settingJson(setting)))
+    else console.log(t('cli.config.cleared', { key, path: dim(CONFIG_PATH) }))
     return 0
   }
   if (value === undefined) {
-    console.log(current(setting))
+    console.log(bool(args, 'json') ? JSON.stringify(settingJson(setting)) : current(setting))
     return 0
   }
   const stored = setSetting(key, value) ?? setting.default
+  if (bool(args, 'json')) {
+    console.log(JSON.stringify(settingJson(setting)))
+    return 0
+  }
   if (key === 'lang' && stored !== 'auto') {
     console.log(t('common.lang.set', { name: showValue(setting, stored), code: stored, path: dim(CONFIG_PATH) }))
   } else {
@@ -55,6 +60,31 @@ function current(s: Setting): string {
   const { value, source, envName } = settingValue(s.key)
   const from = source === 'env' ? envName! : source === 'config' ? `nod config ${s.key}` : t('common.lang.source.default')
   return t('cli.config.current', { value: showValue(s, value), source: from })
+}
+
+/**
+ * One setting as a window draws it: its label, the value in force and where it comes from
+ * (an env var's value can't be changed from there), and every choice with its label.
+ */
+function settingJson(s: Setting): Record<string, unknown> {
+  const { value, source, envName } = settingValue(s.key)
+  return {
+    key: s.key,
+    label: t(`settings.label.${s.key}`),
+    type: s.type,
+    value,
+    value_label: showValue(s, value),
+    default: s.default,
+    source,
+    env: envName ?? null,
+    choices: s.values.map((v) => ({ value: v, label: showValue(s, v) })),
+  }
+}
+
+/** `nod config --json`: every setting, in the order the bench's dialog lists them. */
+function listJson(): number {
+  console.log(JSON.stringify({ path: CONFIG_PATH, settings: SETTINGS.map(settingJson) }))
+  return 0
 }
 
 /** `decs config`: every setting, then this project's letter when there is a project here. */

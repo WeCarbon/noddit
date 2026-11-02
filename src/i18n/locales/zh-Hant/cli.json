@@ -387,7 +387,7 @@
     "noneMatching": "沒有匹配的節點。"
   },
   "config": {
-    "help": "nod config                      所有設定、各自的值從哪來，以及這個專案的字母\nnod config <設定>                一項設定的值和來源\nnod config <設定> <值>            為你設定（存在 ~/.decs/config.json）\nnod config <設定> --off          刪除，回到預設值\nnod config letter [W]           這個專案的字母（存在 decisions/decs.json）\nnod config name [\"網站\"]         這個專案的顯示名稱（存在 decisions/decs.json）；--off 回到資料夾名\n\n設定（有環境變數的，環境變數優先於存下的值；DECS_* 舊名字也還認）：\n{{settings}}\n\n看板裡也有同樣的設定：按 , 開啟。\n\nlang —— {{languages}}。順序：任何指令上的 --lang，然後 NODDIT_LANG，然後\nnod config lang，然後系統語言（LC_ALL / LC_MESSAGES / LANG，或作業系統語言），\n最後是英文。\n\n專案字母讓多個專案一起開看板時分得清楚：web 設 W，它的 305 就顯示成 W305。\n檔名不變（305-….md，舊的 D305-….md 也照常讀取）。沒設字母的專案顯示成 {{defaultLetter}}305。\n引用時 305、W305、D305（舊寫法）、W:305、web:305 都可以。",
+    "help": "nod config                      所有設定、各自的值從哪來，以及這個專案的字母\n  nod config --json            每個設定的名稱、目前值、來源和可選值（給視窗用）\nnod config <設定>                一項設定的值和來源\nnod config <設定> <值>            為你設定（存在 ~/.decs/config.json）\nnod config <設定> --off          刪除，回到預設值\nnod config letter [W]           這個專案的字母（存在 decisions/decs.json）\nnod config name [\"網站\"]         這個專案的顯示名稱（存在 decisions/decs.json）；--off 回到資料夾名\n\n設定（有環境變數的，環境變數優先於存下的值；DECS_* 舊名字也還認）：\n{{settings}}\n\n看板裡也有同樣的設定：按 , 開啟。\n\nlang —— {{languages}}。順序：任何指令上的 --lang，然後 NODDIT_LANG，然後\nnod config lang，然後系統語言（LC_ALL / LC_MESSAGES / LANG，或作業系統語言），\n最後是英文。\n\n專案字母讓多個專案一起開看板時分得清楚：web 設 W，它的 305 就顯示成 W305。\n檔名不變（305-….md，舊的 D305-….md 也照常讀取）。沒設字母的專案顯示成 {{defaultLetter}}305。\n引用時 305、W305、D305（舊寫法）、W:305、web:305 都可以。",
     "unknownKey": "無法辨識的設定「{{key}}」——目前有：{{keys}}",
     "letterUnset": "{{letter}}（未設定）",
     "letterSet": "專案字母 {{letter}}：這個專案的節點顯示為 {{letter}}<編號>",

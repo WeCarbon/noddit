@@ -1981,3 +1981,42 @@ figcaption {
   order: 3;
   margin-inline-start: auto;
 }
+
+/* Settings: the shared ones (same list as the terminal bench's dialog), then this app's own. */
+.s-group {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+}
+
+.s-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 5px 0;
+}
+
+.s-field-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.s-field select {
+  font: inherit;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  max-width: 220px;
+}
+
+.s-field .s-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}

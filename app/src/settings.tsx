@@ -29,8 +29,25 @@ function hotkeyFrom(e: KeyboardEvent): string | null {
   return [...mods, key].join('+')
 }
 
-export function Settings({ onClose }: { onClose: () => void }) {
+export function Settings({ onClose, onShared }: { onClose: () => void; onShared?: (key: string) => void }) {
   const [view, setView] = useState<api.SettingsView | null>(null)
+  const [shared, setShared] = useState<api.SharedSetting[] | null>(null)
+  const [sharedError, setSharedError] = useState<string | null>(null)
+  useEffect(() => {
+    void api.sharedSettings().then(setShared, (e: Error) => setSharedError(e.message))
+  }, [])
+  const setOne = async (item: api.SharedSetting, value: string) => {
+    setSharedError(null)
+    try {
+      const next = await api.setSharedSetting(item.key, value === item.default ? null : value)
+      setShared((all) => all && all.map((x) => (x.key === item.key ? (next ?? { ...x, value }) : x)))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 1200)
+      onShared?.(item.key)
+    } catch (e) {
+      setSharedError((e as Error).message)
+    }
+  }
   const [recording, setRecording] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -82,6 +99,31 @@ export function Settings({ onClose }: { onClose: () => void }) {
           {saved && <span class="saved">✓</span>}
         </h3>
 
+        {shared && shared.length > 0 && (
+          <section class="s-shared">
+            <div class="s-group">{s('settingsShared')}</div>
+            {shared.map((item) => (
+              <label key={item.key} class="s-field" title={item.source === 'env' ? s('settingSetBy', { env: item.env ?? '' }) : undefined}>
+                <span class="s-field-label">{item.label}</span>
+                <select
+                  value={item.value}
+                  disabled={item.source === 'env'}
+                  onChange={(e) => void setOne(item, (e.currentTarget as HTMLSelectElement).value)}
+                >
+                  {(item.choices.some((c) => c.value === item.value) ? item.choices : [{ value: item.value, label: item.value_label }, ...item.choices]).map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                {item.source === 'env' && <span class="s-note">{s('settingSetBy', { env: item.env ?? '' })}</span>}
+              </label>
+            ))}
+            {sharedError && <p class="s-error">{sharedError}</p>}
+          </section>
+        )}
+
+        <div class="s-group">{s('settingsApp')}</div>
         <section>
           <div class="s-label">{s('notifications')}</div>
           <div class="s-choices">
