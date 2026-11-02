@@ -31,4 +31,8 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 panic = "abort"
-strip = true
+# Function names stay in the binary and line tables go to a .dSYM beside it, so a `sample`
+# of a hung app names its frames.
+strip = false
+debug = "line-tables-only"
+split-debuginfo = "packed"

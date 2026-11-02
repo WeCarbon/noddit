@@ -253,6 +253,36 @@ fn prefs_save(app: AppHandle, json: String) -> Result<(), String> {
     std::fs::write(data_dir(&app).join("prefs.json"), json).map_err(|e| e.to_string())
 }
 
+/// Debug builds: a line on stderr whenever the main thread has not run a posted task for
+/// over two seconds — a hang shows up in the log with when it started, not as a frozen window.
+#[cfg(debug_assertions)]
+fn watch_main_thread(app: &AppHandle) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+    let app = app.clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(500));
+        let done = Arc::new(AtomicBool::new(false));
+        let flag = done.clone();
+        let asked = Instant::now();
+        if app.run_on_main_thread(move || flag.store(true, Ordering::SeqCst)).is_err() {
+            return;
+        }
+        let mut warned = false;
+        while !done.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(100));
+            if !warned && asked.elapsed() > Duration::from_secs(2) {
+                eprintln!("decs-app: MAIN THREAD BLOCKED for over 2 s");
+                warned = true;
+            }
+        }
+        if warned {
+            eprintln!("decs-app: main thread back after {} ms", asked.elapsed().as_millis());
+        }
+    });
+}
+
 /// The window stays hidden until the first frame is drawn, so it never flashes blank.
 #[tauri::command]
 fn ready(app: AppHandle, state: State<'_, AppState>, what: String) -> u128 {
@@ -411,6 +441,8 @@ pub fn run() {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
             watch::init(app.handle());
+            #[cfg(debug_assertions)]
+            watch_main_thread(app.handle());
             // Shown by `ready` once the first frame is drawn; this is only the fallback if the page never says so.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

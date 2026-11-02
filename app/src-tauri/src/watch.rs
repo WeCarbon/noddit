@@ -249,11 +249,9 @@ fn announce_unclaimed(app: &AppHandle, line: &Value) {
 
 /// `decs monitor --updates --json`, restarted whenever it exits; every line re-reads what waits.
 pub fn start_monitor(app: &AppHandle) {
-    let watch = app.state::<Watch>();
-    if env_now(app).and_then(|e| e.decs).is_none() || watch.monitor_started.swap(true, Ordering::SeqCst) {
+    if app.state::<Watch>().monitor_started.swap(true, Ordering::SeqCst) {
         return;
     }
-    refresh(app);
     let app = app.clone();
     let mut args: Vec<String> = ["monitor", "--updates", "--json", "--idle-exit", "0", "--interval", "800", "--all", "--unclaimed-after", "10m", "--with-parent"]
         .iter()
@@ -261,6 +259,16 @@ pub fn start_monitor(app: &AppHandle) {
         .collect();
     args.push(std::process::id().to_string());
     tauri::async_runtime::spawn(async move {
+        // Finding decs may run a login shell: never on the main thread, nor blocking a worker.
+        let found = {
+            let app = app.clone();
+            tauri::async_runtime::spawn_blocking(move || env_now(&app).and_then(|e| e.decs)).await.ok().flatten()
+        };
+        if found.is_none() {
+            app.state::<Watch>().monitor_started.store(false, Ordering::SeqCst);
+            return;
+        }
+        refresh(&app);
         loop {
             let Some(env) = env_now(&app) else { break };
             let Ok(mut cmd) = decs_command(&env, &args, None) else { break };
@@ -325,18 +333,28 @@ fn on_menu(app: &AppHandle, id: &str) {
     }
 }
 
+/// Tray calls hop to the main thread and wait for it. So the state is copied out first
+/// and no lock is held, and the work itself is posted to the main thread rather than
+/// waited on: a command running there that wants one of these locks can never deadlock
+/// against a worker that holds it.
 fn update_tray(app: &AppHandle, waiting: &[Waiting]) {
     let watch = app.state::<Watch>();
     let count = waiting.len();
     if noddit_env::is_set("APP_TIMING") {
         eprintln!("decs-app: tray {count} waiting");
     }
-    let tray = watch.tray.lock().unwrap();
-    let Some(tray) = tray.as_ref() else { return };
+    let Some(tray) = watch.tray.lock().unwrap().clone() else { return };
+    let words = watch.phrases.lock().unwrap().clone();
+    let waiting = waiting.to_vec();
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || draw_tray(&handle, &tray, &waiting, &words));
+}
+
+fn draw_tray(app: &AppHandle, tray: &TrayIcon, waiting: &[Waiting], words: &Phrases) {
+    let count = waiting.len();
     #[cfg(target_os = "macos")]
     let _ = tray.set_title(if count > 0 { Some(count.to_string()) } else { None });
     let _ = tray.set_tooltip(Some(if count > 0 { format!("Noddit · {count}") } else { "Noddit".into() }));
-    let words = watch.phrases.lock().unwrap().clone();
     let build = || -> tauri::Result<Menu<tauri::Wry>> {
         let menu = Menu::new(app)?;
         for w in waiting.iter().take(TRAY_ITEMS) {
@@ -493,7 +511,7 @@ pub fn settings_set(app: AppHandle, settings: Settings) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn set_phrases(app: AppHandle, phrases: Phrases) {
+pub async fn set_phrases(app: AppHandle, phrases: Phrases) {
     *app.state::<Watch>().phrases.lock().unwrap() = phrases;
     let waiting = app.state::<Watch>().waiting.lock().unwrap().clone();
     update_tray(&app, &waiting);

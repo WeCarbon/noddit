@@ -218,6 +218,24 @@
     divider.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     await until('default layout again', () => listWidth() === w0)
 
+    log('STEP stress')
+    // Views switching, tray phrases and node writes all at once, while the monitor streams the
+    // writes back: the main thread must keep answering (debug builds log when it stops).
+    const phrases = { needsDecision: 'needs a decision', notCollected: 'not collected', open: 'Open', settings: 'Settings…', quit: 'Quit' }
+    const writes = []
+    for (let i = 0; i < 40; i++) {
+      key('Tab')
+      void invoke('set_phrases', { phrases })
+      void invoke('waiting_get')
+      if (i % 4 === 0) writes.push(invoke('decs', { args: ['note', '2', `stress ${i}`, '--agent', '--author', 'lane-stress · e2e'], cwd: null, stdin: null }))
+      await sleep(25)
+    }
+    const results = await Promise.all(writes)
+    if (results.some((r) => r.code !== 0)) throw new Error(`a write during the stress failed: ${results.find((r) => r.code !== 0).stderr}`)
+    const t0 = performance.now()
+    await invoke('is_background')
+    if (performance.now() - t0 > 1000) throw new Error('the main thread is slow to answer after the stress')
+
     log('STEP project-filter')
     $('.project[data-ctx="project"]').click()
     await until('project filter on', () => $('.project.on') && $('.scope-chip'))

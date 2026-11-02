@@ -49,17 +49,19 @@ pub fn resized(start: (f64, f64, f64, f64), edge: &str, dx: f64, dy: f64, y_up: 
 }
 
 #[tauri::command]
-pub fn resize_begin(app: AppHandle, state: State<'_, ResizeStart>) -> Result<(), String> {
+pub async fn resize_begin(app: AppHandle, state: State<'_, ResizeStart>) -> Result<(), String> {
     let window = app.get_webview_window("main").ok_or("no main window")?;
+    // Off the main thread (async): frame_of waits for the main thread to read the frame.
     let frame = frame_of(&window)?;
     *state.0.lock().unwrap() = Some(frame);
     Ok(())
 }
 
 #[tauri::command]
-pub fn resize_to(app: AppHandle, state: State<'_, ResizeStart>, edge: String, dx: f64, dy: f64) -> Result<(), String> {
+pub async fn resize_to(app: AppHandle, state: State<'_, ResizeStart>, edge: String, dx: f64, dy: f64) -> Result<(), String> {
     let window = app.get_webview_window("main").ok_or("no main window")?;
-    let Some(start) = *state.0.lock().unwrap() else { return Ok(()) };
+    let start = *state.0.lock().unwrap();
+    let Some(start) = start else { return Ok(()) };
     let next = resized(start, &edge, dx, dy, cfg!(target_os = "macos"));
     set_frame(&window, next)
 }

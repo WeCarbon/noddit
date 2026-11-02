@@ -74,6 +74,10 @@ for _ in $(seq 1 1500); do
 done
 kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
+if grep -q "MAIN THREAD BLOCKED" "$work/log"; then
+  echo "e2e: the main thread was blocked (see the log)" >&2
+  status=1
+fi
 # Whoever is at the keyboard may switch apps meanwhile; what must never happen is this app in front.
 if [ "$NODDIT_APP_BACKGROUND" = 1 ] && grep -q "frontmost" "$work/front" 2>/dev/null; then
   echo "e2e: the app came to the front during the run" >&2
