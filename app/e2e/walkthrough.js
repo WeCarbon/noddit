@@ -218,6 +218,14 @@
     divider.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     await until('default layout again', () => listWidth() === w0)
 
+    log('STEP project-filter')
+    $('.project[data-ctx="project"]').click()
+    await until('project filter on', () => $('.project.on') && $('.scope-chip'))
+    await sleep(300)
+    if (!JSON.parse((await invoke('prefs_load')) ?? '{}').project) throw new Error('the project filter is not remembered')
+    key('Escape')
+    await until('Esc lifts the project filter', () => !$('.scope-chip') && !$('.project.on'))
+
     log('STEP settings')
     key(',', { metaKey: true })
     await until('settings', () => $('.settings'))

@@ -63,3 +63,34 @@ export function reveal(bench: Bench, view: View, nodeKey: string, folds: Folds):
   }
   return next
 }
+
+/** The project a row belongs to; null for a fold row that gathers nodes from every project. */
+function projectOfRow(r: Row): string | null {
+  if (r.node) return r.node.slice(0, r.node.lastIndexOf('#'))
+  if (r.key.startsWith('project:')) return r.key.slice('project:'.length)
+  if (r.key.startsWith('fold:project:')) return r.key.slice('fold:project:'.length)
+  if (r.key.startsWith('fold:') && r.key.includes('#')) return r.key.slice('fold:'.length, r.key.lastIndexOf('#'))
+  return null
+}
+
+/** What a view's number counts: listed nodes, not dim ancestors, not what sits in the 「Deferred」 row. */
+const counted = (r: Row) => r.kind === 'node' && !r.context && r.fold !== 'fold:deferred'
+
+/**
+ * `view` narrowed to one project: its rows only, the number recounted, and a fold row
+ * that gathers every project (Deferred, Older) kept only if some of its rows remain,
+ * with its number recounted too.
+ */
+export function scopeView(view: View, project: string | null): View {
+  if (!project) return view
+  const mine = view.rows.filter((r) => {
+    const p = projectOfRow(r)
+    return p === null || p === project
+  })
+  const inFold = new Map<string, number>()
+  for (const r of mine) if (r.kind === 'node' && r.fold) inFold.set(r.fold, (inFold.get(r.fold) ?? 0) + 1)
+  const rows = mine
+    .filter((r) => projectOfRow(r) !== null || r.kind !== 'fold' || (inFold.get(r.key) ?? 0) > 0)
+    .map((r) => (r.kind === 'fold' && projectOfRow(r) === null ? { ...r, count: inFold.get(r.key), text: r.text?.replace(/\d+/, String(inFold.get(r.key))) } : r))
+  return { ...view, rows, count: view.count === null ? null : rows.filter(counted).length }
+}

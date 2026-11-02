@@ -102,6 +102,8 @@ export const ar: Strings = {
   keyReply: 'رد',
   keyNext: 'القرار التالي الذي ينتظرك',
   keyRecent: 'مؤخرًا: ما أجبت عنه أو رددت عليه',
+  allProjects: 'كل المشاريع',
+  keyProject: 'مشروع واحد فقط (⌘⌥0: الكل)',
   keyScroll: 'تمرير التفاصيل',
   keyAdd: 'إضافة مشروع',
   keyClose: 'إغلاق',

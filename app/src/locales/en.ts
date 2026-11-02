@@ -100,6 +100,8 @@ export const en = {
   keyReply: 'Reply',
   keyNext: 'Next decision waiting on you',
   keyRecent: 'Recent: what you answered or replied to',
+  allProjects: 'All projects',
+  keyProject: 'Show one project (⌘⌥0: all)',
   keyScroll: 'Scroll the detail',
   keyAdd: 'Add a project',
   keyClose: 'Close',

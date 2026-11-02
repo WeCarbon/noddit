@@ -1831,3 +1831,51 @@ figcaption {
   cursor: col-resize !important;
   user-select: none;
 }
+
+/* The project picked in the sidebar narrows every view. */
+.project {
+  cursor: default;
+}
+
+.project.on {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-weight: 500;
+}
+
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 50%;
+  margin-inline-start: 8px;
+  padding: 2px 4px 2px 9px;
+  border-radius: 999px;
+  background: var(--sel);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.scope-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scope-clear {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: inherit;
+}
+
+.scope-clear:hover {
+  background: var(--hover);
+}

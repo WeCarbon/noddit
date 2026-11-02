@@ -102,6 +102,8 @@ export const zhHant: Strings = {
   keyReply: '回覆',
   keyNext: '下一個等你決定的',
   keyRecent: '最近：你回答過、回覆過的',
+  allProjects: '全部專案',
+  keyProject: '只看某個專案（⌘⌥0 看全部）',
   keyScroll: '捲動詳情',
   keyAdd: '新增專案',
   keyClose: '關閉',

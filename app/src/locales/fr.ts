@@ -103,6 +103,8 @@ export const fr: Strings = {
   keyReply: 'Commenter',
   keyNext: 'Décision suivante qui vous attend',
   keyRecent: 'Récent : ce que vous avez tranché ou commenté',
+  allProjects: 'Tous les projets',
+  keyProject: 'Un seul projet (⌘⌥0 : tous)',
   keyScroll: 'Faire défiler le détail',
   keyAdd: 'Ajouter un projet',
   keyClose: 'Fermer',

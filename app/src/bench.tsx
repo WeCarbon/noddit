@@ -6,13 +6,13 @@ import { QuickEntry, StartSession } from './quick.tsx'
 import {
   ArrowDownToLine, ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Pin, PinOff, Play, Plus, RotateCcw,
-  RefreshCcw, Settings as SettingsIcon, SquareTerminal, Timer, TimerOff, Unlink, type LucideIcon,
+  RefreshCcw, Settings as SettingsIcon, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
 const I = (Icon: LucideIcon) => <Icon size={14} strokeWidth={1.75} />
 import { Bar, Glyph, Segs } from './segs.tsx'
-import { hiddenCount, isSelectable, nodeCollapsed, reveal, visibleRows, type Folds } from './rows.ts'
+import { hiddenCount, isSelectable, nodeCollapsed, reveal, scopeView, visibleRows, type Folds } from './rows.ts'
 import { ContextMenu, type MenuItem, type MenuState } from './menu.tsx'
 import { popupNative } from './native-menu.ts'
 import { LetterPicker, RenameField, UnlinkConfirm } from './projects.tsx'
@@ -29,6 +29,8 @@ export interface Prefs {
   onboarded: boolean
   /** Dragged pane widths; absent = the default layout. */
   panes?: PaneWidths | null
+  /** Only this project's nodes in every view (its key); absent = all projects. */
+  project?: string | null
 }
 
 type Composer =
@@ -73,7 +75,12 @@ export function Bench(props: {
   onNoProjects: () => void
 }) {
   const { bench, prefs, setPrefs, refresh } = props
-  const view = bench.views.find((v) => v.view === prefs.view) ?? bench.views[0]
+  // A project picked in the sidebar narrows every view; one that is gone (unlinked) no longer does.
+  const scope = prefs.project && bench.projects.some((p) => p.project === prefs.project) ? prefs.project : null
+  const views = useMemo(() => bench.views.map((v) => scopeView(v, scope)), [bench, scope])
+  const view = views.find((v) => v.view === prefs.view) ?? views[0]
+  const setScope = (project: string | null) => props.setPrefs({ project })
+  const scopeName = scope ? (bench.projects.find((p) => p.project === scope)?.name ?? scope) : null
   const rows = useMemo(() => visibleRows(view, prefs.folds), [view, prefs.folds])
   // The composer belongs to the node it was opened on, so moving to another node closes it in the
   // same render — not in an effect that might land after the next keypress.
@@ -466,7 +473,9 @@ export function Bench(props: {
     for (const v of [view, ...bench.views.filter((x) => x !== view && x.view === 'all')]) {
       const folds = reveal(bench, v, nodeKey, prefs.folds)
       if (folds) {
-        setPrefs({ view: v.view, folds, selected: nodeKey })
+        // A node in another project lifts the project filter, or it could not show.
+        const elsewhere = scope !== null && nodeKey.slice(0, nodeKey.lastIndexOf('#')) !== scope
+        setPrefs({ view: v.view, folds, selected: nodeKey, ...(elsewhere ? { project: null } : {}) })
         return
       }
     }
@@ -492,7 +501,9 @@ export function Bench(props: {
           ;(document.activeElement as HTMLElement | null)?.blur()
           return
         }
-        setError(null)
+        if (menu || letterFor || unlinkFor || renaming || quick || startFor || isTyping(e)) return
+        if (error) return setError(null)
+        if (scope) return setScope(null)
         return
       }
       if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || isTyping(e)) return
@@ -508,6 +519,11 @@ export function Bench(props: {
       }
       if (help) return setHelp(false)
       const meta = e.metaKey || e.ctrlKey
+      if (meta && e.altKey && /^Digit[0-9]$/.test(e.code)) {
+        e.preventDefault()
+        const n = Number(e.code.slice(5))
+        return setScope(n === 0 ? null : (bench.projects[n - 1]?.project ?? scope))
+      }
       if (meta && /^[1-9]$/.test(e.key) && bench.views[Number(e.key) - 1]) {
         e.preventDefault()
         return switchView(bench.views[Number(e.key) - 1].view)
@@ -634,7 +650,7 @@ export function Bench(props: {
         <div class="drag" data-tauri-drag-region />
         <nav>
           <div class="section-label">{s('views')}</div>
-          {bench.views.map((v, i) => (
+          {views.map((v, i) => (
             <button key={v.view} data-ctx="view" data-view={v.view} class={`nav-item ${v.view === view.view ? 'on' : ''}`} onClick={() => switchView(v.view)} title={`⌘${i + 1}`}>
               <svg viewBox="0 0 16 16" class={`ico ico-${v.view}`}>
                 <path d={VIEW_ICON[v.view]} />
@@ -644,8 +660,16 @@ export function Bench(props: {
             </button>
           ))}
           <div class="section-label">{s('projects')}</div>
-          {bench.projects.map((p) => (
-            <div key={p.root} class={`project ${renaming === p.root ? 'editing' : ''}`} title={p.root} data-ctx="project" data-root={p.root}>
+          {bench.projects.map((p, i) => (
+            <div
+              key={p.root}
+              class={`project ${renaming === p.root ? 'editing' : ''} ${scope === p.project ? 'on' : ''}`}
+              title={`${p.root}${i < 9 ? `  ⌘⌥${i + 1}` : ''}`}
+              data-ctx="project"
+              data-root={p.root}
+              aria-pressed={scope === p.project}
+              onClick={() => renaming !== p.root && setScope(scope === p.project ? null : p.project)}
+            >
               <span
                 class={`live-dot ${live[p.project] ? (live[p.project].listening ? 'on' : 'off') : 'unknown'}`}
                 title={live[p.project] ? (live[p.project].listening ? s('listening', { who: listenerOf(p)?.author ?? listenerOf(p)?.harness ?? 'AI' }) : s('notListening')) : ''}
@@ -704,6 +728,14 @@ export function Bench(props: {
         <header class="pane-head" data-tauri-drag-region>
           <h1>{view.label}</h1>
           {view.count !== null && <span class="head-count">{view.count}</span>}
+          {scopeName && (
+            <span class="scope-chip" title={s('allProjects')}>
+              <span class="scope-name">{scopeName}</span>
+              <button class="scope-clear" aria-label={s('allProjects')} onClick={() => setScope(null)}>
+                <X size={12} strokeWidth={2} />
+              </button>
+            </span>
+          )}
         </header>
         <div class="list" ref={listRef} role="listbox">
           {!rows.length && (
@@ -1222,6 +1254,7 @@ function Help({ onClose }: { onClose: () => void }) {
     ['G', s('keyGoto')],
     ['W', s('keyNext')],
     ['H', s('keyRecent')],
+    ['⌘⌥1–9', s('keyProject')],
     ['J K', s('keyScroll')],
     ['⌘O', s('keyAdd')],
     ['⌘K', s('keyQuick')],
