@@ -891,6 +891,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     }
     if (input === ':') return startText('goto')
     if (input === 'w' || input === 'W') return nextWaiting()
+    if (input === 'h') return switchView(view === 'recent' ? 'available' : 'recent')
     if (input === 'k') return setOffset((o) => Math.max(0, o - 1))
     if (input === 'j') return setOffset((o) => o + 1)
     if (key.pageUp) return setOffset((o) => Math.max(0, o - pageRows))

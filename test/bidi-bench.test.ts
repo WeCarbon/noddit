@@ -301,13 +301,13 @@ test('ar (visual): tab clicks hit exactly the reversed, individually mirrored ta
   inLang('ar', () => {
     const s = input(store, { width: 100, current: release })
     const g = geometry(s)
-    assert.equal(g.tabSpans.length, 5)
+    assert.equal(g.tabSpans.length, 6)
     for (const sp of g.tabSpans) assertExactSpan(s, g, sp, 1, { on: 'tab', view: sp.view })
     // "available" (the first tab logically) reads first for a right-to-left
     // user — mirroring put it at the rightmost span, not the leftmost.
     const byColumn = [...g.tabSpans].sort((a, b) => a.from - b.from)
     assert.equal(byColumn[byColumn.length - 1].view, 'available')
-    assert.equal(byColumn[0].view, 'waiting')
+    assert.equal(byColumn[0].view, 'recent')
   })
 })
 

@@ -15,7 +15,7 @@ import { metaLines, statusSegments, whoOf } from './detail.ts'
 import { bodyRows, canPin, canUseDefault, type BodyRow, type Segment } from './model.ts'
 import { imageName, nodeImages } from './images.ts'
 import {
-  DEFERRED_GROUP, VIEWS, VIEW_EMPTY, VIEW_LABEL, doneGroupKey, glyphOf, isCollapsed, isDeferHidden, isTreeView,
+  DEFERRED_GROUP, RECENT_OLDER_GROUP, touchLabel, VIEWS, VIEW_EMPTY, VIEW_LABEL, doneGroupKey, glyphOf, isCollapsed, isDeferHidden, isTreeView,
   keyOf, progressOf, rowsFor, subtreeWaiting, suffixOf, viewCount, type Row, type View,
 } from './views.ts'
 
@@ -44,7 +44,7 @@ function backlinkIndex(store: Store, items: Item[]): Map<string, Item[]> {
 }
 
 function everyFoldKey(items: Item[]): Set<string> {
-  const keys = new Set<string>([DEFERRED_GROUP])
+  const keys = new Set<string>([DEFERRED_GROUP, RECENT_OLDER_GROUP])
   for (const i of items) {
     keys.add(doneGroupKey(i))
     keys.add(doneGroupKey({ project: i.project }))
@@ -75,6 +75,8 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
     progress: progressOf(d) ?? null,
     badge: plain(forms[0] ?? []),
     badge_short: plain(forms.at(-1) ?? []),
+    // 最近: what the owner did, for a window that shows it its own way.
+    ...(row.touch ? { touch: { ...row.touch, label: touchLabel(row.touch) } } : {}),
   }
 }
 

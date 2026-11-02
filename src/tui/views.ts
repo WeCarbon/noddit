@@ -22,19 +22,22 @@ import { fit, padToWidth, stringWidth } from './width.ts'
  * - 待决: only what the owner must rule on, AI-stuck first.
  * - 全部: every node; finished ones fold into 「✓ 已完成/已结束 N」.
  * - 等待: held up outside, longest first, plus a 「延迟 N」 fold row.
+ * - 最近: what the owner answered, replied to, filed or deferred, latest first —
+ *   finished and archived nodes included.
  *
  * 延迟 keeps its state (not archived); it and its subtree are out of
  * 可用/活动/待决/等待 proper, and dim in 全部.
  */
-export type View = 'available' | 'active' | 'decide' | 'all' | 'waiting'
+export type View = 'available' | 'active' | 'decide' | 'all' | 'waiting' | 'recent'
 /** The tabs in the header, in Tab order. */
-export const VIEWS: View[] = ['available', 'active', 'decide', 'all', 'waiting']
+export const VIEWS: View[] = ['available', 'active', 'decide', 'all', 'waiting', 'recent']
 export const VIEW_LABEL: Record<View, string> = {
   get available() { return t('bench.tabs.available') },
   get active() { return t('bench.tabs.active') },
   get decide() { return t('bench.tabs.decide') },
   get all() { return t('bench.tabs.all') },
   get waiting() { return t('bench.tabs.waiting') },
+  get recent() { return t('bench.tabs.recent') },
 }
 export const VIEW_EMPTY: Record<View, string> = {
   get available() { return t('bench.viewEmpty.available') },
@@ -42,6 +45,7 @@ export const VIEW_EMPTY: Record<View, string> = {
   get decide() { return t('bench.viewEmpty.decide') },
   get all() { return t('bench.viewEmpty.all') },
   get waiting() { return t('bench.viewEmpty.waiting') },
+  get recent() { return t('bench.viewEmpty.recent') },
 }
 
 /** The views that draw the tree (and so fold with ←/→ and +/-). */
@@ -82,6 +86,7 @@ export function isDeferHidden(d: Item, items: Item[]): boolean {
 
 /** Whether `d` is one of the nodes `view` lists (not counting ancestors drawn for context). */
 export function inView(view: View, d: Item, items: Item[]): boolean {
+  if (view === 'recent') return lastTouch(d) !== undefined
   if (view !== 'all' && isDeferHidden(d, items)) return false
   switch (view) {
     case 'available':
@@ -104,9 +109,9 @@ export function inView(view: View, d: Item, items: Item[]): boolean {
   }
 }
 
-/** The number on a tab; 全部 has none. */
+/** The number on a tab; 全部 and 最近 have none. */
 export function viewCount(view: View, items: Item[]): number | undefined {
-  if (view === 'all') return undefined
+  if (view === 'all' || view === 'recent') return undefined
   return items.filter((d) => inView(view, d, items)).length
 }
 
@@ -134,6 +139,8 @@ export interface Row {
   /** fold rows: the finished nodes it stands for, and whether they are listed below it. */
   finished?: Item[]
   open?: boolean
+  /** 最近: what the owner last did to this node. */
+  touch?: Touch
 }
 
 export const isSelectable = (r: Row) => r.kind === 'node' || r.kind === 'fold'
@@ -328,7 +335,80 @@ export function waitingRows(items: Item[], opts: TreeOptions = {}): Row[] {
   return out
 }
 
+/** Something the owner did to a node: a section written as the human. */
+export interface Touch {
+  kind: 'answered' | 'seen' | 'replied' | 'filed' | 'deferred' | 'undeferred' | 'noted'
+  at: string
+  /** The owner's words, if any. */
+  text: string
+  /** answered: the option picked. */
+  choice?: string
+}
+
+const TOUCH_KIND: Record<string, Touch['kind']> = {
+  [NOTE_KIND.answered]: 'answered',
+  [NOTE_KIND.seen]: 'seen',
+  [NOTE_KIND.reply]: 'replied',
+  [NOTE_KIND.followUp]: 'replied',
+  reply: 'replied',
+  [NOTE_KIND.original]: 'filed',
+  [NOTE_KIND.deferred]: 'deferred',
+  [NOTE_KIND.undeferred]: 'undeferred',
+}
+
+const touchTime = (at: string) => Date.parse(at) || 0
+
+/** Everything the owner did to `d`, oldest first. Pins aren't signed, so they don't count. */
+export function ownerTouches(d: Item): Touch[] {
+  const answers = d.notes.filter((n) => n.role === 'human' && n.kind === NOTE_KIND.answered)
+  return d.notes
+    .filter((n) => n.role === 'human')
+    .map((n): Touch => {
+      const kind = TOUCH_KIND[n.kind] ?? 'noted'
+      // The stored answer is the latest one; earlier answers were superseded by it.
+      const choice = kind === 'answered' && n === answers.at(-1) ? d.answer?.choice : undefined
+      return { kind, at: n.at, text: n.text, ...(choice ? { choice } : {}) }
+    })
+    .sort((a, b) => touchTime(a.at) - touchTime(b.at))
+}
+
+export const lastTouch = (d: Item): Touch | undefined => ownerTouches(d).at(-1)
+
+/** 最近 lists this far back before the 「更早 N」 row… */
+export const RECENT_DAYS = 30
+/** …and at most this many above it. */
+export const RECENT_MAX = 200
+export const RECENT_OLDER_GROUP = 'fold:recent-older'
+
+/** 最近: nodes the owner touched, latest touch first, across every project and
+ *  whatever their state; past 30 days (or 200 rows) behind a 「更早 N」 fold row. */
+export function recentRows(items: Item[], opts: TreeOptions = {}, now = Date.now()): Row[] {
+  const touched = items
+    .map((d) => ({ d, touch: lastTouch(d) }))
+    .filter((x): x is { d: Item; touch: Touch } => x.touch !== undefined)
+    .sort((a, b) => touchTime(b.touch.at) - touchTime(a.touch.at) || a.d.id - b.d.id)
+  const since = now - RECENT_DAYS * 86_400_000
+  const cut = touched.findIndex((x, i) => i >= RECENT_MAX || touchTime(x.touch.at) < since)
+  const shown = cut === -1 ? touched : touched.slice(0, cut)
+  const older = cut === -1 ? [] : touched.slice(cut)
+  const row = (x: { d: Item; touch: Touch }, depth: number): Row => ({ key: keyOf(x.d), kind: 'node', node: x.d, depth, touch: x.touch })
+  const out = shown.map((x) => row(x, 0))
+  if (!older.length) return out
+  const open = Boolean(opts.openGroups?.has(RECENT_OLDER_GROUP))
+  const suffix = open ? t('bench.fold.collapseSuffix') : t('bench.fold.expandSuffix')
+  out.push({ key: RECENT_OLDER_GROUP, kind: 'fold', depth: 0, text: `${t('bench.fold.olderRow', { count: older.length })}${suffix}`, finished: older.map((x) => x.d), open })
+  if (open) for (const x of older) out.push(row(x, 1))
+  return out
+}
+
+/** "Answered 2" / "Replied" — what the owner did, without the when. */
+export function touchLabel(touch: Touch): string {
+  if (touch.kind === 'answered' && touch.choice) return t('bench.recent.answeredChoice', { choice: touch.choice })
+  return t(`bench.recent.${touch.kind}`)
+}
+
 export function rowsFor(view: View, items: Item[], opts: TreeOptions = {}): Row[] {
+  if (view === 'recent') return recentRows(items, opts)
   if (view === 'decide') return ownerRows(items)
   if (view === 'waiting') return waitingRows(items, opts)
   if (view === 'all') return treeRows(items, opts)
@@ -492,6 +572,14 @@ function refsShort(refs: string[], max = 2): string {
 export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
   const forms: Segment[][] = []
   const fold: Segment[] = row?.collapsed ? [{ text: `+${countBelow(d, items)} `, dim: true }] : []
+  if (row?.touch) {
+    const when = ago(minutesSince({ updatedAt: row.touch.at, created: d.created }, now))
+    const what = touchLabel(row.touch)
+    forms.push([{ text: `${what} · ${when}`, color: 'blue' }, { text: ` · ${statusLabel(d.state)}`, dim: true }])
+    forms.push([{ text: `${what} · ${when}`, color: 'blue' }])
+    forms.push([{ text: when, dim: true }])
+    return forms
+  }
   if (isDeferred(d)) {
     const since = d.deferredAt ? ago(minutesSince({ updatedAt: d.deferredAt, created: d.created }, now)) : ''
     if (since) forms.push([...fold, { text: t('bench.badge.deferredSince', { since }), dim: true }])

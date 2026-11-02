@@ -121,13 +121,13 @@ test('Waiting: waiting only', (t) => {
   assert.deepEqual(rowsFor('waiting', store.all()).map((r) => r.node!.id), [ids.f])
 })
 
-test('tab counts: Available / Active / Decide / Waiting count what each lists; All has none', (t) => {
+test('tab counts: Available / Active / Decide / Waiting count what each lists; All and Recent have none', (t) => {
   const { store } = fixture(t)
   const items = store.all()
   const counts = Object.fromEntries(VIEWS.map((v) => [v, viewCount(v, items)]))
-  assert.deepEqual(counts, { available: 8, active: 5, decide: 2, all: undefined, waiting: 1 })
+  assert.deepEqual(counts, { available: 8, active: 5, decide: 2, all: undefined, waiting: 1, recent: undefined })
   for (const v of VIEWS) {
-    if (v === 'all') continue
+    if (v === 'all' || v === 'recent') continue
     const listed = rowsFor(v, items).filter((r) => r.kind === 'node' && !r.context).length
     assert.equal(listed, counts[v], `${v}: the number is what the view lists (context rows aside)`)
   }
@@ -148,7 +148,7 @@ test('a jump lands in the current view when it lists the node, else Available, e
 // The App
 // ---------------------------------------------------------------------------
 
-test('App: opens in Available, Tab walks Available Active Decide All Waiting, and c does nothing', async (t) => {
+test('App: opens in Available, Tab walks Available Active Decide All Waiting Recent, and c does nothing', async (t) => {
   const { store } = fixture(t)
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a startable/))
@@ -160,19 +160,20 @@ test('App: opens in Available, Tab walks Available Active Decide All Waiting, an
   assert.equal(b.frame().join('\n'), before, 'c is gone: no banner, no change')
 
   const seen: string[] = []
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     await b.press('\t')
     await b.quiet()
     // Which view is up, read from the left pane alone.
     const left = b.frame().slice(2).map((l) => l.split('│')[0]).join('\n')
-    const which = /✓ Finished/.test(left) ? 'all'
+    const which = /Answered 1 ·/.test(left) ? 'recent'
+      : /✓ Finished/.test(left) ? 'all'
       : /f waiting externally/.test(left) && !/c AI stuck/.test(left) ? 'waiting'
       : /c AI stuck/.test(left) && !/P parent task/.test(left) ? 'decide'
       : /e answered/.test(left) ? 'available'
       : /P parent task/.test(left) ? 'active' : '?'
     seen.push(which)
   }
-  assert.deepEqual(seen, ['active', 'decide', 'all', 'waiting', 'available'])
+  assert.deepEqual(seen, ['active', 'decide', 'all', 'waiting', 'recent', 'available'])
 })
 
 /** Whether the right pane (what the cursor is on) mentions `re`. */
