@@ -27,9 +27,13 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, opts: { selec
     return () => {
       clearTimeout(later)
       window.removeEventListener('focus', onWindowFocus)
-      const active = document.activeElement
-      const lost = active === null || active === document.body || el.contains(active) || !active.isConnected
-      if (lost && before?.isConnected) before.focus({ preventScroll: true })
+      // After the dialog is gone, not during: taking focus from a field still on screen
+      // would fire its blur handler (a rename field saves on blur) a second time.
+      setTimeout(() => {
+        const active = document.activeElement
+        const lost = active === null || active === document.body || !active.isConnected
+        if (lost && before?.isConnected) before.focus({ preventScroll: true })
+      }, 0)
     }
   }, deps)
 }
