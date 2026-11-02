@@ -823,7 +823,7 @@ export function Bench(props: {
           {views.map((v, i) => (
             <button key={v.view} data-ctx="view" data-view={v.view} class={`nav-item ${!scope && v.view === view.view ? 'on' : ''}`} onClick={() => switchView(v.view)} title={`⌘${i + 1}`}>
               <svg viewBox="0 0 16 16" class={`ico ico-${v.view}`}>
-                <path d={VIEW_ICON[v.view]} />
+                <path d={VIEW_ICON[v.view as keyof typeof VIEW_ICON] ?? VIEW_ICON.all} />
               </svg>
               <span class="label">{v.label}</span>
               {v.count !== null && v.count > 0 && <span class={`count ${v.view === 'decide' ? 'hot' : ''}`}>{v.count}</span>}

@@ -65,12 +65,12 @@ for _ in $(seq 1 1500); do
   # By process id: an installed copy of the app has the same name and may be in use.
   [ "$NODDIT_APP_BACKGROUND" = 1 ] && [ "$(front)" = "$pid" ] && echo "frontmost" >> "$work/front"
   if [ -z "${filed:-}" ] && grep -q "decs-app: STEP announce" "$work/log"; then
-    # A decision filed while the app runs must reach the bench and be announced.
+    # A decision filed while the app runs must reach the bench and be announced (X9: ⌘N made X8).
     decs add "Pick a CDN" -o 1=Keep 2=Switch
     filed=1
   fi
   if grep -q "decs-app: DONE" "$work/log"; then
-    grep -q "announce X8" "$work/log" && status=0
+    grep -q "announce X9" "$work/log" && status=0
     break
   fi
   if grep -q "decs-app: FAIL" "$work/log"; then sleep 2; break; fi
@@ -101,7 +101,7 @@ if [ "$status" -eq 0 ]; then
   check 1 "d.project_name === 'Shop front' && d.ref === 'Q1'"
   check X1 "d.ref === 'Q1'"
   if grep -q "STEP brief$" "$work/log"; then
-    check 9 "d.intake === true && d.brief === 'unclaimed' && d.original === 'Add rate limits to the export endpoint'"
+    check 10 "d.intake === true && d.brief === 'unclaimed' && d.original === 'Add rate limits to the export endpoint'"
   fi
   # Unlinked: out of the registry, folder and files untouched.
   ! grep -q '"root"' "$NODDIT_HOME/config.json"
