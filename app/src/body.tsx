@@ -35,7 +35,18 @@ type Block =
 
 const isNoteHeading = (r: BodyRow) => Boolean(r.style && (r.style.color === 'magenta' || r.style.color === 'blue'))
 
-function blocks(rows: BodyRow[], images: Image[]): Block[] {
+/** A section heading that only introduces attachments: images follow, or nothing does before the next heading. */
+function attachmentsHeading(rows: BodyRow[], at: number): boolean {
+  for (let i = at + 1; i < rows.length; i++) {
+    const r = rows[i]
+    if (r.image !== undefined) return true
+    if (r.style) return true
+    if (r.text.trim()) return false
+  }
+  return true
+}
+
+function blocks(rows: BodyRow[], images: Image[], dropAttachmentHeadings = false): Block[] {
   const out: Block[] = []
   let target = out
   let para: string[] | null = null
@@ -44,7 +55,8 @@ function blocks(rows: BodyRow[], images: Image[]): Block[] {
     if (para?.length) target.push({ kind: 'para', lines: para })
     para = null
   }
-  for (const r of rows) {
+  for (let at = 0; at < rows.length; at++) {
+    const r = rows[at]
     if (code) {
       if (/^\s*```/.test(r.text)) {
         target.push({ kind: 'code', lines: code })
@@ -70,6 +82,8 @@ function blocks(rows: BodyRow[], images: Image[]): Block[] {
     }
     if (r.style) {
       flush()
+      // Files are drawn under their own message by the caller; the heading would only repeat that.
+      if (dropAttachmentHeadings && !isNoteHeading(r) && attachmentsHeading(rows, at)) continue
       if (isNoteHeading(r)) {
         const note: Block = { kind: 'note', row: r, human: r.style.color === 'magenta', rows: [], index: out.filter((b) => b.kind === 'note').length }
         out.push(note)
@@ -138,6 +152,8 @@ function NoteHead({ text, tools }: { text: string; tools?: preact.ComponentChild
 export interface NoteHooks {
   tools?: (index: number, human: boolean) => preact.ComponentChildren
   replace?: (index: number) => preact.ComponentChildren | null
+  /** Drawn at the end of each note (its files), and after the description (`-1`). When set, attachment headings are left out. */
+  after?: (index: number) => preact.ComponentChildren | null
 }
 
 function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks }) {
@@ -151,7 +167,10 @@ function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image
             return (
               <section key={i} class={`note ${b.human ? 'human' : 'agent'}`} data-ctx="note">
                 <NoteHead text={b.row.text} tools={notes?.tools?.(b.index, b.human)} />
-                <div class="note-body">{notes?.replace?.(b.index) ?? <Blocks list={b.rows} images={images} onImage={onImage} />}</div>
+                <div class="note-body">
+                  {notes?.replace?.(b.index) ?? <Blocks list={b.rows} images={images} onImage={onImage} />}
+                  {notes?.after?.(b.index)}
+                </div>
               </section>
             )
           case 'para':
@@ -300,7 +319,21 @@ export function withoutComments(rows: BodyRow[]): BodyRow[] {
 export function Body({ rows, images, onImage, notes }: { rows: BodyRow[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks }) {
   return (
     <div class="prose">
-      <Blocks list={blocks(withoutComments(rows), images)} images={images} onImage={onImage} notes={notes} />
+      {(() => {
+        const list = blocks(withoutComments(rows), images, Boolean(notes?.after))
+        if (!notes?.after) return <Blocks list={list} images={images} onImage={onImage} notes={notes} />
+        // The description's own files sit between it and the first note.
+        const first = list.findIndex((b) => b.kind === 'note')
+        const head = first === -1 ? list : list.slice(0, first)
+        const rest = first === -1 ? [] : list.slice(first)
+        return (
+          <>
+            <Blocks list={head} images={images} onImage={onImage} notes={notes} />
+            {notes.after(-1)}
+            <Blocks list={rest} images={images} onImage={onImage} notes={notes} />
+          </>
+        )
+      })()}
     </div>
   )
 }

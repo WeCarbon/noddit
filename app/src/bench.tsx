@@ -25,7 +25,7 @@ import { useDialogFocus } from './focus.ts'
 import { applyOps, both, dropRows, patchNode, patchRows, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
-import type { Bench as BenchData, Node, Project, Row, View, ViewName } from './types.ts'
+import type { Attachment, Bench as BenchData, Node, Project, Row, View, ViewName } from './types.ts'
 
 export interface Prefs {
   view: ViewName
@@ -1269,7 +1269,23 @@ function Detail(p: {
   onQuestions: (picks: Record<string, string>) => void
 }) {
   const n = p.node
-  const files = n.attachments.filter((a) => !a.image)
+  // Each message's files sit under it when the CLI says which message they belong to; older CLIs: one list at the end.
+  const perMessage = n.body_attachments !== undefined || n.notes.some((x) => x.attachments !== undefined)
+  const files = perMessage ? [] : n.attachments.filter((a) => !a.image)
+  const fileChips = (list: Attachment[] | undefined) => {
+    const only = (list ?? []).filter((a) => !a.image)
+    if (!only.length) return null
+    return (
+      <div class="note-files">
+        {only.map((a, i) => (
+          <button key={i} class="file" data-ctx="file" data-path={a.path} onClick={() => p.onFile(a.path)} title={a.caption ?? a.label}>
+            <Paperclip size={13} strokeWidth={1.75} />
+            <span class="cap-text">{a.label}</span>
+          </button>
+        ))}
+      </div>
+    )
+  }
   const chosen = n.answer?.choice
   const waitsForAnswer = !n.terminal && n.status === 'needs_decision'
   return (
@@ -1365,6 +1381,7 @@ function Detail(p: {
                       <PenLine size={12} strokeWidth={1.75} />
                     </button>
                   ) : null,
+                after: perMessage ? (i) => fileChips(i === -1 ? n.body_attachments : n.notes[i]?.attachments) : undefined,
                 replace: (i) =>
                   p.editing === i ? (
                     <BodyEditor markdown={n.notes[i]?.text ?? ''} onSave={(md) => p.onSaveEdit(i, md)} onCancel={p.onCancelEdit} onFiles={(f) => p.onFiles(i, f)} />

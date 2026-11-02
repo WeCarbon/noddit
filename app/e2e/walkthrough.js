@@ -140,6 +140,18 @@
     const edited = JSON.parse((await invoke('decs', { args: ['get', '1', '--json'], cwd: null, stdin: null })).stdout)
     if (!/Revisit in March/.test(edited.body ?? edited.description ?? '')) throw new Error('the edit did not reach the file')
 
+    log('STEP files-per-note')
+    // Each note's files sit under that note, not in one list at the end.
+    $$('.row.node').find((r) => r.textContent.includes('Weekly report is ready')).click()
+    await until('two notes', () => $$('.note').length >= 2)
+    const noteWith = (name) => $$('.note').find((n) => [...n.querySelectorAll('.note-files .file')].some((f) => f.textContent.includes(name)))
+    const n44 = await until('week 44 under its note', () => noteWith('week44.txt'))
+    const n45 = noteWith('week45.txt')
+    if (!n45 || n44 === n45) throw new Error('each note should carry its own file')
+    if (!n44.textContent.includes('Week 44 numbers') || !n45.textContent.includes('Week 45 numbers')) throw new Error('a file sits under the wrong note')
+    if ($('.detail section.files')) throw new Error('a trailing attachments list is still drawn')
+    await shot('files-per-note')
+
     log('STEP preview')
     // An attachment opens in the window: markdown read in place, ←→ to the next one, Esc closes.
     $$('.row.node').find((r) => r.textContent.includes('Write the schema')).click()

@@ -41,6 +41,10 @@ decs add "Weekly report is ready" --body "Nothing unusual this week."
 printf '# Schema notes\n\n- users: id, email\n' > "$work/schema.md"
 printf 'migration 1 ok\nmigration 2 ok\n' > "$work/migrate.log"
 decs attach 2 "$work/schema.md" "$work/migrate.log"
+printf 'week 44\n' > "$work/week44.txt"
+printf 'week 45\n' > "$work/week45.txt"
+decs note 7 "Week 44 numbers" --attach "$work/week44.txt"
+decs note 7 "Week 45 numbers" --attach "$work/week45.txt"
 
 "$app" > "$work/log" 2>&1 &
 pid=$!

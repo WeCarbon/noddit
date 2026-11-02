@@ -2561,3 +2561,31 @@ figcaption {
   background: var(--panel);
   color: var(--text);
 }
+
+/* A message's files, right under it. */
+.note-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.note-files .file {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.note-files .file:hover {
+  color: var(--text);
+  background: var(--hover);
+}
