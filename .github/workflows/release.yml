@@ -31,7 +31,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      publish: ${{ steps.version.outputs.publish }}
       macos-signed: ${{ steps.secrets-status.outputs.macos-signed }}
       macos-notarize-method: ${{ steps.secrets-status.outputs.macos-notarize-method }}
       npm-token-present: ${{ steps.secrets-status.outputs.npm-token-present }}
@@ -42,13 +41,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             version="${{ inputs.version }}"
-            publish=false
           else
             version="${GITHUB_REF_NAME#v}"
-            publish=true
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
       - run: node scripts/check-version.mjs "${{ steps.version.outputs.version }}"
       # `if:` can't reference the secrets context directly (GitHub Actions restricts which
       # contexts if: can see — secrets isn't one, see actionlint/the contexts-availability

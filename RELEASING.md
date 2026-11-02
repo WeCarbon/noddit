@@ -111,7 +111,7 @@ poke at, and stops: no draft release, no npm publish, no PyPI publish.
 
 | Platform | File(s) | Notes |
 | --- | --- | --- |
-| macOS | `noddit_<version>_universal.dmg` | One universal dmg, Apple Silicon and Intel |
+| macOS | `Noddit_<version>_universal.dmg` | One universal dmg, Apple Silicon and Intel |
 | Windows | `.exe` (NSIS installer), `.msi` | Either works; NSIS is smaller |
 | Linux | `.AppImage`, `.deb` | AppImage runs on most distros without installing; `.deb` is for Debian/Ubuntu |
 
