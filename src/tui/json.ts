@@ -74,6 +74,9 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
     progress: progressOf(d) ?? null,
     badge: plain(forms[0] ?? []),
     badge_short: plain(forms.at(-1) ?? []),
+    // The owner's marks: 'important' (★) or 'milestone' (⚑, counted down to `due`).
+    flag: isTerminal(d.state) ? null : d.milestone && d.due ? 'milestone' : d.urgency === 'high' ? 'important' : null,
+    due: d.due ?? null,
     // 最近: what the owner did, for a window that shows it its own way.
     ...(row.touch ? { touch: { ...row.touch, label: touchLabel(row.touch) } } : {}),
   }

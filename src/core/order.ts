@@ -26,9 +26,17 @@ export function overdue(d: Pick<Decision, 'due' | 'status'>, now = Date.now()): 
   return d.status === 'open' && dueTime(d) < now
 }
 
-/** Higher urgency first; within the same urgency, the nearer deadline first. */
-export function compareUrgency(a: Pick<Decision, 'urgency' | 'due'>, b: Pick<Decision, 'urgency' | 'due'>): number {
-  const r = urgencyRank(a) - urgencyRank(b)
+/** Marked by the owner as one to look at first: important (urgency high) or a milestone. */
+export const isFlagged = (d: Pick<Decision, 'urgency' | 'milestone'>) => d.urgency === 'high' || Boolean(d.milestone)
+
+/** 0 = important or a milestone, 1 = normal, 2 = low. */
+function flagRank(d: Pick<Decision, 'urgency' | 'milestone'>): number {
+  return isFlagged(d) ? 0 : urgencyRank(d)
+}
+
+/** Flagged first, then normal, then low; within the same rank, the nearer date first. */
+export function compareUrgency(a: Pick<Decision, 'urgency' | 'due' | 'milestone'>, b: Pick<Decision, 'urgency' | 'due' | 'milestone'>): number {
+  const r = flagRank(a) - flagRank(b)
   if (r) return r
   const da = dueTime(a)
   const db = dueTime(b)
@@ -46,3 +54,6 @@ export function benchOrder(a: Decision, b: Decision): number {
   if (ta !== tb) return ta < tb ? -1 : 1
   return a.id - b.id
 }
+
+/** Until a milestone's date, in ms; negative once it has passed. */
+export const untilDue = (d: Pick<Decision, 'due'>, now = Date.now()) => dueTime(d) - now

@@ -97,7 +97,8 @@
     "optionsCountWord_other": "{{count}} options",
     "briefIsTask": "a brief is a task: no options, no --fyi",
     "claimFinished": "{{ref}} is {{state}} — nothing left to pick up",
-    "alreadyClaimed": "{{ref}} was already picked up by {{by}} at {{at}} — leave it to them (--force takes it over)"
+    "alreadyClaimed": "{{ref}} was already picked up by {{by}} at {{at}} — leave it to them (--force takes it over)",
+    "milestoneNeedsDue": "{{ref}}: a milestone needs a date — add --due 2026-11-15 (or 3d)"
   },
   "duration": {
     "notADuration": "\"{{value}}\" is not a duration — e.g. 90s, 30m, 1h, 2d"

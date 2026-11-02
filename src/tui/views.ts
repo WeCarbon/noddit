@@ -1,5 +1,5 @@
 import { isUnclaimedBrief } from '../core/intake.ts'
-import { benchOrder } from '../core/order.ts'
+import { benchOrder, isFlagged, untilDue } from '../core/order.ts'
 import { NOTE_KIND } from '../core/format.ts'
 import { parseNotes } from '../core/parse.ts'
 import { refOf } from '../core/ref.ts'
@@ -169,7 +169,7 @@ function childMap(items: Item[]): Map<string, Item[]> {
 /** Siblings in happening order: after the siblings it's `after`, else
  *  creation order — not by status, or a row would jump mid-watch. */
 export function siblingOrder(sibs: Item[], items: Item[]): Item[] {
-  const rest = [...sibs].sort((a, b) => a.id - b.id)
+  const rest = [...sibs].sort((a, b) => Number(isFlagged(b)) - Number(isFlagged(a)) || a.id - b.id)
   const placed: Item[] = []
   const isSib = (d: Item) => rest.some((s) => s === d)
   while (rest.length) {
@@ -224,7 +224,7 @@ export function filteredTreeRows(view: View, items: Item[], opts: TreeOptions = 
         key: `project:${p.project}`,
         kind: 'header',
         depth: 0,
-        text: t('bench.header.viewCount', { letter: p.letter ?? 'X', project: p.name, count: n, label: VIEW_LABEL[view] }),
+        text: t('bench.header.viewCount', { letter: p.letter ?? 'X', project: p.name, count: n, label: VIEW_LABEL[view] }) + flaggedNote(items.filter((i) => i.project === p.project && match.has(keyOf(i)))),
       })
     }
     for (const r of roots) walk(r, 0)
@@ -290,6 +290,32 @@ const finishedAt = (d: Item) => d.archivedAt || d.updatedAt || d.answer?.at || d
 const newestFinishedFirst = (a: Item, b: Item) =>
   finishedAt(a) === finishedAt(b) ? b.id - a.id : finishedAt(a) < finishedAt(b) ? 1 : -1
 
+/** 「 · ★ 2」 after a project header: how many of its listed nodes the owner flagged. */
+function flaggedNote(list: Item[]): string {
+  const n = list.filter((d) => isFlagged(d) && !isTerminal(d.state)).length
+  return n ? t('bench.header.flagged', { count: n }) : ''
+}
+
+/** ★ important, ⚑ a milestone — the owner's marks, drawn after the ref. */
+export function flagMark(d: Item, now = Date.now()): Segment | null {
+  if (d.milestone && d.due && !isTerminal(d.state)) {
+    const left = untilDue(d, now)
+    return { text: '⚑ ', color: left < 86_400_000 ? 'red' : 'magenta', bold: left < 86_400_000 }
+  }
+  if (d.urgency === 'high' && !isTerminal(d.state)) return { text: '★ ', color: 'yellow', bold: true }
+  return null
+}
+
+/** "in 3 days" / "overdue 2 hours" for a live milestone; null otherwise. */
+export function milestoneCountdown(d: Item, now = Date.now()): Segment | null {
+  if (!d.milestone || !d.due || isTerminal(d.state)) return null
+  const left = untilDue(d, now)
+  if (!Number.isFinite(left)) return null
+  const minutes = Math.abs(left) / 60_000
+  if (left < 0) return { text: t('bench.badge.milestoneOverdue', { span: agoSpan(minutes) }), color: 'red', bold: true }
+  return { text: t('bench.badge.milestoneIn', { span: agoSpan(minutes) }), color: left < 86_400_000 ? 'red' : 'magenta', bold: left < 86_400_000 }
+}
+
 /** 待决: per project, AI-stuck nodes first, then early-answerable ones.
  *  Answered nodes have left this view; they're in 可用. */
 export function ownerRows(items: Item[]): Row[] {
@@ -297,7 +323,7 @@ export function ownerRows(items: Item[]): Row[] {
   for (const p of projectsOf(items)) {
     const list = ownerQueue(items).filter((i) => i.project === p.project)
     if (!list.length) continue
-    out.push({ key: `project:${p.project}`, kind: 'header', depth: 0, text: t('bench.header.decide', { letter: p.letter ?? 'X', project: p.name, count: list.length }) })
+    out.push({ key: `project:${p.project}`, kind: 'header', depth: 0, text: t('bench.header.decide', { letter: p.letter ?? 'X', project: p.name, count: list.length }) + flaggedNote(list) })
     for (const d of list) out.push({ key: keyOf(d), kind: 'node', node: d, depth: 0 })
   }
   return out
@@ -324,7 +350,7 @@ export function deferredNodes(items: Item[]): Item[] {
 export function waitingRows(items: Item[], opts: TreeOptions = {}): Row[] {
   const out: Row[] = items
     .filter((i) => inView('waiting', i, items))
-    .sort((a, b) => (waitingSince(a) === waitingSince(b) ? a.id - b.id : waitingSince(a) < waitingSince(b) ? -1 : 1))
+    .sort((a, b) => Number(isFlagged(b)) - Number(isFlagged(a)) || (waitingSince(a) === waitingSince(b) ? a.id - b.id : waitingSince(a) < waitingSince(b) ? -1 : 1))
     .map((d) => ({ key: keyOf(d), kind: 'node', node: d, depth: 0 }))
   const deferred = deferredNodes(items)
   if (!deferred.length) return out
@@ -570,6 +596,13 @@ function refsShort(refs: string[], max = 2): string {
 
 /** Row's right end, longest form first; the renderer uses the first that fits beside the full title. */
 export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
+  const countdown = row?.touch ? null : milestoneCountdown(d, now)
+  if (!countdown) return stateSuffix(d, items, now, row)
+  const sep: Segment = { text: ' · ', dim: true }
+  return [...stateSuffix(d, items, now, row).map((f) => [countdown, sep, ...f]), [countdown]]
+}
+
+function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
   const forms: Segment[][] = []
   const fold: Segment[] = row?.collapsed ? [{ text: `+${countBelow(d, items)} `, dim: true }] : []
   if (row?.touch) {
@@ -705,6 +738,7 @@ function nodeRowParts(row: Row, items: Item[], width: number, now: number, opts:
     { text: opts.tree ? (row.hasKids ? (row.collapsed ? '▸' : '▾') : ' ') : '', dim: true },
     { ...glyph },
     { text: ` ${refOf(d)} `, color: finished ? undefined : 'cyan', dim: finished },
+    ...(flagMark(d, now) ? [flagMark(d, now)!] : []),
   ]
   const titleColor = d.state === 'in_progress' && d.checkin?.unanswered ? 'red' : undefined
   const title: Segment = {

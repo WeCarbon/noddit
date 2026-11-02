@@ -163,6 +163,8 @@ export interface Decision {
   urgency?: Urgency
   /** ISO time the proposer needs an answer by. */
   due?: string
+  /** A key date the owner marked: `due` is the date, counted down on the bench. */
+  milestone?: boolean
   /** What the proposer will do if nobody answers — the 「你不回的话」 line, as data. */
   ifNoAnswer?: string
   /** Whether that default action can be undone. */

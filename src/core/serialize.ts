@@ -9,7 +9,7 @@ import type { Attachment, Decision, DecisionOption, NoteRole, AttachmentApproval
 const KEY_ORDER = [
   'id', 'title', 'author', 'status', 'close_reason', 'waiting_on', 'deferred_at', 'deferred_by', 'created', 'updated_at',
   'after', 'progress', 'progress_msg', 'est', 'when', 'stale_after', 'steps', 'owner_agent', 'intake', 'claimed_by', 'claimed_at',
-  'kind', 'urgency', 'due', 'default', 'question_defaults', 'if_no_answer', 'reversible',
+  'kind', 'urgency', 'due', 'milestone', 'default', 'question_defaults', 'if_no_answer', 'reversible',
   'pin', 'pinned_at', 'tags', 'session', 'supersedes', 'superseded_by', 'answer', 'approvals',
   'archived_at', 'reopened_at',
 ]
@@ -46,6 +46,7 @@ export function frontMatterOf(d: Decision): Record<string, unknown> {
   if (d.kind === 'fyi') fm.kind = 'fyi'
   if (d.urgency && d.urgency !== 'normal') fm.urgency = d.urgency
   if (d.due) fm.due = d.due
+  if (d.milestone) fm.milestone = true
   if (d.ifNoAnswer) fm.if_no_answer = d.ifNoAnswer
   if (d.reversible !== undefined) fm.reversible = d.reversible
   if (d.session) fm.session = d.session

@@ -1,6 +1,7 @@
 import { bool, one, type Args } from '../args.ts'
 import { resolveStore } from '../context.ts'
 import { alignRow, summaryLine, toJSON } from '../../core/render.ts'
+import { isFlagged } from '../../core/order.ts'
 import { isStale } from '../../core/staleness.ts'
 import { deferHidden, isDeferred, statusLabel } from '../../core/status.ts'
 import type { ListFilter } from '../../core/store.ts'
@@ -17,6 +18,7 @@ const SCOPES: Record<string, ListFilter> = {
   all: { status: 'all', archived: 'all' },
   fyi: { status: 'all', archived: 'all' },
   deferred: { status: 'all', archived: false },
+  flagged: { status: 'all', archived: false },
 }
 
 const statusWordCache = new Map<Lang, Record<string, ItemStatus>>()
@@ -69,6 +71,8 @@ export function run(args: Args): number {
     .filter((d) => (staleOnly ? isStale(d) : true))
     // 延迟 is put off: not 待决 for the owner; listed on its own under `deferred`.
     .filter((d) => (scope === 'deferred' ? isDeferred(d) : scope === 'open' ? !hidden(d) : true))
+    // What the owner marked important or as a milestone, still live and not put off.
+    .filter((d) => (scope === 'flagged' ? isFlagged(d) && !hidden(d) : true))
 
   if (bool(args, 'json')) {
     console.log(JSON.stringify(list.map(toJSON)))

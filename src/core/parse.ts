@@ -299,7 +299,7 @@ export function legacyStatus(state: ItemStatus, answered: boolean): DecisionStat
 /** Every front matter key this version reads; anything else is kept verbatim in `extra`. */
 const KNOWN_KEYS = new Set([
   'id', 'title', 'author', 'status', 'created', 'updated_at', 'default', 'pin', 'pinned_at',
-  'urgency', 'due', 'if_no_answer', 'reversible', 'kind', 'session', 'superseded_by', 'supersedes',
+  'urgency', 'due', 'milestone', 'if_no_answer', 'reversible', 'kind', 'session', 'superseded_by', 'supersedes',
   'close_reason', 'waiting_on', 'deferred_at', 'deferred_by', 'answer', 'answered_by', 'answered_at', 'archived_at', 'reopened_at', 'tags',
   'question_defaults', 'progress', 'progress_msg', 'after', 'est', 'when', 'stale_after', 'steps', 'owner_agent',
   'approvals', 'intake', 'claimed_by', 'claimed_at',
@@ -368,6 +368,7 @@ export function parseDecision(
     pin: data.pin === 'top' || data.pin === 'bottom' ? data.pin : undefined,
     urgency: data.urgency === 'high' || data.urgency === 'low' ? data.urgency : undefined,
     due: str(data.due),
+    milestone: data.milestone === true || undefined,
     ifNoAnswer: str(data.if_no_answer),
     reversible: typeof data.reversible === 'boolean' ? data.reversible : undefined,
     kind: kindOf(data.kind, options),

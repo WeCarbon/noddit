@@ -94,7 +94,8 @@
     "optionsCountWord_other": "{{count}} 個選項",
     "briefIsTask": "派活是任務：不能帶選項，也不能是 --fyi",
     "claimFinished": "{{ref}} 已經{{state}}，沒什麼可接的了",
-    "alreadyClaimed": "{{ref}} 已被 {{by}} 在 {{at}} 接走，交給它做（--force 強行接手）"
+    "alreadyClaimed": "{{ref}} 已被 {{by}} 在 {{at}} 接走，交給它做（--force 強行接手）",
+    "milestoneNeedsDue": "{{ref}}：里程碑要有日期——加 --due 2026-11-15（或 3d）"
   },
   "duration": {
     "notADuration": "「{{value}}」不是一個時長——例如 90s、30m、1h、2d"

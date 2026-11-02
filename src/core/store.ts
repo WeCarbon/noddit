@@ -947,6 +947,23 @@ export class Store {
     return this.mutate(d, (d) => ({ next: { ...d, state, closeReason: undefined }, move: 'unarchive' }))
   }
 
+  /**
+   * The owner's marks: `important` (urgency high), `milestone` (a key date, needs `due`),
+   * or `normal` (both off). Like a pin it is triage, not a request: nothing is queued.
+   */
+  flag(d: Decision, how: { important?: boolean; milestone?: boolean; due?: string }): Decision {
+    const due = how.due ?? d.due
+    if (how.milestone && !due) throw new Error(t('core.store.milestoneNeedsDue', { ref: refOf(d) }))
+    return this.mutate(d, (d) => ({
+      next: {
+        ...d,
+        urgency: how.important === undefined ? d.urgency : how.important ? 'high' : undefined,
+        milestone: how.milestone === undefined ? d.milestone : how.milestone || undefined,
+        due,
+      },
+    }))
+  }
+
   /** Changes the title only; the filename keeps its slug, since the id is the stable reference. */
   retitle(d: Decision, title: string): Decision {
     const trimmed = title.trim()

@@ -951,6 +951,16 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       }
       return reload()
     }
+    if (input === '!') {
+      const on = current.urgency !== 'high'
+      try {
+        store.flag(current, { important: on })
+        say(t(on ? 'bench.toast.flaggedImportant' : 'bench.toast.unflaggedImportant', { ref: refOf(current) }))
+      } catch (e) {
+        say((e as Error).message)
+      }
+      return reload()
+    }
     if (/^[tTbBuU]$/.test(input)) {
       if (!canPin(current)) return say(t('bench.toast.notPinnable'))
       const where = /[tT]/.test(input) ? 'top' : /[bB]/.test(input) ? 'bottom' : null
