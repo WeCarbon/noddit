@@ -29,6 +29,9 @@ export interface Row {
   progress?: number | null
   badge?: Seg[]
   badge_short?: Seg[]
+  /** The owner's mark: ★ important, ⚑ a milestone counted down to `due`. */
+  flag?: 'important' | 'milestone' | null
+  due?: string | null
   /** Recent: what the owner last did here. */
   touch?: { kind: string; at: string; text: string; choice?: string; label: string }
 }
@@ -124,6 +127,9 @@ export interface Node {
   created: string
   updated_at: string | null
   due: string | null
+  /** The owner's marks (nod flag). */
+  important?: boolean
+  milestone?: boolean
   if_no_answer: string | null
   reversible: boolean | null
   notes: Note[]

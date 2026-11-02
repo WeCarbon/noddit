@@ -62,6 +62,10 @@ export const defer = (root: string, id: number, off: boolean) => ok(['defer', St
 
 export const pin = (root: string, id: number, where: 'top' | 'bottom' | 'off') => ok(['pin', String(id), where, '--dir', root])
 
+/** The owner's marks: important, a milestone on `due` (YYYY-MM-DD or 3d), or normal (both off). */
+export const flag = (root: string, id: number, how: 'important' | 'milestone' | 'normal', due?: string) =>
+  ok(['flag', String(id), how, ...(due ? ['--due', due] : []), '--dir', root])
+
 export const close = (root: string, id: number, reason: string) => ok(['close', String(id), '--reason', reason, '--dir', root])
 
 export const seen = (root: string, id: number) => ok(['archive', String(id), '--seen', '--dir', root])
@@ -140,11 +144,11 @@ export interface FiledBrief {
 }
 
 /** The owner's own words, filed for an AI to pick up and expand. More than one line goes in on stdin. */
-export async function fileBrief(root: string, text: string, parentRef?: string): Promise<FiledBrief> {
+export async function fileBrief(root: string, text: string, parentRef?: string, important = false): Promise<FiledBrief> {
   const words = text.trim()
   const multi = words.includes('\n')
   const title = words.split('\n')[0].trim()
-  const args = ['add', title, '--brief', ...(parentRef ? ['--parent', parentRef] : []), '--dir', root, '--json']
+  const args = ['add', title, '--brief', ...(parentRef ? ['--parent', parentRef] : []), ...(important ? ['--urgency', 'high'] : []), '--dir', root, '--json']
   if (!inDesktop) return { ref: 'W11', id: 11, project: 'web', title, listening: false }
   return JSON.parse(await ok(args, undefined, multi ? words : undefined)) as FiledBrief
 }
@@ -252,7 +256,7 @@ export async function settingsGet(): Promise<SettingsView> {
 
 export const settingsSet = (settings: AppSettings) => (inDesktop ? invoke<void>('settings_set', { settings }) : Promise.resolve())
 
-export const setPhrases = (phrases: { needsDecision: string; notCollected: string; open: string; settings: string; quit: string }) => (inDesktop ? invoke('set_phrases', { phrases }).catch(() => {}) : Promise.resolve())
+export const setPhrases = (phrases: { needsDecision: string; notCollected: string; milestoneDay: string; milestoneHour: string; milestone: string; open: string; settings: string; quit: string }) => (inDesktop ? invoke('set_phrases', { phrases }).catch(() => {}) : Promise.resolve())
 
 export const summoned = (what: string) => (inDesktop ? invoke('summoned', { what }).catch((e) => log(`summoned: ${e}`)) : Promise.resolve())
 

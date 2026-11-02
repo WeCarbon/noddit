@@ -1929,3 +1929,44 @@ figcaption {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* The owner's marks after the ref: ★ important, ⚑ a milestone (red within a day). */
+.flag-mark {
+  flex: none;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.flag-mark.important {
+  color: var(--yellow);
+}
+
+.flag-mark.milestone {
+  color: var(--magenta);
+}
+
+.flag-mark.milestone.soon {
+  color: var(--red);
+}
+
+.milestone-dialog h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.milestone-date {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.milestone-date input {
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+}

@@ -235,6 +235,11 @@
     const t0 = performance.now()
     await invoke('is_background')
     if (performance.now() - t0 > 1000) throw new Error('the main thread is slow to answer after the stress')
+    // Let the monitor's echoes of those writes settle before the next steps look at the screen.
+    for (let quiet = 0; quiet < 8; ) {
+      await sleep(250)
+      quiet = $('.live.busy') ? 0 : quiet + 1
+    }
 
     log('STEP project-filter')
     $('.project[data-ctx="project"]').click()
@@ -282,10 +287,32 @@
     await until('menu closed', () => !$('.ctx-menu'))
 
     // ⇧F10 opens the selected row's menu; arrows and Enter run an item.
+    await until('a selected row', () => $('.row.sel'))
     key('F10', { shiftKey: true })
-    await until('keyboard menu', () => $('.ctx-menu'))
+    await until('keyboard menu', () => $('.ctx-menu') || (key('F10', { shiftKey: true }), false), 5000)
     key('Escape')
     await until('menu closed again', () => !$('.ctx-menu'))
+
+    log('STEP flag')
+    // ! marks important; the context menu sets a milestone through its date dialog.
+    $$('.nav-item').find((b) => b.textContent.includes('All')).click()
+    await sleep(200)
+    await pick('Write the schema')
+    key('!')
+    await toast('Marked important')
+    await until('★ on the row', () => $('.row.sel .flag-mark.important'))
+    rightClick($('.row.sel'))
+    await until('milestone item', () => menuItem('Set a milestone'))
+    menuItem('Set a milestone').click()
+    const date = await until('milestone date', () => $('.milestone-dialog input'))
+    await focused('milestone date', '.milestone-dialog input')
+    type(date, '2030-01-15')
+    await sleep(100)
+    await shot('milestone-dialog')
+    // Enabled once the previous write (the ! above) has finished refreshing.
+    ;(await until('save enabled', () => ($('.milestone-dialog .primary')?.disabled === false ? $('.milestone-dialog .primary') : null))).click()
+    await toast('Milestone set')
+    await until('⚑ on the row', () => $('.row.sel .flag-mark.milestone') || $('.row.node.sel') && $('.nhead .mchip.c-magenta'))
 
     log('STEP announce')
     // The runner files a decision from outside now; it must reach the bench (and be announced, which the runner checks).
@@ -317,8 +344,10 @@
     for (const want of ['Rename', 'Change letter', 'Unlink', 'Reveal in Finder', 'Copy path']) if (!menuItem(want)) throw new Error(`project menu lacks ${want}`)
     await shot('project-menu')
     menuItem('Rename').click()
-    const field = await until('rename field', () => $('.project input.rename'))
+    await until('rename field', () => $('.project input.rename'))
     await focused('rename field', '.project input.rename')
+    // Looked up again: a live refresh may have redrawn the sidebar meanwhile.
+    const field = $('.project input.rename')
     field.value = 'Shop front'
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await toast('Renamed')

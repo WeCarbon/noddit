@@ -87,12 +87,27 @@ pub struct Waiting {
     urgent: bool,
 }
 
+/// A live node the owner marked as a milestone (`nod flag … milestone`).
+#[derive(Clone, Serialize)]
+pub struct Milestone {
+    key: String,
+    #[serde(rename = "ref")]
+    reference: String,
+    title: String,
+    /// Milliseconds since the epoch.
+    due: i64,
+}
+
 /// Words the notifications use, in the window's language (it knows it; this side does not).
 #[derive(Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(default, rename_all = "camelCase")]
 pub struct Phrases {
     needs_decision: String,
     not_collected: String,
+    /// "Milestone in a day" / "Milestone in an hour" / "Milestone".
+    milestone_day: String,
+    milestone_hour: String,
+    milestone: String,
     open: String,
     settings: String,
     quit: String,
@@ -107,6 +122,10 @@ pub struct Watch {
     settings: Mutex<Settings>,
     phrases: Mutex<Phrases>,
     waiting: Mutex<Vec<Waiting>>,
+    milestones: Mutex<Vec<Milestone>>,
+    /// `key|day` / `key|hour`: reminders already shown in this run.
+    reminded: Mutex<HashSet<String>>,
+    clock_started: AtomicBool,
     /// Keys already waiting when last read; `None` until the first read, which notifies nothing.
     known: Mutex<Option<HashSet<String>>>,
     refreshing: AtomicBool,
@@ -132,6 +151,112 @@ pub fn settings(app: &AppHandle) -> Settings {
 // ---------------------------------------------------------------------------
 // What is waiting
 // ---------------------------------------------------------------------------
+
+const HOUR_MS: i64 = 3_600_000;
+const DAY_MS: i64 = 24 * HOUR_MS;
+
+fn parse_milestones(json: &str) -> Vec<Milestone> {
+    let Ok(Value::Array(items)) = serde_json::from_str::<Value>(json) else { return vec![] };
+    items
+        .iter()
+        .filter(|d| d["milestone"] == true)
+        .filter_map(|d| {
+            let due = chrono_ms(d["due"].as_str()?)?;
+            Some(Milestone {
+                key: format!("{}#{}", d["project"].as_str().unwrap_or_default(), d["id"]),
+                reference: d["ref"].as_str().unwrap_or_default().to_string(),
+                title: d["title"].as_str().unwrap_or_default().to_string(),
+                due,
+            })
+        })
+        .collect()
+}
+
+/// `2026-11-15T23:59:59+08:00` (what nod writes) as ms since the epoch.
+fn chrono_ms(iso: &str) -> Option<i64> {
+    let b = iso.as_bytes();
+    if b.len() < 19 {
+        return None;
+    }
+    let n = |r: std::ops::Range<usize>| iso.get(r)?.parse::<i64>().ok();
+    let (y, mo, d, h, mi, s) = (n(0..4)?, n(5..7)?, n(8..10)?, n(11..13)?, n(14..16)?, n(17..19)?);
+    let mut rest = &iso[19..];
+    if let Some(r) = rest.strip_prefix('.') {
+        rest = r.trim_start_matches(|c: char| c.is_ascii_digit());
+    }
+    let offset_min = match rest {
+        "" | "Z" => 0,
+        _ => {
+            let sign = if rest.starts_with('-') { -1 } else { 1 };
+            let hh = rest.get(1..3)?.parse::<i64>().ok()?;
+            let mm = rest.get(4..6)?.parse::<i64>().ok()?;
+            sign * (hh * 60 + mm)
+        }
+    };
+    // Days from the civil date (Howard Hinnant's algorithm).
+    let (y2, m2) = if mo <= 2 { (y - 1, mo + 9) } else { (y, mo - 3) };
+    let era = if y2 >= 0 { y2 } else { y2 - 399 } / 400;
+    let yoe = y2 - era * 400;
+    let doy = (153 * m2 + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some(((days * 86_400 + h * 3600 + mi * 60 + s) - offset_min * 60) * 1000)
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or_default()
+}
+
+/// Which reminder is due now for a milestone `left` ms away, if any: within a day, then within an hour.
+pub fn reminder_for(left: i64) -> Option<&'static str> {
+    if left <= 0 {
+        None
+    } else if left <= HOUR_MS {
+        Some("hour")
+    } else if left <= DAY_MS {
+        Some("day")
+    } else {
+        None
+    }
+}
+
+/// Milestones about to come up: one reminder within a day, one within an hour.
+fn remind(app: &AppHandle, milestones: &[Milestone]) {
+    let now = now_ms();
+    let due: Vec<(Milestone, &'static str)> = {
+        let watch = app.state::<Watch>();
+        let mut reminded = watch.reminded.lock().unwrap();
+        milestones
+            .iter()
+            .filter_map(|m| {
+                let which = reminder_for(m.due - now)?;
+                reminded.insert(format!("{}|{which}", m.key)).then(|| (m.clone(), which))
+            })
+            .collect()
+    };
+    if due.is_empty() || settings(app).notify == "off" || background() {
+        return;
+    }
+    let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
+    for (m, which) in due {
+        let head = if which == "hour" { phrase(&phrases.milestone_hour, "Milestone in an hour") } else { phrase(&phrases.milestone_day, "Milestone in a day") };
+        let _ = app.notification().builder().title(format!("⚑ {} · {head}", m.reference)).body(&m.title).show();
+    }
+}
+
+/// A refresh every minute, so a milestone's reminder comes on time even when nothing changes.
+fn start_clock(app: &AppHandle) {
+    if app.state::<Watch>().clock_started.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            refresh(&app);
+        }
+    });
+}
 
 fn parse_waiting(json: &str) -> Vec<Waiting> {
     let Ok(Value::Array(items)) = serde_json::from_str::<Value>(json) else { return vec![] };
@@ -185,7 +310,16 @@ pub fn refresh(app: &AppHandle) {
             if !out.status.success() {
                 continue;
             }
+            let flagged = match decs_command(&env, &["show".into(), "flagged".into(), "--json".into()], None) {
+                Ok(mut cmd) => match cmd.output().await {
+                    Ok(o) if o.status.success() => parse_milestones(&String::from_utf8_lossy(&o.stdout)),
+                    _ => vec![],
+                },
+                Err(_) => vec![],
+            };
+            *app.state::<Watch>().milestones.lock().unwrap() = flagged.clone();
             apply(&app, parse_waiting(&String::from_utf8_lossy(&out.stdout)));
+            remind(&app, &flagged);
         }
     });
 }
@@ -252,6 +386,7 @@ pub fn start_monitor(app: &AppHandle) {
     if app.state::<Watch>().monitor_started.swap(true, Ordering::SeqCst) {
         return;
     }
+    start_clock(app);
     let app = app.clone();
     let mut args: Vec<String> = ["monitor", "--updates", "--json", "--idle-exit", "0", "--interval", "800", "--all", "--unclaimed-after", "10m", "--with-parent"]
         .iter()
@@ -345,24 +480,30 @@ fn update_tray(app: &AppHandle, waiting: &[Waiting]) {
     }
     let Some(tray) = watch.tray.lock().unwrap().clone() else { return };
     let words = watch.phrases.lock().unwrap().clone();
+    let now = now_ms();
+    // Milestones within a day (or past) count as much as a decision waiting.
+    let soon: Vec<Milestone> = watch.milestones.lock().unwrap().iter().filter(|m| m.due - now <= DAY_MS).cloned().collect();
     let waiting = waiting.to_vec();
     let handle = app.clone();
-    let _ = app.run_on_main_thread(move || draw_tray(&handle, &tray, &waiting, &words));
+    let _ = app.run_on_main_thread(move || draw_tray(&handle, &tray, &waiting, &soon, &words));
 }
 
-fn draw_tray(app: &AppHandle, tray: &TrayIcon, waiting: &[Waiting], words: &Phrases) {
-    let count = waiting.len();
+fn draw_tray(app: &AppHandle, tray: &TrayIcon, waiting: &[Waiting], soon: &[Milestone], words: &Phrases) {
+    let count = waiting.len() + soon.len();
     #[cfg(target_os = "macos")]
     let _ = tray.set_title(if count > 0 { Some(count.to_string()) } else { None });
     let _ = tray.set_tooltip(Some(if count > 0 { format!("Noddit · {count}") } else { "Noddit".into() }));
     let build = || -> tauri::Result<Menu<tauri::Wry>> {
         let menu = Menu::new(app)?;
+        for m in soon.iter().take(TRAY_ITEMS) {
+            menu.append(&MenuItem::with_id(app, format!("node:{}", m.key), format!("⚑ {}  {}", m.reference, m.title), true, None::<&str>)?)?;
+        }
         for w in waiting.iter().take(TRAY_ITEMS) {
             let label = format!("{}{}  {}", if w.urgent { "! " } else { "" }, w.reference, w.title);
             menu.append(&MenuItem::with_id(app, format!("node:{}", w.key), label, true, None::<&str>)?)?;
         }
-        if count > TRAY_ITEMS {
-            menu.append(&MenuItem::with_id(app, "open", format!("+{}", count - TRAY_ITEMS), true, None::<&str>)?)?;
+        if waiting.len() > TRAY_ITEMS {
+            menu.append(&MenuItem::with_id(app, "open", format!("+{}", waiting.len() - TRAY_ITEMS), true, None::<&str>)?)?;
         }
         if count > 0 {
             menu.append(&PredefinedMenuItem::separator(app)?)?;
@@ -578,5 +719,27 @@ pub fn init(app: &AppHandle) {
 pub fn stop_monitor(app: &AppHandle) {
     if let Some(pid) = app.state::<AppState>().monitor.lock().unwrap().take() {
         let _ = std::process::Command::new("kill").arg(pid.to_string()).status();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{chrono_ms, reminder_for, DAY_MS, HOUR_MS};
+
+    #[test]
+    fn reads_the_times_nod_writes() {
+        assert_eq!(chrono_ms("1970-01-01T00:00:00Z"), Some(0));
+        assert_eq!(chrono_ms("1970-01-01T08:00:00+08:00"), Some(0));
+        assert_eq!(chrono_ms("2026-11-15T23:59:59.250+08:00"), chrono_ms("2026-11-15T15:59:59Z"));
+        assert_eq!(chrono_ms("2026-11-15T15:59:59Z"), Some(1_794_758_399_000));
+    }
+
+    #[test]
+    fn a_day_before_then_an_hour_before_nothing_after() {
+        assert_eq!(reminder_for(2 * DAY_MS), None);
+        assert_eq!(reminder_for(DAY_MS), Some("day"));
+        assert_eq!(reminder_for(2 * HOUR_MS), Some("day"));
+        assert_eq!(reminder_for(HOUR_MS), Some("hour"));
+        assert_eq!(reminder_for(-1), None);
     }
 }

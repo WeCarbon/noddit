@@ -1,4 +1,4 @@
-import { CornerDownRight, FolderGit2, PenLine, SquareTerminal, X } from 'lucide-preact'
+import { CornerDownRight, FolderGit2, PenLine, SquareTerminal, Star, X } from 'lucide-preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { useDialogFocus } from './focus.ts'
@@ -21,6 +21,7 @@ export function QuickEntry(p: {
   const [text, setText] = useState('')
   const [project, setProject] = useState(p.project)
   const [nested, setNested] = useState(false)
+  const [important, setImportant] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
@@ -33,7 +34,7 @@ export function QuickEntry(p: {
     setBusy(true)
     setError(null)
     try {
-      const brief = await api.fileBrief(project.root, words, asChild && under ? under.ref : undefined)
+      const brief = await api.fileBrief(project.root, words, asChild && under ? under.ref : undefined, important)
       p.onFiled(brief, project)
     } catch (e) {
       setError((e as Error).message)
@@ -88,6 +89,10 @@ export function QuickEntry(p: {
               {nested && <X size={12} strokeWidth={2} />}
             </button>
           )}
+          <button class={`qchip ${important ? 'on' : ''}`} onClick={() => setImportant(!important)} aria-pressed={important}>
+            <Star {...ICON} />
+            {s('quickImportant')}
+          </button>
           <span class="grow" />
           {project.listening === false && (
             <span class="qchip warn" title={s('noSessionHint')}>

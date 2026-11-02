@@ -1,4 +1,4 @@
-import { Bot, CalendarClock, CornerLeftUp, Flame, GitFork, Link2, PenLine, Pin, PinOff, Radio, Timer, User } from 'lucide-preact'
+import { Bot, CalendarClock, CornerLeftUp, Flag, GitFork, Link2, PenLine, Pin, PinOff, Radio, Star, Timer, User } from 'lucide-preact'
 import type { ComponentChildren } from 'preact'
 import { Bar, Glyph, segClass } from './segs.tsx'
 import { s } from './strings.ts'
@@ -92,9 +92,14 @@ export function NodeHeader({ n, onJump, listening }: { n: Node; onJump: (key: st
       <div class="nhead-top">
         <span class="ref-pill">{n.ref}</span>
         <StatusPill segs={n.status_line} />
-        {n.urgency === 'high' && (
-          <Chip icon={<Flame {...ICON} />} tone="c-red">
-            {s('urgentShort')}
+        {n.urgency === 'high' && !n.terminal && (
+          <Chip icon={<Star {...ICON} />} tone="c-yellow">
+            {s('important')}
+          </Chip>
+        )}
+        {n.milestone && n.due && !n.terminal && (
+          <Chip icon={<Flag {...ICON} />} title={fullTime(n.due)} tone={Date.parse(n.due) - Date.now() < 86_400_000 ? 'c-red' : 'c-magenta'}>
+            {`${s('milestone')} · ${ago(n.due)}`}
           </Chip>
         )}
         {n.pin && <Chip icon={n.pin === 'top' ? <Pin {...ICON} /> : <PinOff {...ICON} />}>{n.pin === 'top' ? s('pinnedTop') : s('pinnedBottom')}</Chip>}
@@ -135,7 +140,7 @@ export function NodeHeader({ n, onJump, listening }: { n: Node; onJump: (key: st
         <Chip icon={<CalendarClock {...ICON} />} title={`${fullTime(n.created)}`} tone={stale ? 'c-red' : ''}>
           {ago(waitingSince ?? n.updated_at ?? n.created)}
         </Chip>
-        {n.due && (
+        {n.due && !n.milestone && (
           <Chip icon={<Timer {...ICON} />} title={fullTime(n.due)} tone={Date.parse(n.due) < Date.now() ? 'c-red' : ''}>
             {ago(n.due)}
           </Chip>

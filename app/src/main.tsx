@@ -134,7 +134,16 @@ window.addEventListener('error', (e) => api.log(`error: ${e.message} at ${e.file
 window.addEventListener('unhandledrejection', (e) => api.log(`unhandled: ${String(e.reason)}`))
 
 whenLanguageSet(() =>
-  void api.setPhrases({ needsDecision: s('phraseNeedsDecision'), notCollected: s('phraseNotCollected'), open: s('trayOpen'), settings: s('traySettings'), quit: s('trayQuit') }),
+  void api.setPhrases({
+    needsDecision: s('phraseNeedsDecision'),
+    notCollected: s('phraseNotCollected'),
+    milestoneDay: s('phraseMilestoneDay'),
+    milestoneHour: s('phraseMilestoneHour'),
+    milestone: s('milestone'),
+    open: s('trayOpen'),
+    settings: s('traySettings'),
+    quit: s('trayQuit'),
+  }),
 )
 
 async function bootBanner() {
