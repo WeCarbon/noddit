@@ -35,6 +35,8 @@ function decs(cwd: string, args: string[], opts: { input?: string; human?: boole
   delete env.CLAUDECODE
   delete env.CLAUDE_SESSION_ID
   env.NODDIT_ROLE = opts.human ? 'human' : 'agent'
+  // The scenario has the lead moving nodes its lanes filed; skip the other-author check.
+  if (['start', 'done', 'close', 'hold', 'ask'].includes(args[0]) && !args.includes('--force')) args = [...args, '--force']
   const r = spawnSync(process.execPath, [BIN, ...args], { cwd, input: opts.input ?? '', encoding: 'utf8', env })
   if (r.status !== 0) throw new Error(`decs ${args.join(' ')}\n${r.stdout}${r.stderr}`)
   return r.stdout
