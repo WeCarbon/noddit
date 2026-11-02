@@ -27,6 +27,8 @@
   }
   const button = (text) => $$('button').find((b) => b.textContent.trim().startsWith(text))
   const toast = (text) => until(`toast "${text}"`, () => $('.toast.show')?.textContent.includes(text))
+  // A dialog that has a field puts the keyboard there as soon as it opens.
+  const focused = (what, sel) => until(`${what} has focus`, () => document.activeElement?.closest(sel), 3000)
 
   try {
     log('STEP welcome')
@@ -65,6 +67,7 @@
     await sleep(200)
     key('2')
     const answerBox = await until('answer composer', () => $('.composer textarea'))
+    await focused('answer composer', '.composer textarea')
     type(answerBox, 'Postgres — we need the JSON columns')
     await sleep(200)
     await shot('answer-composer')
@@ -90,6 +93,7 @@
     await sleep(200)
     key('N')
     const replyBox = await until('reply composer', () => $('.composer textarea'))
+    await focused('reply composer', '.composer textarea')
     type(replyBox, '先把 users 表的索引补上，再跑迁移。')
     replyBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await toast('Reply added')
@@ -116,6 +120,7 @@
     await pick('Rotate the keys')
     key('x')
     const why = await until('close composer', () => $('.composer textarea'))
+    await focused('close composer', '.composer textarea')
     type(why, 'merged into X5')
     why.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await toast('Closed')
@@ -129,7 +134,15 @@
 
     log('STEP goto')
     key('g')
-    const box = await until('palette', () => $('.palette input'))
+    let box = await until('palette', () => $('.palette input'))
+    await focused('goto palette', '.palette input')
+    if (box.value !== '') throw new Error(`the g that opened the palette was typed into it: "${box.value}"`)
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await until('palette closed by Esc', () => !$('.palette'))
+    if (document.activeElement?.closest('.palette')) throw new Error('focus stayed in the closed palette')
+    key('g')
+    box = await until('palette again', () => $('.palette input'))
+    await focused('goto palette again', '.palette input')
     type(box, 'X1')
     await sleep(200)
     box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
@@ -203,11 +216,13 @@
       log('STEP brief')
       key('k', { metaKey: true })
       const words = await until('quick entry', () => $('.quick textarea'))
+      await focused('quick entry', '.quick textarea')
       type(words, 'Add rate limits to the export endpoint')
       words.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
       await toast('Filed')
       // Nobody listens in a scratch project: the app offers to start a session; in test mode that is a dry run.
       await until('start-session prompt', () => $('.confirm .primary'))
+      await focused('start-session prompt', '.confirm .primary')
       await shot('start-session')
       $('.confirm .primary').click()
       await toast('test mode')
@@ -223,6 +238,7 @@
     await shot('project-menu')
     menuItem('Rename').click()
     const field = await until('rename field', () => $('.project input.rename'))
+    await focused('rename field', '.project input.rename')
     field.value = 'Shop front'
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await toast('Renamed')
@@ -232,6 +248,7 @@
     await until('project menu again', () => menuItem('Change letter'))
     menuItem('Change letter').click()
     await until('letter picker', () => $('.letter-picker'))
+    await focused('letter picker', '.letter-picker')
     await shot('letter-picker')
     $$('.lp').find((b) => b.textContent === 'Q').click()
     await toast('Letter changed')
@@ -241,6 +258,7 @@
     await until('project menu for unlink', () => menuItem('Unlink'))
     menuItem('Unlink').click()
     await until('confirm', () => $('.confirm'))
+    await focused('unlink confirm', '.confirm')
     await shot('unlink-confirm')
     $$('.confirm button').find((b) => b.textContent.trim() === 'Unlink').click()
     // It was the only project: the window goes back to "Add a project".

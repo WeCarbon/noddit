@@ -1,6 +1,7 @@
 import { CornerDownRight, FolderGit2, PenLine, SquareTerminal, X } from 'lucide-preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
+import { useDialogFocus } from './focus.ts'
 import { s } from './strings.ts'
 import type { Project } from './types.ts'
 
@@ -23,7 +24,7 @@ export function QuickEntry(p: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
-  useEffect(() => box.current?.focus(), [])
+  useDialogFocus(box)
   const under = p.under && project.project === p.project.project ? p.under : null
 
   const file = async (asChild: boolean) => {
@@ -109,7 +110,7 @@ export function StartSession(p: { project: Project; reason: 'brief' | 'menu'; on
   const [manual, setManual] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const go = useRef<HTMLButtonElement>(null)
-  useEffect(() => go.current?.focus(), [])
+  useDialogFocus(go)
   const start = async () => {
     setBusy(true)
     setError(null)

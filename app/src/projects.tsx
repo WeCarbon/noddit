@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
+import { useDialogFocus } from './focus.ts'
 import { s } from './strings.ts'
 import type { Project } from './types.ts'
 
@@ -7,10 +8,7 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 /** The sidebar row's name, as a text field while it is being renamed. Empty goes back to the folder name. */
 export function RenameField({ project, onDone, onCancel }: { project: Project; onDone: (name: string) => void; onCancel: () => void }) {
   const ref = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    ref.current?.focus()
-    ref.current?.select()
-  }, [])
+  useDialogFocus(ref, { select: true })
   const folder = project.root.split(/[\\/]/).filter(Boolean).pop() ?? project.project
   return (
     <input
@@ -35,7 +33,7 @@ export function LetterPicker(p: { project: Project; projects: Project[]; busy: b
   for (const o of p.projects) if (o.root !== p.project.root && o.letter !== 'X') owner.set(o.letter, o.name)
   const [at, setAt] = useState(Math.max(0, LETTERS.indexOf(p.project.letter)))
   const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => ref.current?.focus(), [])
+  useDialogFocus(ref)
   const pick = (l: string) => {
     if (owner.has(l) || l === p.project.letter || p.busy) return
     p.onPick(l)
@@ -92,7 +90,7 @@ export function LetterPicker(p: { project: Project; projects: Project[]; busy: b
 /** Unlinking only forgets the project; this says so before it happens. */
 export function UnlinkConfirm(p: { project: Project; busy: boolean; error: string | null; onConfirm: () => void; onClose: () => void }) {
   const ref = useRef<HTMLButtonElement>(null)
-  useEffect(() => ref.current?.focus(), [])
+  useDialogFocus(ref)
   return (
     <div class="overlay" onClick={p.onClose}>
       <div

@@ -17,6 +17,7 @@ import { ContextMenu, type MenuItem, type MenuState } from './menu.tsx'
 import { popupNative } from './native-menu.ts'
 import { LetterPicker, RenameField, UnlinkConfirm } from './projects.tsx'
 import { Settings } from './settings.tsx'
+import { useDialogFocus } from './focus.ts'
 import { s } from './strings.ts'
 import type { Bench as BenchData, Node, Project, Row, View, ViewName } from './types.ts'
 
@@ -1037,7 +1038,7 @@ function Detail(p: {
 
 function ComposerBox(p: { node: Node; composer: Composer; draft: string; setDraft: (s: string) => void; busy: boolean; onSend: (typed?: string) => void; onCancel: () => void }) {
   const ref = useRef<HTMLTextAreaElement>(null)
-  useEffect(() => ref.current?.focus(), [p.composer])
+  useDialogFocus(ref, {}, [p.composer])
   const c = p.composer!
   const option = c.kind === 'answer' ? p.node.options.find((o) => o.key === c.key) : undefined
   const title =
@@ -1111,6 +1112,8 @@ function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubm
 function Palette({ rows, onPick, onClose }: { rows: Row[]; onPick: (key: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
   const [at, setAt] = useState(0)
+  const field = useRef<HTMLInputElement>(null)
+  useDialogFocus(field)
   const all = useMemo(() => rows.filter((r) => r.kind === 'node'), [rows])
   const term = q.trim().toLowerCase()
   const hits = (term ? all.filter((r) => r.ref!.toLowerCase() === term || `${r.ref} ${r.title}`.toLowerCase().includes(term)) : all).slice(0, 50)
@@ -1118,7 +1121,7 @@ function Palette({ rows, onPick, onClose }: { rows: Row[]; onPick: (key: string)
     <div class="overlay" onClick={onClose}>
       <div class="palette" onClick={(e) => e.stopPropagation()}>
         <input
-          autoFocus
+          ref={field}
           value={q}
           placeholder={s('gotoPlaceholder')}
           onInput={(e) => (setQ((e.target as HTMLInputElement).value), setAt(0))}

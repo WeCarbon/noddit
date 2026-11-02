@@ -22,7 +22,7 @@ trap cleanup EXIT
 export NODDIT_HOME="$work/home" NODDIT_APP_DATA="$work/app" NODDIT_LANG=en NODDIT_APP_TIMING=1
 # Never in front of whoever is using this Mac: no window, Dock icon, menu-bar icon, hotkey or notification.
 export NODDIT_APP_BACKGROUND=${NODDIT_APP_BACKGROUND:-1}
-front() { osascript -e 'tell application "System Events" to get name of first process whose frontmost is true' 2>/dev/null; }
+front() { osascript -e 'tell application "System Events" to get unix id of first process whose frontmost is true' 2>/dev/null; }
 front_before=$(front)
 export NODDIT_BIN="${E2E_NOD:-$repo/bin/nod}" NODDIT_APP_PICK="$work/shop" NODDIT_APP_SCRIPT="$here/walkthrough.js"
 mkdir -p "$NODDIT_HOME" "$NODDIT_APP_PICK" "$NODDIT_APP_DATA"
@@ -59,7 +59,8 @@ for _ in $(seq 1 1500); do
     esac
   done
   seen=$lines
-  [ "$NODDIT_APP_BACKGROUND" = 1 ] && echo "decs-app: frontmost $(front)" >> "$work/front"
+  # By process id: an installed copy of the app has the same name and may be in use.
+  [ "$NODDIT_APP_BACKGROUND" = 1 ] && [ "$(front)" = "$pid" ] && echo "frontmost" >> "$work/front"
   if [ -z "${filed:-}" ] && grep -q "decs-app: STEP announce" "$work/log"; then
     # A decision filed while the app runs must reach the bench and be announced.
     decs add "Pick a CDN" -o 1=Keep 2=Switch
@@ -74,7 +75,7 @@ done
 kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
 # Whoever is at the keyboard may switch apps meanwhile; what must never happen is this app in front.
-if [ "$NODDIT_APP_BACKGROUND" = 1 ] && grep -q "frontmost decs-app\|frontmost Noddit" "$work/front" 2>/dev/null; then
+if [ "$NODDIT_APP_BACKGROUND" = 1 ] && grep -q "frontmost" "$work/front" 2>/dev/null; then
   echo "e2e: the app came to the front during the run" >&2
   status=1
 fi
