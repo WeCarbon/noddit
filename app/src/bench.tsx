@@ -82,12 +82,19 @@ export function Bench(props: {
   useEffect(() => setLoadedAt(Date.now()), [props.bench])
   useEffect(() => setOps((o) => (o.some((x) => x.doneAt && x.doneAt <= loadedAt) ? o.filter((x) => !x.doneAt || x.doneAt > loadedAt) : o)), [loadedAt])
   const bench = useMemo(() => applyOps(props.bench, ops, loadedAt), [props.bench, ops, loadedAt])
-  // A project picked in the sidebar narrows every view; one that is gone (unlinked) no longer does.
+  // The sidebar picks one thing to show: a view across every project, or one project's
+  // whole tree (live work, finished folded) — never the two combined. A project that is
+  // gone (unlinked) falls back to the view.
   const scope = prefs.project && bench.projects.some((p) => p.project === prefs.project) ? prefs.project : null
-  const views = useMemo(() => bench.views.map((v) => scopeView(v, scope)), [bench, scope])
-  const view = views.find((v) => v.view === prefs.view) ?? views[0]
-  const setScope = (project: string | null) => props.setPrefs({ project })
+  const views = bench.views
   const scopeName = scope ? (bench.projects.find((p) => p.project === scope)?.name ?? scope) : null
+  const view = useMemo((): View => {
+    if (!scope) return views.find((v) => v.view === prefs.view) ?? views[0]
+    const tree = scopeView(views.find((v) => v.view === 'all') ?? views[0], scope)
+    const live = tree.rows.filter((r) => r.kind === 'node' && r.state !== 'completed' && r.state !== 'closed').length
+    return { ...tree, label: scopeName ?? scope, count: live, empty: s('projectEmpty') }
+  }, [views, scope, scopeName, prefs.view])
+  const setScope = (project: string | null) => props.setPrefs({ project })
   const rows = useMemo(() => visibleRows(view, prefs.folds), [view, prefs.folds])
   // The composer belongs to the node it was opened on, so moving to another node closes it in the
   // same render — not in an effect that might land after the next keypress.
@@ -208,7 +215,7 @@ export function Bench(props: {
     const next = selectable[Math.max(0, Math.min(selectable.length - 1, Math.max(0, index) + delta))]
     select(next.key)
   }
-  const switchView = (v: ViewName) => setPrefs({ view: v })
+  const switchView = (v: ViewName) => setPrefs({ view: v, project: null })
   const cycleView = (delta: number) => {
     const i = bench.views.findIndex((v) => v.view === view.view)
     switchView(bench.views[(i + delta + bench.views.length) % bench.views.length].view)
@@ -767,7 +774,7 @@ export function Bench(props: {
         <nav>
           <div class="section-label">{s('views')}</div>
           {views.map((v, i) => (
-            <button key={v.view} data-ctx="view" data-view={v.view} class={`nav-item ${v.view === view.view ? 'on' : ''}`} onClick={() => switchView(v.view)} title={`⌘${i + 1}`}>
+            <button key={v.view} data-ctx="view" data-view={v.view} class={`nav-item ${!scope && v.view === view.view ? 'on' : ''}`} onClick={() => switchView(v.view)} title={`⌘${i + 1}`}>
               <svg viewBox="0 0 16 16" class={`ico ico-${v.view}`}>
                 <path d={VIEW_ICON[v.view]} />
               </svg>
@@ -784,7 +791,7 @@ export function Bench(props: {
               data-ctx="project"
               data-root={p.root}
               aria-pressed={scope === p.project}
-              onClick={() => renaming !== p.root && setScope(scope === p.project ? null : p.project)}
+              onClick={() => renaming !== p.root && setScope(p.project)}
             >
               <span
                 class={`live-dot ${live[p.project] ? (live[p.project].listening ? 'on' : 'off') : 'unknown'}`}
@@ -849,14 +856,6 @@ export function Bench(props: {
         <header class="pane-head" data-tauri-drag-region>
           <h1>{view.label}</h1>
           {view.count !== null && <span class="head-count">{view.count}</span>}
-          {scopeName && (
-            <span class="scope-chip" title={s('allProjects')}>
-              <span class="scope-name">{scopeName}</span>
-              <button class="scope-clear" aria-label={s('allProjects')} onClick={() => setScope(null)}>
-                <X size={12} strokeWidth={2} />
-              </button>
-            </span>
-          )}
         </header>
         <div class="list" ref={listRef} role="listbox">
           {!rows.length && (

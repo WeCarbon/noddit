@@ -270,12 +270,17 @@
     }
 
     log('STEP project-filter')
+    // A project and a view are never on together: picking one lets go of the other.
     $('.project[data-ctx="project"]').click()
-    await until('project filter on', () => $('.project.on') && $('.scope-chip'))
+    await until('the project shown, no view selected', () => $('.project.on') && !$('.nav-item.on') && $('.pane-head h1').textContent.includes('shop'))
     await sleep(300)
-    if (!JSON.parse((await invoke('prefs_load')) ?? '{}').project) throw new Error('the project filter is not remembered')
+    if (!JSON.parse((await invoke('prefs_load')) ?? '{}').project) throw new Error('the open project is not remembered')
     key('Escape')
-    await until('Esc lifts the project filter', () => !$('.scope-chip') && !$('.project.on'))
+    await until('Esc goes back to the view', () => !$('.project.on') && $('.nav-item.on'))
+    $('.project[data-ctx="project"]').click()
+    await until('the project again', () => $('.project.on'))
+    $$('.nav-item').find((b) => b.textContent.includes('Available')).click()
+    await until('a view lets go of the project', () => !$('.project.on') && $('.nav-item.on'))
 
     log('STEP settings')
     key(',', { metaKey: true })
