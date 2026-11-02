@@ -24,13 +24,8 @@ suite — tout est dans `nod bench`. Hors nod, invisible. Détails :
   chat.
 - **La progression avance seule** : connectez les longues commandes à
   `nod progress` (`pytest … | nod progress --parse pytest`) ;
-  plusieurs étapes → `nod steps` / `nod step`. `nod progress --from-file
-  x.jsonl` détecte seul le format d’événements JSONL de noddit
-  (`progress_events` du paquet Python / son plugin pytest). Ou laissez
-  `nod run <id> -- <cmd…>` tout faire : démarre, suit la progression
-  (règle `NODDIT_EVENTS` pour vous), puis `nod done` si le code de
-  sortie est 0, sinon `nod hold --on "failing: …"` avec la fin de la
-  sortie. Pas de mise à jour depuis la durée de relance (30 min par
+  plusieurs étapes → `nod steps` / `nod step`. `nod run <id> -- <cmd…>` démarre,
+  suit la progression puis fait `nod done` ou `nod hold`. Pas de mise à jour depuis la durée de relance (30 min par
   défaut, `nod config checkin-after`) = une ligne `NODDIT-CHECKIN` —
   voir plus bas. Toujours en cours mais rien de nouveau à dire ?
   `nod beat <id>` seul compte
