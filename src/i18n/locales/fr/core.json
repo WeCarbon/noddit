@@ -10,6 +10,7 @@
     "optionsCount_many": "{{count}} options",
     "optionsCount_other": "{{count}} options",
     "staleFor": "{{duration}} sans mise à jour",
+    "checkinUnanswered": "relancé {{count}} fois, sans réponse",
     "reopenedAfterArchive": "nouvelle réponse après archivage",
     "supersededBy": "remplacé par {{ref}}",
     "overdueAt": "en retard depuis {{time}}",

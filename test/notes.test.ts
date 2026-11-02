@@ -344,7 +344,10 @@ test('decs monitor prints one line per owner reply or answer, never an agent rec
   child.stdout.on('data', (b) => (out += b))
   t.after(() => killAndWait(child))
   await waitFor(monitorReady(home), 'the monitor to start')
-  decs(root, ['note', '1', '--human', "wait for Carol's reply first"])
+  // No DECS_AUTHOR on the owner's reply: a real owner's own terminal has none — the
+  // monitor's write-marker self-filter (core/identity.ts) must not mistake this for
+  // the lane's own write just because the test suite's default author name matches.
+  decs(root, ['note', '1', '--human', "wait for Carol's reply first"], { DECS_AUTHOR: undefined })
   decs(root, ['note', '1', '--agent', "lane's own note"])
   await waitFor(() => out.includes("Carol's reply"), 'the reply line')
   await settle()
@@ -355,7 +358,7 @@ test('decs monitor prints one line per owner reply or answer, never an agent rec
   // re-arming with the last since= replays nothing already seen, but picks up what happened while no monitor ran
   const since = lines[0].split('since=')[1]
   await killAndWait(child)
-  decs(root, ['note', '1', '--human', 'ship it after all'])
+  decs(root, ['note', '1', '--human', 'ship it after all'], { DECS_AUTHOR: undefined })
   const replay = spawn(process.execPath, [BIN, 'monitor', '--since', since, '--interval', '200'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },

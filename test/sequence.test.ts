@@ -7,10 +7,8 @@ import { Store } from '../src/core/store.ts'
 import { buildSchedule, dependentsOf, findCycles } from '../src/core/sequence.ts'
 import { buildOverview } from '../src/core/overview.ts'
 import {
-  DEFAULT_STALE_AFTER_MS,
   isPossiblyObsolete,
   isStale,
-  isVeryStale,
   minutesSince,
   stalenessOf,
 } from '../src/core/staleness.ts'
@@ -52,23 +50,28 @@ function makeItem(overrides: Partial<Item>): Item {
   } as Item
 }
 
-test('stalenessOf: only in_progress can be stale; default threshold is 30m, 2x is very_stale', () => {
+test('stalenessOf: only in_progress can be stale; default threshold is the checkin-after setting (1h)', (t) => {
+  // Pin it: the real ~/.decs/config.json on whatever machine runs this must never leak in.
+  const prev = process.env.NODDIT_CHECKIN_AFTER
+  process.env.NODDIT_CHECKIN_AFTER = '1h'
+  t.after(() => {
+    if (prev === undefined) delete process.env.NODDIT_CHECKIN_AFTER
+    else process.env.NODDIT_CHECKIN_AFTER = prev
+  })
+
   const fresh = makeItem({ updatedAt: new Date(Date.now() - 5 * 60_000).toISOString() })
   assert.equal(stalenessOf(fresh), 'fresh')
 
   const needsDecision = makeItem({ state: 'needs_decision', updatedAt: new Date(Date.now() - 90 * 60_000).toISOString() })
   assert.equal(stalenessOf(needsDecision), 'fresh', 'needs_decision not moving is expected, not stuck')
 
-  const stale = makeItem({ updatedAt: new Date(Date.now() - 31 * 60_000).toISOString() })
+  const almost = makeItem({ updatedAt: new Date(Date.now() - 59 * 60_000).toISOString() })
+  assert.equal(stalenessOf(almost), 'fresh', 'not past the default 1h threshold yet')
+  assert.equal(isStale(almost), false)
+
+  const stale = makeItem({ updatedAt: new Date(Date.now() - 61 * 60_000).toISOString() })
   assert.equal(stalenessOf(stale), 'stale')
   assert.equal(isStale(stale), true)
-  assert.equal(isVeryStale(stale), false)
-
-  const veryStale = makeItem({ updatedAt: new Date(Date.now() - 61 * 60_000).toISOString() })
-  assert.equal(stalenessOf(veryStale), 'very_stale')
-  assert.equal(isVeryStale(veryStale), true)
-
-  assert.equal(DEFAULT_STALE_AFTER_MS, 30 * 60_000)
 })
 
 test('stalenessOf: a custom stale_after changes the threshold', () => {

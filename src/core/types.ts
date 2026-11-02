@@ -109,6 +109,10 @@ export interface DecisionNote {
   text: string
   /** The heading line as written, minus `## `. */
   heading: string
+  /** The invisible `<!-- nod:by=<identity> -->` marker, if the write that
+   *  made this section left one — see `core/identity.ts`. Absent on
+   *  anything written before the marker existed, or with no identity set. */
+  writer?: string
 }
 
 /** 「做完了，等你看一眼」 — a decision whose only option is `验收通过`. */
@@ -193,6 +197,10 @@ export interface Decision {
   parent?: number
   /** Direct children's ids. Filled in by `Store.all()`; absent on a single reread. */
   children?: number[]
+  /** Check-in asks on this node (`core/checkins.ts`), freshly read on every
+   *  `Store.all()` call since the ask count can change with no write to the
+   *  node itself. Absent when it has never been asked. */
+  checkin?: { asked: number; lastAskedAt: string; unanswered: boolean }
   /** Unknown front matter keys, kept verbatim so a newer tool's fields survive. */
   extra?: Record<string, unknown>
   /** Set on an entry another one replaced: `decs supersede`. */

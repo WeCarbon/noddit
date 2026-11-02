@@ -9,6 +9,7 @@
     "optionsCount_one": "{{count}} option",
     "optionsCount_other": "{{count}} options",
     "staleFor": "{{duration}} without an update",
+    "checkinUnanswered": "asked {{count}}× · no reply",
     "reopenedAfterArchive": "new reply after archiving",
     "supersededBy": "superseded by {{ref}}",
     "overdueAt": "overdue {{time}}",

@@ -10,7 +10,8 @@
     "images": "الصور المضمّنة",
     "mouse": "الفأرة",
     "idle-exit": "توقف المراقبة بعد الخمول",
-    "unclaimed-after": "رد غير مستلم بعد"
+    "unclaimed-after": "رد غير مستلم بعد",
+    "checkin-after": "طلب تحديث الحالة بعد"
   },
   "value": {
     "auto": "تلقائي",

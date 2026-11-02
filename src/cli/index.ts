@@ -61,6 +61,7 @@ const COMMANDS: Record<string, () => Promise<CommandModule>> = {
   session: () => import('./commands/session.ts'),
   sessions: () => import('./commands/session.ts'),
   step: () => import('./commands/steps.ts'),
+  whoami: () => import('./commands/whoami.ts'),
 }
 
 const usage = () => t('cli.usage')

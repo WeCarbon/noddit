@@ -1,15 +1,18 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, sep } from 'node:path'
 import { DECS_HOME } from '../../core/config.ts'
 import { nodditEnv } from '../../core/env.ts'
-import { bool, one, type Args } from '../args.ts'
+import { many, bool, one, type Args } from '../args.ts'
 import { resolveAuthor, resolveStore } from '../context.ts'
+import { askIfDue, staleNagDue, staleTasksOf } from '../../core/checkins.ts'
 import { parseDuration, parseSince } from '../../core/duration.ts'
+import { currentIdentity } from '../../core/identity.ts'
 import { findLayout } from '../../core/paths.ts'
 import { listSources, sourceEventsSince } from '../../core/sources.ts'
-import { nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
+import { lastHumanAt, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
 import { isUnclaimedBrief, originalWords } from '../../core/intake.ts'
 import { HEARTBEAT_MS, harnessOf, removeHeartbeat, writeHeartbeat } from '../../core/listeners.ts'
 import type { Decision } from '../../core/types.ts'
@@ -96,6 +99,49 @@ export function teammateName(command: string): string | undefined {
   return /(?:^|\s)--agent-name[ =](\S+)/.exec(command)?.[1]
 }
 
+interface TeamMember {
+  name?: string
+  agentType?: string
+  cwd?: string
+  isActive?: boolean
+}
+interface TeamConfig {
+  members?: TeamMember[]
+}
+
+/**
+ * Fallback for when the `--agent-name` argv walk fails (a different Claude
+ * Code build, or no `ps`/PowerShell reachable): `~/.claude/teams/<team>/
+ * config.json` lists every member with the directory it runs in. The
+ * member whose `cwd` is this process's cwd (or an ancestor of it) — the
+ * closest match wins — is this session, unless it's the team-lead.
+ */
+export function teammateFromTeamConfig(cwd: string = process.cwd(), home: string = homedir()): string | undefined {
+  const root = join(home, '.claude', 'teams')
+  let teams: string[]
+  try {
+    teams = readdirSync(root)
+  } catch {
+    return undefined
+  }
+  let best: { name: string; len: number } | undefined
+  for (const team of teams) {
+    let cfg: TeamConfig
+    try {
+      cfg = JSON.parse(readFileSync(join(root, team, 'config.json'), 'utf8')) as TeamConfig
+    } catch {
+      continue
+    }
+    for (const m of cfg.members ?? []) {
+      if (!m.name || !m.cwd || m.agentType === 'team-lead' || m.isActive === false) continue
+      const matches = cwd === m.cwd || cwd.startsWith(`${m.cwd}${sep}`) || m.cwd.startsWith(`${cwd}${sep}`)
+      if (!matches) continue
+      if (!best || m.cwd.length > best.len) best = { name: m.name, len: m.cwd.length }
+    }
+  }
+  return best?.name
+}
+
 function sessionCommand(): string {
   const teammate = nodditEnv('TEAMMATE')
   if (teammate !== undefined) return teammate ? `--agent-name ${teammate}` : ''
@@ -176,10 +222,32 @@ export async function run(args: Args): Promise<number> {
   }
   const here = bool(args, 'here')
   if (here && !findLayout()) return 0
-  const store = resolveStore(args, { allowRegistry: !here })
+  const allProjects = bool(args, 'all-projects')
+  const explicitDirs = many(args, 'dir', 'd').length > 0
+  // Default scope is this project alone — the same thing --here does, minus
+  // exiting when there's none. Every other registered project needs
+  // --all-projects spelled out; otherwise an agent re-arming a bare `nod
+  // monitor` from inside project A never hears about project B's events.
+  if (!here && !allProjects && !explicitDirs && !findLayout()) {
+    process.stderr.write(`${t('cli.monitor.noProjectHere')}\n`)
+    return 0
+  }
+  const store = resolveStore(args, { allowRegistry: allProjects, preferRegistry: allProjects })
   // A teammate watches only its own nodes even when the plugin starts it without --mine; a lead watches everything.
-  const teammate = one(args, 'author') || bool(args, 'mine') || bool(args, 'all') ? undefined : teammateName(sessionCommand())
+  const teammate = one(args, 'author') || bool(args, 'mine') || bool(args, 'all')
+    ? undefined
+    : teammateName(sessionCommand()) ?? teammateFromTeamConfig()
   const author = one(args, 'author') ?? (bool(args, 'mine') ? resolveAuthor(args) : teammate)
+  // This process's own identity (core/identity.ts) — a write it made itself
+  // never needs to be reported back to it, however it's signed (N41: the
+  // lead relaying the owner's own words with `--human --by owner(...)`
+  // otherwise immediately echoes right back to the lead's own monitor).
+  const myIdentity = currentIdentity()
+  // Whose nodes this monitor asks check-ins for (core/checkins.ts): --mine's
+  // own author; for a bare lead, whatever it would sign as, so "the lead's
+  // monitor without --mine also sees nodes it filed" — never undefined just
+  // because --mine wasn't passed.
+  const checkinAuthor = author ?? (() => { try { return resolveAuthor(args) } catch { return undefined } })()
   const asJson = bool(args, 'json')
   const updates = bool(args, 'updates')
   const withSources = !bool(args, 'no-sources')
@@ -212,20 +280,32 @@ export async function run(args: Args): Promise<number> {
   }
 
   const versions = new Map<string, string>()
-  /** Any write at all — an agent's progress, a new node, one archived — as one line of refs, for a window that redraws. */
+  /** Any write at all — an agent's progress, a new node, one archived — as one line of refs, for a window that redraws.
+   *  `owner_facing`: refs among them whose latest note is an agent's first reply to a human post — the
+   *  owner can see it on the bench, so the desktop app notifies on it too (N47). */
   const reportUpdates = (first: boolean) => {
     const changed: string[] = []
+    const ownerFacing: string[] = []
     const now = new Map(store.all().filter((d) => !author || sameAgent(d.author, author)).map((d) => [`${d.project}#${d.id}`, d]))
     for (const [key, d] of now) {
       const version = JSON.stringify([d.updatedAt, d.state, d.archived, d.notes.length, d.answer?.at, d.deferredAt, d.progress, d.title])
-      if (versions.get(key) !== version && !first) changed.push(refOfNode(d))
+      if (versions.get(key) !== version && !first) {
+        changed.push(refOfNode(d))
+        const latestNote = d.notes.at(-1)
+        const lastHuman = lastHumanAt(d)
+        if (latestNote?.role === 'agent' && (!lastHuman || Date.parse(latestNote.at) > Date.parse(lastHuman))) ownerFacing.push(refOfNode(d))
+      }
       versions.set(key, version)
     }
     const gone = [...versions.keys()].filter((k) => !now.has(k))
     for (const k of gone) versions.delete(k)
     if (!changed.length && !gone.length) return
     lastEventAt = Date.now()
-    process.stdout.write(asJson ? `${JSON.stringify({ event: 'updated', refs: changed, gone, at: nowStamp(new Date(), { ms: true }) })}\n` : `DECS-UPDATED ${changed.join(' ')}\n`)
+    process.stdout.write(
+      asJson
+        ? `${JSON.stringify({ event: 'updated', refs: changed, gone, owner_facing: ownerFacing, at: nowStamp(new Date(), { ms: true }) })}\n`
+        : `DECS-UPDATED ${changed.join(' ')}${ownerFacing.length ? `  (owner-facing: ${ownerFacing.join(' ')})` : ''}\n`,
+    )
   }
 
   /**
@@ -287,6 +367,8 @@ export async function run(args: Args): Promise<number> {
         if (e.event === 'created' || e.event === 'completed' || e.event === 'closed') continue
         // A brief's 原话 is reported once, as DECS-BRIEF below.
         if (e.kind === NOTE_KIND.original) continue
+        // This session's own write (e.g. relaying the owner's words), however it's signed.
+        if (myIdentity && e.writer === myIdentity) continue
         emit(`n|${e.project}|${e.id}|${e.event}|${e.at}`, e.at, nodeLine(e), { ...e, since: e.at })
       }
       if (withSources) {
@@ -329,6 +411,52 @@ export async function run(args: Args): Promise<number> {
       reportBriefs()
     } catch (err) {
       process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
+    }
+    // Check-ins (core/checkins.ts): rides along whatever this pass already
+    // printed where there was anything to ride on, but a node idle long
+    // enough with nothing else happening still gets asked — just at most
+    // once per span either way (askIfDue/staleNagDue's own spacing).
+    if (checkinAuthor) {
+      try {
+        for (const d of store.all()) {
+          if (!ownedBy(d, checkinAuthor)) continue
+          const asked = askIfDue(store.layoutOf(d), d)
+          if (!asked) continue
+          lastEventAt = Date.now()
+          const sinceMs = Date.now() - Date.parse(d.activeAt || d.updatedAt || d.created || '')
+          process.stdout.write(
+            asJson
+              ? `${JSON.stringify({ event: 'checkin', ref: refOfNode(d), id: d.id, project: d.project, asked: asked.asked, unanswered: asked.unanswered })}\n`
+              : `NODDIT-CHECKIN ${refOfNode(d)} ${t('cli.monitor.checkin', { duration: durationText(sinceMs) })}\n`,
+          )
+        }
+      } catch (err) {
+        process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
+      }
+    }
+    // Stale tasks (N47): the lead's job, project-wide — not gated by
+    // checkinAuthor/--mine, since a lane's own monitor only ever sees its
+    // own nodes and stale tasks are a project health question, not an
+    // ownership one.
+    if (!author) {
+      try {
+        const due: Decision[] = []
+        for (const d of staleTasksOf(store.all())) {
+          if (staleNagDue(store.layoutOf(d), d)) due.push(d)
+        }
+        if (due.length) {
+          lastEventAt = Date.now()
+          const shown = due.slice(0, 3)
+          const refs = shown.map((d) => refOfNode(d))
+          process.stdout.write(
+            asJson
+              ? `${JSON.stringify({ event: 'stale_tasks', refs, count: due.length })}\n`
+              : `NODDIT-STALE ${refs.join(' ')} ${t('cli.monitor.stale', { count: due.length, more: due.length - shown.length })}\n`,
+          )
+        }
+      } catch (err) {
+        process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
+      }
     }
     cursor = startedAt
     saveCursor(stateFile, cursor)

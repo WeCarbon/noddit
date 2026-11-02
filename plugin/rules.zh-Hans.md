@@ -15,7 +15,8 @@
 - **计划就是子节点**：拆步骤时把还没做的写成子节点（`--parent`），有先后的写 `--after`，能估的写 `--est 30m`。
   中途发现新事项，加子节点，不要只在对话里说。
 - **进度要能自己走**：长跑的命令接到 `nod progress`（`pytest … | nod progress --parse pytest`），
-  多步流程用 `nod steps` / `nod step`。超过 30 分钟不更新会被标成卡住。
+  多步流程用 `nod steps` / `nod step`。超过 check-in 的时限（默认 30 分钟，`nod config checkin-after`
+  可改）没更新会收到一条 `NODDIT-CHECKIN`——见下。还在做但没新内容可报？`nod beat <id>` 本身就算回报。
 - **等外部**：卡在同事、客户、供应商或某个服务上，`nod hold <id> --on "<谁/什么>"`（状态「等待」，不算卡住）；等到了 `nod start <id>`。
 - **要负责人拍板**：在当前节点上 `nod ask <id> -o …`，或新建带选项的子节点；答复会从 nod monitor 来（见下）。
 - **做完自己标完成，不要等别人**：活合进去、检查（测试、关卡）通过，当场 `nod done <id> --note "<结果、提交>"`。
@@ -35,14 +36,23 @@
 
 ## 接通知：nod monitor（MUST FOLLOW）
 
-- **主控会话不用自己挂**：decs plugin 在每个会话开始时自动启动 `nod monitor --here`（只盯当前项目，整个会话有效，不会 30 分钟到期）。
-  每一行就是一件要处理的事：负责人的答复/回复 → `nod read` 取走去做；`DECS-UNCLAIMED` → 有答复没人取，去取；
-  外部来源新条目 → 处理后 `nod source ack`；`DECS-ERROR` → 看一眼，监听会继续。
+- **主控会话不用自己挂**：decs plugin 在每个会话开始时自动启动 `nod monitor --here`（只盯当前项目，整个会话有效，不会到期）。
+  每一行就是一件要处理的事：负责人的答复/回复 → `nod read` 取走，然后在节点上回一句要做什么（简单记一笔，或
+  一步到位用 `nod read <id> --ack "…"`）——负责人看得到的回复本身就是会通知的事件，这点很重要；
+  `DECS-UNCLAIMED` → 有答复没人取，去取；外部来源新条目 → 处理后 `nod source ack`；
+  `NODDIT-CHECKIN` → 马上在那个节点上用 `nod progress`、`nod note`，或者没有新内容就 `nod beat <id>`
+  回报——问满 3 次没回看板会标出来（多数是搭着别的消息一起来，静默够久也可能自己单独出现）；
+  `NODDIT-STALE` → 有些既不待决策、也没人在做的节点放太久了，逐个 `nod start`、`nod defer`、`nod close`
+  或重新规划；`DECS-ERROR` → 看一眼，监听会继续。
 - **`DECS-IDLE`**：连续 2 小时没有事件，监听自己下线了。之后又有要等负责人回复的事，自己挂：
   `Monitor({ command: "nod monitor", description: "nod", timeout_ms: 1800000 })`，到期原样重挂（它自己记得看到哪）。
+- **裸的 `nod monitor` 只盯 cwd 所在的项目**——跟 `--here` 一样，只是没项目时不会退出。要盯所有登记过的
+  项目得显式加 `--all-projects`；别图省事随手加上，那意味着也会收到其他项目的节点。
 - **子智能体 / 队友只管自己的节点，必须用 `--mine`**：自己挂监听时一律 `nod monitor --mine`；
   队友会话里 plugin 自动启动的监听会认出自己是队友、自动只推自己提的节点。
   收到不是自己的节点，不处理，那是主控会话的事。plugin 的监听不一定在进程内的子智能体里跑，开工就自己挂，到期原样重挂。
+  `nod whoami` 能看到监听用来匹配的身份（`NODDIT_IDENTITY`，没设就是署名的名字加 session id），
+  这个身份会（看不见地）打在你写的每一笔上，所以转记负责人的原话不会反过来推给你自己。
 - 主控会话一律不加 `--mine`（替子智能体提的节点署的是子智能体的名字，加了就收不到）。
 - 不要用后台终端跑 `nod wait`、不要自己写轮询脚本、不要用 `nod watch`（那是给人看的）。
 

@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { addProject, isScratchPath } from '../../core/config.ts'
+import { ensureGitignoreLines } from '../../core/gitignore.ts'
 import { initLayout } from '../../core/paths.ts'
 import { writeProjectConfig } from '../../core/project.ts'
 import { bool, one, type Args } from '../args.ts'
@@ -16,17 +17,11 @@ const GITIGNORE_LINES = [
   'sources/*/*.tmp',
   'sources/events.jsonl',
   'sources/*.lock',
+  // core/checkins.ts: how many times nod monitor has asked an in_progress
+  // node for a status update — bookkeeping, shared by the monitor and the
+  // bench, never meant to be committed.
+  'checkins.json',
 ]
-
-/** Adds missing lines without touching anything a human added by hand. */
-function ensureGitignoreLines(path: string, lines: string[]): void {
-  const existing = existsSync(path) ? readFileSync(path, 'utf8').split('\n') : []
-  const have = new Set(existing.map((l) => l.trim()).filter(Boolean))
-  const missing = lines.filter((l) => !have.has(l))
-  if (!missing.length) return
-  const base = existing.join('\n').replace(/\s+$/, '')
-  writeFileSync(path, `${base ? `${base}\n` : ''}${missing.join('\n')}\n`)
-}
 
 const README = `# decisions/
 

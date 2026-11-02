@@ -10,7 +10,8 @@
     "images": "内嵌图片",
     "mouse": "鼠标",
     "idle-exit": "监听空闲多久下线",
-    "unclaimed-after": "答复多久没人取算没人管"
+    "unclaimed-after": "答复多久没人取算没人管",
+    "checkin-after": "没更新多久要问进度"
   },
   "value": {
     "auto": "自动",

@@ -1,6 +1,7 @@
 import { isAbsolute, relative, resolve } from 'node:path'
 import { stringify as stringifyYaml } from 'yaml'
 import { ATTACHMENT_GROUP_END, HEADING, optionsHeading } from './format.ts'
+import { currentIdentity } from './identity.ts'
 import { toPosixPath } from './paths.ts'
 import type { Attachment, Decision, DecisionOption, NoteRole, AttachmentApproval } from './types.ts'
 
@@ -197,10 +198,25 @@ export function relinkFile(text: string, fromDir: string, toDir: string, rename:
   return fm + relinkBody(text.slice(m[0].length), fromDir, toDir, rename)
 }
 
+/**
+ * `<!-- nod:by=<identity> -->` on its own line — invisible in any markdown
+ * viewer, stripped back out by `parse.ts`'s `parseNotes`. Records which
+ * *process* wrote the section, regardless of whose name/role it's signed
+ * as (a lead relaying the owner's own words still signs `--human --by
+ * owner`, but writes the lead's identity here) — see `core/identity.ts`
+ * and N41: a monitor skips its own marker so relaying never echoes back.
+ */
+function writerMarker(): string {
+  const id = currentIdentity()
+  return id ? `<!-- nod:by=${id} -->` : ''
+}
+
 /** Appends a `## <heading>` section without touching a byte of what came before. */
 export function appendSection(body: string, heading: string, text: string): string {
   const base = body.replace(/\s+$/, '')
-  return `${base}\n\n## ${heading}\n\n${text.trim()}\n`
+  const marker = writerMarker()
+  const content = marker ? `${text.trim()}\n${marker}` : text.trim()
+  return `${base}\n\n## ${heading}\n\n${content}\n`
 }
 
 const SLUG_STRIP = /[^0-9a-zA-Z\u4e00-\u9fff\u3040-\u30ff]+/g

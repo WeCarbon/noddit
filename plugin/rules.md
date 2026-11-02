@@ -23,7 +23,10 @@ load the decs skill.
   work found mid-task gets a child node, not just a chat mention.
 - **Progress should move itself**: pipe long commands into `nod progress`
   (`pytest … | nod progress --parse pytest`); multi-step work uses
-  `nod steps` / `nod step`. No update past 30 minutes flags as stuck.
+  `nod steps` / `nod step`. No update past the check-in span (default
+  30m, `nod config checkin-after`) gets a `NODDIT-CHECKIN` line — see
+  below. Still working but nothing to report yet? `nod beat <id>` alone
+  counts as a reply.
 - **Waiting on someone outside**: `nod hold <id> --on "<who/what>"`
   (status "waiting", not stuck); `nod start <id>` once it clears.
 - **Need the owner to decide**: `nod ask <id> -o …` on the current node,
@@ -63,19 +66,36 @@ load the decs skill.
 - **The main session / lead doesn't arm one**: the plugin starts
   `nod monitor --here` automatically each session (current project only,
   lasts the whole session, never expires). Each line is one thing to act
-  on: an owner answer/reply → `nod read`; `DECS-UNCLAIMED` → an unclaimed
-  answer, go claim it; a new external-source item → handle it, then
-  `nod source ack`; `DECS-ERROR` → look, the monitor keeps going.
+  on: an owner answer/reply → `nod read` it, then reply on the node with
+  what you'll do (a short note, or `nod read <id> --ack "…"` in one
+  step) — a reply the owner can see is itself a notifying event, so this
+  matters; `DECS-UNCLAIMED` → an unclaimed answer, go claim it; a new
+  external-source item → handle it, then `nod source ack`; a
+  `NODDIT-CHECKIN` line → reply right away on that node with
+  `nod progress`, `nod note`, or `nod beat <id>` if there's nothing new
+  to say yet — after 3 unanswered the bench flags it (usually piggybacked
+  on another line, but it can show up on its own after a long enough
+  silence); a `NODDIT-STALE` line → some not-started, not-decision-
+  blocked nodes have sat untouched — `nod start`, `nod defer`,
+  `nod close`, or re-plan each one; `DECS-ERROR` → look, the monitor
+  keeps going.
 - **`DECS-IDLE`**: after 2 quiet hours the monitor stops itself. Need to
   wait on a reply again later? Arm it: `Monitor({ command: "nod
   monitor", description: "nod", timeout_ms: 1800000 })`, re-arm
   unchanged on expiry (it remembers where it left off).
+- **A bare `nod monitor` only watches the project under its cwd** — same
+  as `--here`, minus exiting when there's none. Watching every registered
+  project needs `--all-projects` spelled out; don't add it just to be
+  safe, it means seeing other projects' nodes too.
 - **Sub-agents and teammates handle only their own nodes, always with
   `--mine`**: arm `Monitor({ command: "nod monitor --mine", description:
   "nod", timeout_ms: 1800000 })` on start and re-arm it unchanged on
   expiry. In a teammate session the monitor the plugin starts recognises
   the teammate and only reports its own nodes. A node that isn't yours is
-  the lead's — leave it.
+  the lead's — leave it. `nod whoami` shows the identity (`NODDIT_IDENTITY`,
+  else your author name plus a session id) a monitor matches against, and
+  that gets stamped — invisibly — on everything you write, so relaying the
+  owner's own words never echoes back to you.
 - The lead / main session never adds `--mine` (a sub-agent's node is
   authored in its name — add it and you miss the notification).
 - No `nod wait` in a background shell, no home-grown polling, no

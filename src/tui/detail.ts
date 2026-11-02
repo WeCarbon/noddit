@@ -3,14 +3,14 @@ import { overdue } from '../core/order.ts'
 import { approvalLabel, deferredLabel } from '../core/render.ts'
 import { refOf } from '../core/ref.ts'
 import { dependentsOf } from '../core/sequence.ts'
-import { minutesSince, stalenessOf } from '../core/staleness.ts'
+import { minutesSince } from '../core/staleness.ts'
 import { dependenciesOf, isDeferred, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps } from '../core/steps.ts'
 import { type Decision as Item } from '../core/types.ts'
 import type { DecisionQuestion } from '../core/questions.ts'
 import { t } from '../i18n/index.ts'
 import type { Segment } from './model.ts'
-import { GLYPH, STALE_COLOR, ago, agoSpan, bar, glyphOf, keyOf, progressOf, unmetDeps, waitingSince } from './views.ts'
+import { GLYPH, ago, agoSpan, bar, glyphOf, keyOf, progressOf, unmetDeps, waitingSince } from './views.ts'
 import { stringWidth, wrapToWidth } from './width.ts'
 
 type Line = Segment[]
@@ -37,10 +37,8 @@ export function statusSegments(d: Item, items: Item[], now: number): Segment[] {
       }), 'magenta')
       break
     case 'in_progress': {
-      const st = stalenessOf(d, now)
       add(t('bench.detail.updated', { since: ago(minutesSince(d, now)) }))
-      if (st === 'stale') add(t('bench.detail.staleSince', { threshold: d.staleAfter ?? '30m' }), STALE_COLOR[st])
-      if (st === 'very_stale') add(t('bench.detail.veryStaleSince', { threshold: d.staleAfter ?? '30m' }), STALE_COLOR[st], true)
+      if (d.checkin?.unanswered) add(t('bench.detail.checkinUnanswered', { count: d.checkin.asked }), 'red', true)
       break
     }
     case 'decided':
@@ -113,7 +111,7 @@ export function metaLines(d: Item, items: Item[], now: number, width: number, ba
 
   const pct = progressOf(d)
   if (pct !== undefined && (d.state === 'in_progress' || pct > 0)) {
-    const color = STALE_COLOR[stalenessOf(d, now)] ?? 'cyan'
+    const color = d.checkin?.unanswered ? 'red' : 'cyan'
     out.push([
       { text: ` ${t('bench.detail.progress')}`, dim: true },
       { text: bar(pct, Math.max(10, Math.min(30, width - 30))), color },

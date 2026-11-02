@@ -21,7 +21,7 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 | 要 owner 拍板 / 再看一眼 | `nod ask <id> -o 1="…" 2="…"` / `nod ask <id>` |
 | 等外部（同事、客户、供应商、服务恢复） | `nod hold <id> --on "<谁/什么>"`，恢复用 `nod start` |
 | owner 延迟了 / 解除 | owner 可以把节点延迟（bench 里按 d / `nod defer`）：它从可用/活动/待决里消失，状态不变；你收到「owner 延迟」就先停手，解除前别动它（`nod undefer` 解除，`nod show deferred` 列出） |
-| 进度 | `nod progress <pct> "…"` / `nod steps` / `nod step` |
+| 进度 | `nod progress <pct> "…"` / `nod steps` / `nod step`；还在做但没新内容时回 check-in 用 `nod beat <id>` |
 | 等 owner 答复、等外部来源 | 主 session：plugin 自动启动的 decs monitor；DECS-IDLE 之后或子 agent：用 Monitor 挂 `nod monitor`（子 agent 加 --mine） |
 | 附件 / 改标题 / 挪位置 | `nod attach` / `nod retitle` / `nod move` |
 | 负责人派的活（`DECS-BRIEF`、看板里的 ✎） | `nod claim <id>` → `nod expand <id> <<EOF` → 子节点 `--parent --after --est` → `nod ask <id> -o 1="按计划开始" 2="要改（回复里写怎么改）"`；`nod briefs` / `nod sessions` |
@@ -30,14 +30,23 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 
 ## 接通知：nod monitor（MUST FOLLOW）
 
-- **主 session / lead 不用自己挂**：decs plugin 在每个 session 开始时自动启动 `nod monitor --here`（只盯当前项目，整个 session 有效，不会 30 分钟到期）。
-  每一行就是一件要处理的事：owner 的答复/回复 → `nod read` 取走去做；`DECS-UNCLAIMED` → 有答复没人取，去取；
-  外部来源新条目 → 处理后 `nod source ack`；`DECS-ERROR` → 看一眼，monitor 会继续。
+- **主 session / lead 不用自己挂**：decs plugin 在每个 session 开始时自动启动 `nod monitor --here`（只盯当前项目，整个 session 有效，不会到期）。
+  每一行就是一件要处理的事：owner 的答复/回复 → `nod read` 取走，然后在节点上回一句要做什么（简单记一笔，或
+  一步到位用 `nod read <id> --ack "…"`）——owner 看得到的回复本身就是会触发通知的事件，这点很重要；
+  `DECS-UNCLAIMED` → 有答复没人取，去取；外部来源新条目 → 处理后 `nod source ack`；
+  `NODDIT-CHECKIN` → 马上在那个节点上用 `nod progress`、`nod note`，或者没有新内容就 `nod beat <id>`
+  回报——问满 3 次没回 bench 上会标出来（多数搭着别的消息一起来，静默够久也可能自己单独出现）；
+  `NODDIT-STALE` → 有些既不待决策、也没人在做的节点放太久了，逐个 `nod start`、`nod defer`、`nod close`
+  或重新规划；`DECS-ERROR` → 看一眼，monitor 会继续。
 - **`DECS-IDLE`**：连续 2 小时没有事件，monitor 自己下线了。之后又有要等 owner 回复的事，自己挂：
   `Monitor({ command: "nod monitor", description: "nod", timeout_ms: 1800000 })`，到期原样重挂（它自己记得看到哪）。
+- **裸的 `nod monitor` 只盯 cwd 所在的项目**——跟 `--here` 一样，只是没项目时不会退出。要盯所有登记过的
+  项目得显式加 `--all-projects`；别图省事随手加上，那意味着也会收到其他项目的节点。
 - **子 agent / teammate 只管自己的节点，必须用 `--mine`**：自己挂 monitor 时一律 `nod monitor --mine`；
   teammate 会话里 plugin 自动启动的 monitor 会认出自己是 teammate、自动只推自己提的节点。
   收到不是自己的节点，不处理，那是 lead 的事。plugin 的 monitor 不一定在进程内的子 agent 里跑，开工就自己挂，到期原样重挂。
+  `nod whoami` 能看到 monitor 用来匹配的身份（`NODDIT_IDENTITY`，没设就是署名的名字加 session id），
+  这个身份会（看不见地）打在你写的每一笔上，所以转记 owner 的原话不会反过来推给你自己。
 - lead / 主 session 一律不加 `--mine`（替子 agent 提的节点署的是子 agent 的名字，加了就收不到）。
 - 不要用后台 shell 跑 `nod wait`、不要自己写轮询脚本、不要用 `nod watch`（那是给人看的）。
 

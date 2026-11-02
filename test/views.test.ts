@@ -262,11 +262,11 @@ test('one glyph per state: ○ ◐ ⏸ ◆ (bold / dim yellow, green when answer
   assert.deepEqual(g('e'), { text: '◆', color: 'green' }, 'an answered decision keeps ◆, drawn green')
   assert.deepEqual(g('g'), { text: '✓', color: 'green', dim: true })
   assert.deepEqual(g('h'), { text: '✕', dim: true })
-  // ◐ keeps the stale colouring ▶ had.
+  // ◐ no longer colors by age alone — only 3 unanswered check-in asks (core/checkins.ts) turn it red.
   const r = items.find((d) => d.id === ids.r)!
   const at = Date.parse(r.updatedAt!)
-  assert.equal(glyphOf(r, items, at + 31 * 60_000).color, 'gray')
-  assert.equal(glyphOf(r, items, at + 61 * 60_000).color, 'red')
+  assert.equal(glyphOf(r, items, at + 61 * 60_000).color, 'cyan')
+  assert.equal(glyphOf({ ...r, checkin: { asked: 3, lastAskedAt: r.updatedAt!, unanswered: true } }, items).color, 'red')
 })
 
 test('"answered, for AI" is a colour: a task the owner replied to stays ○ / ◐, drawn green', (t) => {

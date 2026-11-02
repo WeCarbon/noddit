@@ -57,11 +57,8 @@ export function summaryLine(d: Decision, opts: { project?: boolean } = {}): stri
   // 待决策 is what `decs show` lists by default, so saying it on every line is noise.
   if (d.state !== 'needs_decision') tail.push(statusLabel(d.state))
   if (d.state === 'needs_decision' && d.options.length) tail.push(i18n('core.render.optionsCount', { count: d.options.length }))
-  const stale = stalenessOf(d)
-  if (stale !== 'fresh') {
-    const text = i18n('core.render.staleFor', { duration: durationText(minutesSince(d) * 60_000) })
-    tail.push(stale === 'very_stale' ? yellow(bold(text)) : yellow(text))
-  }
+  if (stalenessOf(d) !== 'fresh') tail.push(yellow(i18n('core.render.staleFor', { duration: durationText(minutesSince(d) * 60_000) })))
+  if (d.checkin?.unanswered) tail.push(yellow(bold(i18n('core.render.checkinUnanswered', { count: d.checkin.asked }))))
   if (reopenedAfterArchive(d)) tail.push(yellow(i18n('core.render.reopenedAfterArchive')))
   if (d.supersededBy !== undefined) tail.push(i18n('core.render.supersededBy', { ref: formatRef(d.supersededBy, d.letter) }))
   if (d.due && d.status === 'open')
@@ -177,8 +174,11 @@ export function toJSON(d: Decision): Record<string, unknown> {
     est: d.est ?? null,
     when: d.when ?? null,
     stale_after: d.staleAfter ?? null,
-    /** `fresh` unless `in_progress` and past `stale_after` (default 30m); `very_stale` past 2×. */
+    /** `fresh` unless `in_progress` and past its span (`stale_after`, else the `checkin-after` setting). */
     staleness: stalenessOf(d),
+    /** core/checkins.ts: how many times `nod monitor` has asked for a status update since the
+     *  last write, and whether 3 went unanswered. Absent if it's never been asked. */
+    checkin: d.checkin ? { asked: d.checkin.asked, last_asked_at: d.checkin.lastAskedAt, unanswered: d.checkin.unanswered } : null,
     steps: d.steps ?? null,
     owner_agent: d.ownerAgent ?? d.author,
     intake: Boolean(d.intake),

@@ -85,7 +85,7 @@ test('a deferred node is never stale', (t) => {
   const d = store.defer(store.start(store.create({ title: 'running', author: A, task: true, staleAfter: '1m' })), owner)
   const later = Date.parse(d.updatedAt!) + 3 * 3600_000
   assert.equal(stalenessOf(d, later), 'fresh')
-  assert.equal(stalenessOf({ ...d, deferredAt: undefined }, later), 'very_stale')
+  assert.equal(stalenessOf({ ...d, deferredAt: undefined }, later), 'stale')
 })
 
 /**
@@ -219,7 +219,9 @@ test('decs monitor tells the lane "owner Deferred", and nothing is queued', asyn
   }
   await until(() => err.includes('nod monitor: watching'), 'the monitor to start')
   // The cursor is set before that line is printed, so the defer is after it.
-  decs(root, ['defer', '1', '--human'])
+  // No DECS_AUTHOR: a real owner's own terminal has none — the monitor's write-marker
+  // self-filter (core/identity.ts) must not mistake this for the lane's own write.
+  decs(root, ['defer', '1', '--human'], { DECS_AUTHOR: undefined })
   await until(() => out.includes('owner Deferred'), 'the Deferred line')
   // A couple more passes, to be sure nothing else follows.
   await new Promise((r) => setTimeout(r, 500))

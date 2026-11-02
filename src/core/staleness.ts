@@ -1,9 +1,8 @@
 import { parseDuration } from './duration.ts'
+import { settingValue } from './settings.ts'
 import type { Decision as Item } from './types.ts'
 
-/** in_progress with no update for a while → stuck. */
-
-export const DEFAULT_STALE_AFTER_MS = 30 * 60_000
+/** in_progress with no update for a while → due a check-in (see `core/checkins.ts`). */
 
 type Staleish = Pick<Item, 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt'> & Partial<Pick<Item, 'deferredAt'>>
 
@@ -15,28 +14,27 @@ export function minutesSince(i: Pick<Item, 'updatedAt' | 'created' | 'activeAt'>
   return Math.max(0, (now - t) / 60_000)
 }
 
-export type Staleness = 'fresh' | 'stale' | 'very_stale'
+export type Staleness = 'fresh' | 'stale'
+
+/** The node's own `stale_after`, else the `checkin-after` setting (default 1h) — the
+ *  one span both "no update in a while" and the check-in ask (`core/checkins.ts`) share. */
+export function checkinThresholdMs(staleAfter?: string): number {
+  return staleAfter ? parseDuration(staleAfter) : parseDuration(settingValue('checkin-after').value)
+}
 
 /** Only `in_progress` goes stale — a node waiting on the owner (needs_decision) not moving is expected. */
 export function stalenessOf(i: Staleish, now = Date.now()): Staleness {
   if (i.state !== 'in_progress') return 'fresh'
   // 延迟: the owner put it off; nobody is expected to move it.
   if (i.deferredAt) return 'fresh'
-  const thresholdMs = i.staleAfter ? parseDuration(i.staleAfter) : DEFAULT_STALE_AFTER_MS
+  const thresholdMs = checkinThresholdMs(i.staleAfter)
   const t = Date.parse(i.activeAt || i.updatedAt || i.created || '')
   if (Number.isNaN(t)) return 'fresh'
-  const ms = now - t
-  if (ms >= thresholdMs * 2) return 'very_stale'
-  if (ms >= thresholdMs) return 'stale'
-  return 'fresh'
+  return now - t >= thresholdMs ? 'stale' : 'fresh'
 }
 
 export function isStale(i: Staleish, now = Date.now()): boolean {
   return stalenessOf(i, now) !== 'fresh'
-}
-
-export function isVeryStale(i: Staleish, now = Date.now()): boolean {
-  return stalenessOf(i, now) === 'very_stale'
 }
 
 export interface ObsoleteOptions {

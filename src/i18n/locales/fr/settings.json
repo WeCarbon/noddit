@@ -10,7 +10,8 @@
     "images": "Images intégrées",
     "mouse": "Souris",
     "idle-exit": "Arrêt de la surveillance après inactivité",
-    "unclaimed-after": "Réponse non reprise après"
+    "unclaimed-after": "Réponse non reprise après",
+    "checkin-after": "Relance d’avancement après"
   },
   "value": {
     "auto": "automatique",

@@ -3,8 +3,8 @@ import { waitingOnOwner } from '../core/status.ts'
 import type { Decision as Item } from '../core/types.ts'
 import { isRtl, t } from '../i18n/index.ts'
 import type { Segment } from './model.ts'
-import { GLYPH, STALE_COLOR, ago, agoSpan, bar, ownerQueue, progressOf } from './views.ts'
-import { minutesSince, stalenessOf } from '../core/staleness.ts'
+import { GLYPH, ago, agoSpan, bar, ownerQueue, progressOf } from './views.ts'
+import { minutesSince } from '../core/staleness.ts'
 import { refOf } from '../core/ref.ts'
 import { isUnclaimedBrief } from '../core/intake.ts'
 import { fit, stringWidth } from './width.ts'
@@ -121,16 +121,17 @@ export function workingLine(ov: Overview, items: Item[], width: number, now: num
   }
   const head: Segment[] = [{ text: t('bench.summary.working'), bold: true }, { text: `${running.length}`, color: 'cyan', bold: true }, { text: t('bench.summary.colon') }]
   const parts = running.map((d, i): Segment[] => {
-    const st = stalenessOf(d, now)
     const pct = progressOf(d)
-    const color = STALE_COLOR[st]
+    const alert = Boolean(d.checkin?.unanswered)
+    const color = alert ? 'red' : undefined
     return [
       { text: i ? '  ' : '' },
       { text: GLYPH.in_progress, color: color ?? 'cyan' },
       { text: refOf(d), color: 'cyan' },
       { text: ` ${fit(d.title, STRIP_TITLE, isRtl())} `, color },
       ...(pct !== undefined ? [{ text: `${bar(pct, 6)} ${pct}% `, color: color ?? 'cyan' } as Segment] : []),
-      { text: ago(minutesSince(d, now)), color, dim: st === 'fresh', bold: st === 'very_stale' },
+      { text: ago(minutesSince(d, now)), color, dim: !alert, bold: alert },
+      ...(alert ? [{ text: ` ${t('bench.badge.checkinUnanswered', { count: d.checkin!.asked })}`, color: 'red', bold: true } as Segment] : []),
     ]
   })
   return packLine(head, parts, [], width)

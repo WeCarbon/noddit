@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setLang } from '../src/i18n/index.ts'
 
+import { askIfDue } from '../src/core/checkins.ts'
 import { initLayout } from '../src/core/paths.ts'
 import { Store } from '../src/core/store.ts'
 import { buildOverview } from '../src/core/overview.ts'
@@ -215,23 +216,38 @@ test('stepIndex skips group headers but stops on fold rows, which +/- open', () 
 // Status, staleness, owner markers
 // ---------------------------------------------------------------------------
 
-test('a running node goes grey past stale_after and red past twice that', (t) => {
+test('a running node shows no coloring from age alone; only 3 unanswered check-in asks turn it red with a badge', (t) => {
   const store = tmpStore(t)
   const s = session(store)
-  const items = store.all()
+  let items = store.all()
   const gate = items.find((d) => d.id === s.gate.id)!
-  const row: Row = { key: keyOf(gate), kind: 'node', node: gate, depth: 0 }
+  const row = (d: typeof gate): Row => ({ key: keyOf(d), kind: 'node', node: d, depth: 0 })
   const updated = Date.parse(gate.updatedAt!)
-  const colorOfAge = (mins: number) => {
-    const segs = nodeRowSegments(row, items, 80, updated + mins * 60_000)
-    return segs.find((x) => /\d+ minutes? ago|an? hour(s)? ago|a few seconds ago/.test(x.text))?.color
-  }
-  assert.equal(colorOfAge(2), undefined, 'fresh')
-  assert.equal(colorOfAge(12), 'gray', 'stale_after is 10m')
-  assert.equal(colorOfAge(25), 'red', 'past 2×')
-  assert.equal(glyphOf(gate, items, updated + 25 * 60_000).color, 'red')
+
+  // Age by itself never colors the row now (core/checkins.ts replaced the old grey/red).
+  const ageText = (mins: number) => text(nodeRowSegments(row(gate), items, 80, updated + mins * 60_000))
+  assert.equal(nodeRowSegments(row(gate), items, 80, updated + 2 * 60_000).find((x) => /minutes? ago/.test(x.text))?.color, undefined)
+  assert.doesNotMatch(ageText(25), /asked/, 'past the 2× mark used to mean something; now it means nothing on its own')
+  assert.equal(glyphOf(gate, items, updated + 25 * 60_000).color, 'cyan')
   // The progress bar is there too.
-  assert.match(text(nodeRowSegments(row, items, 80, updated)), /███░+ 37%/)
+  assert.match(text(nodeRowSegments(row(gate), items, 80, updated)), /███░+ 37%/)
+
+  // 3 asks spaced a stale_after (10m) apart, with no write in between — the bench turns it red with a badge.
+  const layout = store.layoutOf(gate)
+  const base = Date.now()
+  const idleAt = new Date(base - 3 * 3600_000).toISOString()
+  const idle = { ...gate, updatedAt: idleAt, activeAt: idleAt }
+  for (let i = 0; i < 3; i++) askIfDue(layout, idle, base + i * 15 * 60_000)
+  items = store.all()
+  const asked = items.find((d) => d.id === s.gate.id)!
+  assert.equal(asked.checkin?.asked, 3)
+  assert.equal(asked.checkin?.unanswered, true)
+  assert.equal(glyphOf(asked, items).color, 'red')
+  assert.match(text(nodeRowSegments(row(asked), items, 80, base)), /asked 3× · no reply/)
+
+  // A write (any of them) resets it — `store.write` calls `resetCheckin`.
+  store.progress(asked, { progress: 40 })
+  assert.equal(store.get(asked.id)!.checkin, undefined)
 })
 
 test('◆ bold is an AI stuck on the owner; ◆ dim is a question that can be answered early', (t) => {

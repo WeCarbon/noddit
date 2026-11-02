@@ -4,7 +4,7 @@ import { NOTE_KIND } from '../core/format.ts'
 import { parseNotes } from '../core/parse.ts'
 import { refOf } from '../core/ref.ts'
 import { dependentsOf } from '../core/sequence.ts'
-import { minutesSince, stalenessOf, type Staleness } from '../core/staleness.ts'
+import { minutesSince } from '../core/staleness.ts'
 import { deferHidden, dependenciesOf, isDeferred, isStartable, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps, stepProgress } from '../core/steps.ts'
 import type { Decision as Item } from '../core/types.ts'
@@ -498,8 +498,6 @@ export function progressOf(d: Item): number | undefined {
   return steps.length ? stepProgress(steps) : undefined
 }
 
-export const STALE_COLOR: Record<Staleness, string | undefined> = { fresh: undefined, stale: 'gray', very_stale: 'red' }
-
 export interface Glyph {
   text: string
   color?: string
@@ -536,7 +534,7 @@ export const glyphText = (d: Item) => (isUnclaimedBrief(d) ? BRIEF_GLYPH : d.sta
 /**
  * ◆ is yellow, bold while an AI is stuck on it, dim if answerable early.
  * Green is 已答待取 (owner answered, AI hasn't picked up), keeping its task
- * shape. ◐ goes grey past stale_after, red past 2×.
+ * shape. ◐ goes red once a check-in has gone unanswered 3 times (core/checkins.ts).
  */
 export function glyphOf(d: Item, items: Item[], now = Date.now()): Glyph {
   const text = glyphText(d)
@@ -545,7 +543,7 @@ export function glyphOf(d: Item, items: Item[], now = Date.now()): Glyph {
     case 'not_started':
       return { text, dim: true }
     case 'in_progress':
-      return { text, color: STALE_COLOR[stalenessOf(d, now)] ?? 'cyan' }
+      return { text, color: d.checkin?.unanswered ? 'red' : 'cyan' }
     case 'waiting':
       return { text, color: 'magenta' }
     case 'needs_decision':
@@ -595,14 +593,16 @@ export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segmen
   }
   switch (d.state) {
     case 'in_progress': {
-      const st = stalenessOf(d, now)
       const when = ago(minutesSince(d, now))
       const pct = progressOf(d)
-      const color = STALE_COLOR[st]
-      const age: Segment = { text: when, color, dim: st === 'fresh', bold: st === 'very_stale' }
-      if (pct !== undefined) forms.push([...fold, { text: bar(pct, 8), color: color ?? 'cyan' }, { text: ` ${pct}% ` }, age])
-      if (pct !== undefined) forms.push([...fold, { text: `${pct}% ` }, age])
-      forms.push([age])
+      const alert = d.checkin?.unanswered
+      const color = alert ? 'red' : undefined
+      const age: Segment = { text: when, color, dim: !alert, bold: alert }
+      const badge: Segment[] = alert ? [{ text: ` ${t('bench.badge.checkinUnanswered', { count: d.checkin!.asked })}`, color: 'red', bold: true }] : []
+      if (pct !== undefined) forms.push([...fold, { text: bar(pct, 8), color: color ?? 'cyan' }, { text: ` ${pct}% ` }, age, ...badge])
+      if (pct !== undefined) forms.push([...fold, { text: `${pct}% ` }, age, ...badge])
+      forms.push([age, ...badge])
+      if (alert) forms.push([{ text: t('bench.badge.checkinUnanswered', { count: d.checkin!.asked }), color: 'red', bold: true }])
       break
     }
     case 'waiting': {
@@ -697,7 +697,6 @@ export function nodeRowSegments(row: Row, items: Item[], width: number, now: num
 function nodeRowParts(row: Row, items: Item[], width: number, now: number, opts: { tree?: boolean }): Segment[] {
   const d = row.node!
   const glyph = glyphOf(d, items, now)
-  const st = stalenessOf(d, now)
   const finished = isTerminal(d.state)
   const mark = opts.tree ? subtreeWaiting(d, items) : null
   const lead: Segment[] = [
@@ -707,7 +706,7 @@ function nodeRowParts(row: Row, items: Item[], width: number, now: number, opts:
     { ...glyph },
     { text: ` ${refOf(d)} `, color: finished ? undefined : 'cyan', dim: finished },
   ]
-  const titleColor = d.state === 'in_progress' ? STALE_COLOR[st] : undefined
+  const titleColor = d.state === 'in_progress' && d.checkin?.unanswered ? 'red' : undefined
   const title: Segment = {
     text: d.title,
     dim: finished,

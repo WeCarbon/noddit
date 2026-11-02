@@ -8,6 +8,7 @@
     "noAuthor": "(無署名)",
     "optionsCount_other": "{{count}} 個選項",
     "staleFor": "{{duration}}沒更新",
+    "checkinUnanswered": "問了 {{count}} 次沒回",
     "reopenedAfterArchive": "歸檔後有新回覆",
     "supersededBy": "被 {{ref}} 取代",
     "overdueAt": "已過截止 {{time}}",

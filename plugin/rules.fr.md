@@ -25,7 +25,10 @@ suite — tout est dans `nod bench`. Hors nod, invisible. Détails :
 - **La progression avance seule** : connectez les longues commandes à
   `nod progress` (`pytest … | nod progress --parse pytest`) ;
   plusieurs étapes → `nod steps` / `nod step`. Pas de mise à jour
-  depuis 30 min = bloqué.
+  depuis la durée de relance (30 min par défaut, `nod config
+  checkin-after`) = une ligne `NODDIT-CHECKIN` — voir plus bas. Toujours
+  en cours mais rien de nouveau à dire ? `nod beat <id>` seul compte
+  comme une réponse.
 - **En attente côté extérieur** : `nod hold <id> --on "<qui/quoi>"`
   (statut « en attente », pas bloqué) ; `nod start <id>` une fois
   réglé.
@@ -68,20 +71,40 @@ suite — tout est dans `nod bench`. Hors nod, invisible. Détails :
 - **La session principale n'arme rien** : le plugin démarre
   `nod monitor --here` à chaque session (projet courant, toute la
   session, n'expire jamais). Chaque ligne, une chose à traiter :
-  réponse → `nod read` ; `DECS-UNCLAIMED` → réponse non prise, à
+  réponse → `nod read`, puis répondez sur le nœud ce que vous allez
+  faire (une courte note, ou en une étape `nod read <id> --ack "…"`) —
+  une réponse que le responsable peut voir est elle-même un événement
+  notifiant, c'est important ; `DECS-UNCLAIMED` → réponse non prise, à
   prendre ; élément externe → traitez, puis `nod source ack` ;
-  `DECS-ERROR` → regardez, la surveillance continue.
+  `NODDIT-CHECKIN` → répondez tout de suite sur ce nœud avec
+  `nod progress`, `nod note`, ou `nod beat <id>` si rien de nouveau à
+  dire — après 3 relances sans réponse le tableau le signale (en général
+  en écho d'une autre ligne, mais elle peut apparaître seule après un
+  silence assez long) ; `NODDIT-STALE` → des nœuds ni à décider ni en
+  cours dorment depuis trop longtemps — `nod start`, `nod defer`,
+  `nod close`, ou replanifiez chacun ; `DECS-ERROR` → regardez, la
+  surveillance continue.
 - **`DECS-IDLE`** : après 2 heures de calme, la surveillance s'arrête seule.
   Besoin d'attendre une réponse ensuite ?
   `Monitor({ command: "nod monitor", description: "nod", timeout_ms:
   1800000 })`, réarmé à l'identique à l'expiration (il se souvient d'où
   il s'est arrêté).
+- **Un `nod monitor` nu ne surveille que le projet sous son cwd** —
+  comme `--here`, sauf qu'il ne quitte pas s'il n'y en a aucun.
+  Surveiller tous les projets enregistrés demande `--all-projects`
+  explicitement ; ne l'ajoutez pas par précaution, cela veut dire voir
+  aussi les nœuds des autres projets.
 - **Sous-agents et coéquipiers ne traitent que leurs propres nœuds, toujours
   avec `--mine`** : armez `Monitor({ command: "nod monitor --mine",
   description: "nod", timeout_ms: 1800000 })` au démarrage et réarmez-le à
   l’identique à l’expiration. Dans une session coéquipier, la surveillance lancée
   par le plugin reconnaît le coéquipier et ne signale que ses nœuds. Un nœud
   qui n’est pas le vôtre revient à la session principale : n’y touchez pas.
+  `nod whoami` montre l'identité (`NODDIT_IDENTITY`, sinon votre nom
+  d'auteur plus un identifiant de session) qu'une surveillance reconnaît,
+  et qui est inscrite — invisiblement — sur tout ce que vous écrivez, si
+  bien que relayer les propres mots du responsable ne vous revient jamais
+  en écho.
 - La session principale n'ajoute jamais `--mine` (le nœud d'un sous-agent
   est signé de son nom — l'ajouter fait manquer la notification).
 - Pas de `nod wait` en arrière-plan, pas de script de sondage maison,

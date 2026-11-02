@@ -82,6 +82,13 @@ export const SETTINGS: readonly Setting[] = [
     values: ['1m', '5m', '15m', '30m', '1h'],
     default: '5m',
   },
+  {
+    key: 'checkin-after',
+    type: 'duration',
+    values: ['15m', '30m', '1h', '2h', '4h'],
+    default: '30m',
+    env: 'CHECKIN_AFTER',
+  },
 ]
 
 export function settingFor(key: string): Setting | undefined {

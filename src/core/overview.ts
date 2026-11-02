@@ -2,7 +2,7 @@ import { compareUrgency } from './order.ts'
 import { refOf } from './ref.ts'
 import { buildSchedule, dependentsOf, findCycles, type Cycle, type ScheduleRow } from './sequence.ts'
 import { deferHidden } from './status.ts'
-import { isStale, isVeryStale, minutesSince } from './staleness.ts'
+import { isStale, minutesSince } from './staleness.ts'
 import { listSources, type SourceSummary } from './sources.ts'
 import type { Store } from './store.ts'
 import { projectSessions } from './listeners.ts'
@@ -35,7 +35,8 @@ export interface InProgressRow {
   progress?: number
   progressMsg?: string
   stale: boolean
-  veryStale: boolean
+  /** `core/checkins.ts`: asked 3 times with no reply. */
+  checkinUnanswered: boolean
   minutesSinceUpdate: number
 }
 
@@ -84,7 +85,7 @@ export function buildOverview(items: Item[], now = Date.now(), sources: SourceSu
       progress: i.progress,
       progressMsg: i.progressMsg,
       stale: isStale(i, now),
-      veryStale: isVeryStale(i, now),
+      checkinUnanswered: Boolean(i.checkin?.unanswered),
       minutesSinceUpdate: Math.round(minutesSince(i, now)),
     }))
 

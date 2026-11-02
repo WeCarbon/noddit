@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
+import { checkinsFileExists, readCheckinsMap, resetCheckin, UNANSWERED_AFTER } from './checkins.ts'
 import { createFileAtomic, withFileLock, writeFileAtomic } from './lock.ts'
 import { collapseDuplicateOptions, type DuplicateOptionsBlock } from './repair.ts'
 import { attachmentDir, childDirOf, entryFileName, listEntryFiles, toPosixPath, type Layout } from './paths.ts'
@@ -112,6 +113,35 @@ export class Store {
   private lastAll: { out: Decision[]; misses: number; paths: string } | null = null
 
   all(): Decision[] {
+    return this.withCheckins(this.allCore())
+  }
+
+  /**
+   * `core/checkins.ts`'s ask count can change independent of any node file
+   * (a span elapsing, or the monitor recording an ask), so it's re-read on
+   * every `all()` regardless of `allCore()`'s own cache — but cheaply:
+   * when nobody anywhere has ever been asked (the common case), this is
+   * one tiny file read per layout and the very same array/objects back.
+   */
+  private withCheckins(items: Decision[]): Decision[] {
+    let patched: Decision[] | undefined
+    const perLayout = new Map<string, Record<string, { asked: number; lastAskedAt: string }>>()
+    items.forEach((d, i) => {
+      const layout = this.layoutOf(d)
+      let map = perLayout.get(layout.root)
+      if (map === undefined) {
+        map = checkinsFileExists(layout) ? readCheckinsMap(layout) : {}
+        perLayout.set(layout.root, map)
+      }
+      const entry = map[String(d.id)]
+      if (!entry) return
+      patched ??= [...items]
+      patched[i] = { ...d, checkin: { ...entry, unanswered: entry.asked >= UNANSWERED_AFTER } }
+    })
+    return patched ?? items
+  }
+
+  private allCore(): Decision[] {
     const out: Decision[] = []
     const seen = new Set<string>()
     let misses = 0
@@ -595,6 +625,20 @@ export class Store {
       if (filter.author && !ownedBy(d, filter.author)) continue
       const base = { id: d.id, ref: refOf(d), project: d.project, title: d.title, entry_author: d.author, file: d.file }
       if (after(d.created)) out.push({ ...base, at: d.created, event: 'created', role: 'agent', by: d.author })
+      // The first agent note after a human post is the reply to it — an
+      // owner-facing event the desktop app notifies on (see `cli/commands/
+      // monitor.ts`'s `reportUpdates`). Later agent notes before the next
+      // human post are just further work, not a fresh reply.
+      let repliedSinceHuman = false
+      const ownerFacing = d.notes.map((n) => {
+        if (n.role === 'human') {
+          repliedSinceHuman = false
+          return false
+        }
+        if (repliedSinceHuman) return false
+        repliedSinceHuman = true
+        return true
+      })
       d.notes.forEach((n, i) => {
         const precision = parseNoteHeading(`## ${n.heading}`)?.precisionMs ?? 60_000
         if (!after(n.at, precision)) return
@@ -609,6 +653,8 @@ export class Store {
           by: n.author,
           kind: n.kind,
           text: n.text,
+          ...(n.writer ? { writer: n.writer } : {}),
+          ...(ownerFacing[i] ? { ownerFacing: true } : {}),
           ...(latest && d.answer ? { choice: d.answer.choice ?? null } : {}),
         })
       })
@@ -968,6 +1014,8 @@ export class Store {
   private write(d: Decision, move?: 'archive' | 'unarchive'): Decision {
     d = { ...d, updatedAt: nowStamp(new Date(), { ms: true }) }
     writeFileAtomic(d.file, serializeDecision(d))
+    // Any write is a reply — clears a pending check-in ask (core/checkins.ts).
+    resetCheckin(this.layoutOf(d), d.id)
     if (!move) return this.reread(d)
     const layout = this.layoutOf(d)
     const from = d.archived ? layout.archivedDir : layout.activeDir
@@ -1120,6 +1168,13 @@ export interface ChangeEvent {
   kind?: string
   text?: string
   choice?: string | null
+  /** Who actually wrote this, process-wise (see `core/identity.ts`) — absent
+   *  when the write carried no marker (older files, or no identity set). */
+  writer?: string
+  /** An agent's own note that is the first reply after a human post — the
+   *  owner can see it, so it's an event worth notifying on, not just a
+   *  record. Never set for a human-authored note. */
+  ownerFacing?: boolean
   file: string
 }
 
@@ -1130,9 +1185,13 @@ export function sameAgent(entryAuthor: string | undefined, me: string): boolean 
   return entryAuthor.includes(me) || (name(me) !== '' && name(entryAuthor) === name(me))
 }
 
-/** Whether `me` answers for this node: it filed it, or it claimed the brief the owner filed. */
-export function ownedBy(d: Pick<Decision, 'author' | 'claimedBy'>, me: string): boolean {
-  return sameAgent(d.author, me) || (d.claimedBy !== undefined && (sameAgent(d.claimedBy, me) || sameAgent(me, d.claimedBy)))
+/** Whether `me` answers for this node: it filed it, runs it (`owner_agent`), or claimed the brief the owner filed. */
+export function ownedBy(d: Pick<Decision, 'author' | 'claimedBy' | 'ownerAgent'>, me: string): boolean {
+  return (
+    sameAgent(d.author, me) ||
+    (d.ownerAgent !== undefined && (sameAgent(d.ownerAgent, me) || sameAgent(me, d.ownerAgent))) ||
+    (d.claimedBy !== undefined && (sameAgent(d.claimedBy, me) || sameAgent(me, d.claimedBy)))
+  )
 }
 
 /** A brief someone else has already claimed; carries the node so a caller can say who. */

@@ -4,7 +4,6 @@ import { QUESTIONS_HEADING_RE } from '../core/questions.ts'
 import { toJSON } from '../core/render.ts'
 import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf } from '../core/sequence.ts'
-import { stalenessOf } from '../core/staleness.ts'
 import { dependenciesOf, isTerminal } from '../core/status.ts'
 import { projectSessions } from '../core/listeners.ts'
 import type { Store } from '../core/store.ts'
@@ -173,7 +172,7 @@ function nodeJson(d: Item, items: Item[], now: number, backlinks: Item[]): Recor
     after_nodes: dependenciesOf(d, items).map((dep) => (typeof dep === 'string' ? { key: null, ref: dep, title: null, state: null, glyph: null } : pill(dep, items, now))),
     blocking_nodes: dependentsOf(d, items).map((b) => pill(b, items, now)),
     referenced_by: backlinks.map((b) => pill(b, items, now)),
-    staleness: stalenessOf(d, now),
+    // `staleness` / `checkin` come from `toJSON(d)` above (`...fields`).
     body_rows: bodyRows({ ...d, body: rest }, NO_WRAP, false, nodeImages(d)).map(asHeading(t('bench.detail.attachmentsHeading'))).map((r) => ({
       text: r.text,
       ...(r.image !== undefined ? { image: r.image } : {}),

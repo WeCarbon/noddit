@@ -102,12 +102,22 @@ nod 里批（bench 里按数字，或 owner 自己的终端）；`--human` 只�
 装了 Claude Code 插件的话，插件在每个 session 开始时自动启动 `nod monitor --here`：只盯当前目录所在的项目，
 整个 session 有效，主 session 不用自己挂。每一行就是一件要处理的事：
 
-- owner 的答复/回复 → `nod read` 取走去做；
+- owner 的答复/回复 → `nod read` 取走，然后在节点上回一句要做什么（简单记一笔，或一步到位用
+  `nod read <id> --ack "…"`）——owner 看得到的回复本身就是会触发通知的事件，不要只在心里想；
 - `DECS-UNCLAIMED` → 有答复 5 分钟没人取走，lead 去取；
 - `DECS-BRIEF` → owner 新派了活（或派的活 5 分钟没人接），按下面「owner 派活」接走；
 - 外部来源新条目 → 处理后 `nod source ack`；
+- `NODDIT-CHECKIN` → 执行中的节点过了 check-in 的时限还没更新，马上在那个节点上回：
+  `nod progress` / `nod note` / `nod beat <id>`（没有新内容时用，等于「我还在做」）；
+- `NODDIT-STALE` → 有节点既不待决策、也没人在做，放太久了，`nod start` / `nod defer` /
+  `nod close` 或重新规划；
 - `DECS-ERROR` → 看一眼，monitor 会继续；
 - `DECS-IDLE` → 连续 2 小时（`--idle-exit`，0 = 不下线）没有事件，monitor 自己下线了。
+
+裸的 `nod monitor`（不带 `--here`）只盯 cwd 所在的项目，跟 `--here` 一样，只是没项目时不退出；
+要盯所有登记过的项目得显式加 `--all-projects`，别图省事随手加上。`nod whoami` 看监听用来匹配
+的身份（`NODDIT_IDENTITY`，没设就是署名的名字加 session id）——这个身份会看不见地打在每一笔
+写入上，转记 owner 的原话不会反过来推给自己。
 
 monitor 下线之后又有要等 owner 回复的事，或者你是子 agent（插件的 monitor 不一定在子 agent 里跑），
 用 Monitor 工具自己挂：
@@ -310,10 +320,12 @@ nod step <id> 2        # 第 1、2 步算完成，自动按 2/4 算成 50%，记
 由你转记），节点就变成「待 AI 取走」，不再显示为「等你」。`nod read` 取走后它是执行中；
 改好了要 owner 再看，用 `nod ask <id>`（不给 `-o` 就是把原来的问题再问一次）。
 
-**卡住检测是自动的**：`nod show active --stale`（或 `--json`）会列出执行中、且过了自己
-`stale_after`（默认 30 分钟，`nod add --stale-after 90m` 按节点自己改）还没更新的节点；
-超过 2 倍阈值是 `very_stale`。owner/lead 定时扫一次就知道哪个 lane 掉线了——不需要你主动
-汇报「还在跑，没有新进展」，`nod progress`/`nod step` 按自己的节奏更新就行。
+**没更新会被问，不需要你主动汇报。** 执行中的节点过了自己的 `stale_after`（没设就用
+`checkin-after` 设置，默认 30 分钟；`nod add --stale-after 90m` 按节点自己改）还没更新，
+monitor 会在下一行（或静默够久就单独）打一条 `NODDIT-CHECKIN`——收到就马上回：`nod progress`、
+`nod note`，或没有新内容时 `nod beat <id>`（相当于「我还在做」，不留可见记录）。任何写入都算
+回复，清零次数；连续问了 3 次没回，bench 才会标红。`nod show active --stale`（或 `--json`）
+能自己查还有哪些过了阈值。
 
 ## owner 派活：接走 → 展开 → 确认（MUST FOLLOW）
 

@@ -13,6 +13,7 @@
     "optionsCount_many": "{{count}} خيارًا",
     "optionsCount_other": "{{count}} خيار",
     "staleFor": "{{duration}} بلا تحديث",
+    "checkinUnanswered": "سُئل {{count}} مرات بلا رد",
     "reopenedAfterArchive": "رد جديد بعد الأرشفة",
     "supersededBy": "استُبدلت بـ {{ref}}",
     "overdueAt": "تجاوزت الموعد النهائي {{time}}",

@@ -10,7 +10,8 @@
     "images": "Inline images",
     "mouse": "Mouse",
     "idle-exit": "Monitor stops after idle",
-    "unclaimed-after": "Unclaimed answer after"
+    "unclaimed-after": "Unclaimed answer after",
+    "checkin-after": "Check in after"
   },
   "value": {
     "auto": "automatic",
