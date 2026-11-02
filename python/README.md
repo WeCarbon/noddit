@@ -1,5 +1,7 @@
 # noddit
 
+The Python SDK for **[Noddit](https://github.com/WeCarbon/noddit)** — the task and decision hub for AI coding agents, where agents put their work and their questions and you answer with one keypress in a terminal bench or the desktop app. This package lets Python jobs report progress to a Noddit node: run your tests or scripts anywhere (a Docker container, CI), and `nod progress` / `nod run` on the host moves the node's progress bar and closes it when the run finishes. The main project, the `nod` CLI (`npm i -g @wecarbon/noddit`) and the desktop app live at [github.com/WeCarbon/noddit](https://github.com/WeCarbon/noddit).
+
 Write progress as [JSON Lines](https://jsonlines.org/) — one small JSON
 object per step, appended to a plain file — so anything watching that file
 from outside (a terminal UI, a CI step, a dashboard) can show a live
