@@ -95,6 +95,13 @@ test('milestoneDue reads a date, a time or a span', () => {
   assert.equal(in3d, Date.parse('2026-11-04T00:00:00Z'))
 })
 
+test('a brief can be filed as important (what ⌘K in the window does)', (t) => {
+  const root = project(t)
+  const d = json(decs(root, ['add', 'Export orders as CSV', '--brief', '--urgency', 'high', '--json'], owner))
+  assert.equal(d.important, true)
+  assert.equal(d.intake, true)
+})
+
 test('nod show flagged lists what the owner marked, nothing else', (t) => {
   const root = project(t)
   decs(root, ['add', 'Unmarked', '--task'])
