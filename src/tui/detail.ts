@@ -98,7 +98,7 @@ export function metaLines(d: Item, items: Item[], now: number, width: number, ba
 
   const flags: Segment[] = []
   if (isDeferred(d)) flags.push({ text: ` ${t('bench.detail.undefer', { label: deferredLabel(d, now) })}`, color: 'gray' })
-  if (d.urgency === 'high') flags.push({ text: ` ${t('bench.badge.urgent')}`, color: 'red', bold: true })
+  if (d.urgency === 'high') flags.push({ text: ` ★ ${t('bench.badge.urgent')}`, color: 'yellow', bold: true })
   if (d.urgency === 'low') flags.push({ text: ` ${t('bench.badge.notUrgent')}`, dim: true })
   if (d.due) flags.push({ text: ` ${t('bench.detail.due', { date: d.due.slice(5, 16).replace('T', ' ') })}`, color: overdue(d, now) ? 'red' : undefined })
   if (d.ifNoAnswer && !isTerminal(d.state)) {

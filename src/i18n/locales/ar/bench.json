@@ -52,7 +52,7 @@
     "waitingOn": "بانتظار {{refs}}",
     "ready": "جاهز",
     "answered": "أُجيب",
-    "urgent": "عاجل",
+    "urgent": "مهمة",
     "notUrgent": "غير عاجل",
     "brief": "جديد منك",
     "briefSince": "جديد منك · بانتظار ذكاء اصطناعي · {{since}}",

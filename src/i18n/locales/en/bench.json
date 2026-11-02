@@ -52,7 +52,7 @@
     "waitingOn": "Waiting on {{refs}}",
     "ready": "Ready",
     "answered": "Answered",
-    "urgent": "Urgent",
+    "urgent": "Important",
     "notUrgent": "Not urgent",
     "brief": "New from you",
     "briefSince": "New from you · waiting for an AI · {{since}}",

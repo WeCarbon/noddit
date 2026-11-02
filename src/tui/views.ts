@@ -646,7 +646,8 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
     }
     case 'needs_decision': {
       const blocks = dependentsOf(d, items).length
-      const urgent: Segment[] = d.urgency === 'high' ? [{ text: `${t('bench.badge.urgent')} `, color: 'red', bold: true }] : []
+      // Important shows as ★ before the title; the badge need not say it again.
+      const urgent: Segment[] = []
       const decide = t('bench.tabs.decide')
       if (waitingOnOwner(d, items)) {
         const tail: Segment[] = blocks ? [{ text: ` · ${t('bench.summary.blockingNote', { count: blocks })}`, dim: true }] : []

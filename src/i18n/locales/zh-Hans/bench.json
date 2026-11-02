@@ -52,7 +52,7 @@
     "waitingOn": "等 {{refs}}",
     "ready": "可开始",
     "answered": "已答待取",
-    "urgent": "紧急",
+    "urgent": "重要",
     "notUrgent": "不急",
     "brief": "你新派的",
     "briefSince": "你新派的 · 等 AI 接 · {{since}}",
