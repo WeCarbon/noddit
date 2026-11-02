@@ -265,10 +265,37 @@ function Compare({ indices, images, onImage }: { indices: number[]; images: Imag
   )
 }
 
+/** HTML comments (`<!-- nod:by=… -->`, group ends) are bookkeeping in the file, never text to read. */
+export function withoutComments(rows: BodyRow[]): BodyRow[] {
+  const out: BodyRow[] = []
+  let open = false
+  for (const r of rows) {
+    if (r.image !== undefined || r.style) {
+      out.push(r)
+      continue
+    }
+    let text = r.text
+    if (open) {
+      const end = text.indexOf('-->')
+      if (end === -1) continue
+      text = text.slice(end + 3)
+      open = false
+    }
+    text = text.replace(/<!--[\s\S]*?-->/g, '')
+    const start = text.indexOf('<!--')
+    if (start !== -1) {
+      text = text.slice(0, start)
+      open = true
+    }
+    if (text.trim() || !r.text.includes('<!--') && !r.text.includes('-->')) out.push(text === r.text ? r : { ...r, text })
+  }
+  return out
+}
+
 export function Body({ rows, images, onImage }: { rows: BodyRow[]; images: Image[]; onImage: (i: number) => void }) {
   return (
     <div class="prose">
-      <Blocks list={blocks(rows, images)} images={images} onImage={onImage} />
+      <Blocks list={blocks(withoutComments(rows), images)} images={images} onImage={onImage} />
     </div>
   )
 }
