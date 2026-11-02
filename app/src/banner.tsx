@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
+import { NoticeStack, useNoticeQueue, type Notice } from './notices.tsx'
 import { s } from './strings.ts'
 
 interface Shown {
@@ -22,6 +23,11 @@ export function Banner() {
   const [done, setDone] = useState(false)
   const hovering = useRef(false)
   const timer = useRef<number | undefined>(undefined)
+  const shownRef = useRef<Shown | null>(null)
+  shownRef.current = shown
+  // Notices from the main window while it is not in front: a stack, fitted, gone when empty.
+  const notices = useNoticeQueue(() => !shownRef.current && void api.bannerHide())
+  const stack = useRef<HTMLDivElement>(null)
 
   const hide = () => {
     clearTimeout(timer.current)
@@ -34,6 +40,11 @@ export function Banner() {
 
   useEffect(() => {
     if (!api.inDesktop) void demoShown().then((d) => d && setShown(d))
+    void api.on<Notice>('banner-notice', (n) => {
+      if (shownRef.current?.focus) return
+      setShown(null)
+      notices.push(n)
+    })
     void api.on<Shown>('banner-show', (payload) => {
       setShown(payload)
       setBusy(null)
@@ -78,7 +89,19 @@ export function Banner() {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  if (!shown) return <div class="banner empty" />
+  useLayoutEffect(() => {
+    if (shown || !notices.items.length || !stack.current) return
+    void api.bannerFit(Math.ceil(stack.current.getBoundingClientRect().height) + 2)
+  }, [shown, notices.items.length])
+
+  if (!shown)
+    return notices.items.length ? (
+      <div class="banner-notices" ref={stack}>
+        <NoticeStack q={notices} onOpen={(key) => void api.bannerOpenMain(key)} />
+      </div>
+    ) : (
+      <div class="banner empty" />
+    )
   const n = shown.node
   return (
     <div

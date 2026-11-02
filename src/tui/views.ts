@@ -44,7 +44,8 @@ export const viewIds = (): View[] => loadViews().map((v) => v.id)
 /** The definition behind a tab: the user's, else the built-in of that id, else the first tab. */
 export function defOf(view: View | ViewDef): ViewDef {
   if (typeof view !== 'string') return view
-  return loadViews().find((v) => v.id === view) ?? builtinView(view) ?? loadViews()[0]
+  const id = view === 'recent' ? 'live' : view
+  return loadViews().find((v) => v.id === id) ?? builtinView(id) ?? loadViews()[0]
 }
 
 /** A tab's name: the user's own (in this language if given per language), else the built-in's translated one, else its id. */
@@ -81,6 +82,8 @@ const LEGACY_VIEW: Record<string, View> = {
   // 延迟 lives in 等待 now, as a fold row; bench opens it for these two.
   deferred: 'waiting',
   defer: 'waiting',
+  // 最近 became 实时.
+  recent: 'live',
 }
 
 export function viewFromArg(raw: string | undefined): View {
@@ -234,7 +237,7 @@ export interface Row {
   finished?: Item[]
   open?: boolean
   /** 最近: what the owner last did to this node. */
-  touch?: Touch
+  touch?: Change
   /**
    * The nodes this one can be moved among by hand (`nod order`): rows with the same scope.
    * Siblings in a tree; one group, and one band of the keys sorted before `manual`, in a list.
@@ -489,6 +492,48 @@ export interface Touch {
   choice?: string
 }
 
+/** The latest write to a node, by anyone, and what it was — 实时's right-hand side. */
+export interface Change extends Omit<Touch, 'kind'> {
+  kind: Touch['kind'] | 'asked' | 'claimed' | 'heartbeat' | 'received' | 'waiting' | 'progress' | 'state'
+  /** progress: the percentage. */
+  pct?: number
+  /** state: what it became. */
+  state?: string
+}
+
+const CHANGE_KIND: Record<string, Change['kind']> = {
+  [NOTE_KIND.addendum]: 'noted',
+  [NOTE_KIND.log]: 'noted',
+  [NOTE_KIND.newQuestion]: 'asked',
+  [NOTE_KIND.claimed]: 'claimed',
+  [NOTE_KIND.heartbeat]: 'heartbeat',
+  [NOTE_KIND.received]: 'received',
+  [NOTE_KIND.waiting]: 'waiting',
+  [NOTE_KIND.completed]: 'state',
+  [NOTE_KIND.superseded]: 'state',
+}
+
+/** When a node was last written: any note, progress, state change or edit. */
+export const changedAt = (d: Item) => d.updatedAt || d.created || ''
+
+/** A note this close to the last write is what that write was. */
+const SAME_WRITE_MS = 5000
+
+export function lastChange(d: Item): Change {
+  const at = changedAt(d)
+  const note = d.notes.reduce<(typeof d.notes)[number] | undefined>((a, n) => (!a || touchTime(n.at) >= touchTime(a.at) ? n : a), undefined)
+  if (note && Math.abs(touchTime(note.at) - touchTime(at)) <= SAME_WRITE_MS) {
+    const kind = ((TOUCH_KIND[note.kind] as Change['kind'] | undefined) ?? CHANGE_KIND[note.kind] ?? 'noted') as Change['kind']
+    if (kind === 'state') return { kind, at, text: '', state: d.state }
+    const answers = d.notes.filter((n) => n.kind === NOTE_KIND.answered)
+    const choice = kind === 'answered' && note === answers.at(-1) ? d.answer?.choice : undefined
+    const quiet = kind === 'deferred' || kind === 'undeferred' || kind === 'seen' || kind === 'heartbeat'
+    return { kind, at, text: quiet ? '' : note.text, ...(choice ? { choice } : {}) }
+  }
+  if (typeof d.progress === 'number' && d.state === 'in_progress') return { kind: 'progress', at, text: d.progressMsg ?? '', pct: d.progress }
+  return { kind: 'state', at, text: '', state: d.state }
+}
+
 const TOUCH_KIND: Record<string, Touch['kind']> = {
   [NOTE_KIND.answered]: 'answered',
   [NOTE_KIND.seen]: 'seen',
@@ -520,36 +565,13 @@ export function ownerTouches(d: Item): Touch[] {
 
 export const lastTouch = (d: Item): Touch | undefined => ownerTouches(d).at(-1)
 
-/** 最近 lists this far back before the 「更早 N」 row… */
-export const RECENT_DAYS = 30
-/** …and at most this many above it. */
-export const RECENT_MAX = 200
 export const RECENT_OLDER_GROUP = 'fold:recent-older'
 
-/** 最近: nodes the owner touched, latest touch first, across every project and
- *  whatever their state; past 30 days (or 200 rows) behind a 「更早 N」 fold row. */
-export function recentRows(items: Item[], opts: TreeOptions = {}, now = Date.now()): Row[] {
-  const touched = items
-    .map((d) => ({ d, touch: lastTouch(d) }))
-    .filter((x): x is { d: Item; touch: Touch } => x.touch !== undefined)
-    .sort((a, b) => touchTime(b.touch.at) - touchTime(a.touch.at) || a.d.id - b.d.id)
-  const since = now - RECENT_DAYS * 86_400_000
-  const cut = touched.findIndex((x, i) => i >= RECENT_MAX || touchTime(x.touch.at) < since)
-  const shown = cut === -1 ? touched : touched.slice(0, cut)
-  const older = cut === -1 ? [] : touched.slice(cut)
-  const row = (x: { d: Item; touch: Touch }, depth: number): Row => ({ key: keyOf(x.d), kind: 'node', node: x.d, depth, touch: x.touch })
-  const out = shown.map((x) => row(x, 0))
-  if (!older.length) return out
-  const open = Boolean(opts.openGroups?.has(RECENT_OLDER_GROUP))
-  const suffix = open ? t('bench.fold.collapseSuffix') : t('bench.fold.expandSuffix')
-  out.push({ key: RECENT_OLDER_GROUP, kind: 'fold', depth: 0, text: `${t('bench.fold.olderRow', { count: older.length })}${suffix}`, finished: older.map((x) => x.d), open })
-  if (open) for (const x of older) out.push(row(x, 1))
-  return out
-}
-
 /** "Answered 2" / "Replied" — what the owner did, without the when. */
-export function touchLabel(touch: Touch): string {
+export function touchLabel(touch: Change): string {
   if (touch.kind === 'answered' && touch.choice) return t('bench.recent.answeredChoice', { choice: touch.choice })
+  if (touch.kind === 'progress') return t('bench.recent.progress', { pct: Math.round(touch.pct ?? 0) })
+  if (touch.kind === 'state') return statusLabel((touch.state ?? 'in_progress') as Item['state'])
   return t(`bench.recent.${touch.kind}`)
 }
 
@@ -568,12 +590,12 @@ export function rowsFor(view: View | ViewDef, items: Item[], opts: TreeOptions =
     return treeRows(items.filter((i) => keep.has(i)), opts)
   }
   const sorted = items.filter((i) => inView(def, i, items, now)).sort(compareBy(def.sort ?? ['bench'], items))
-  const touch = (def.sort ?? []).some((k) => k.replace(/^-/, '') === 'touched')
+  const first = (def.sort ?? []).map((k) => k.replace(/^-/, '')).find((k) => k === 'touched' || k === 'changed')
   const scopeOf = listScope(def, items)
   const row = (d: Item, depth: number): Row => {
     const scope = depth === 0 ? scopeOf(d) : undefined
     const r: Row = { key: keyOf(d), kind: 'node', node: d, depth, ...(scope ? { scope } : {}) }
-    const tt = touch ? lastTouch(d) : undefined
+    const tt = first === 'changed' ? lastChange(d) : first === 'touched' ? lastTouch(d) : undefined
     return tt ? { ...r, touch: tt } : r
   }
   const { shown, older } = windowed(def, sorted, now)
@@ -615,12 +637,13 @@ function listScope(def: ViewDef, items: Item[]): (d: Item) => string | undefined
 }
 
 /** Where a list's 「Older N」 row is remembered — 最近 keeps its old key. */
-export const olderGroupKey = (def: ViewDef) => (def.id === 'recent' ? RECENT_OLDER_GROUP : `fold:older:${def.id}`)
+export const olderGroupKey = (def: ViewDef) => (def.id === 'live' ? RECENT_OLDER_GROUP : `fold:older:${def.id}`)
 
 /** The time a windowed list measures from: its first sort key's. */
 function sortTime(def: ViewDef, d: Item): number {
   const key = (def.sort ?? [])[0]?.replace(/^-/, '')
   if (key === 'touched') return touchTime(lastTouch(d)?.at ?? '')
+  if (key === 'changed') return touchTime(changedAt(d))
   if (key === 'updated') return Date.parse(d.updatedAt || d.created || '') || 0
   if (key === 'created') return Date.parse(d.created || '') || 0
   return NaN
@@ -698,6 +721,7 @@ const SORTERS: Record<SortField, (a: Item, b: Item, items: Item[]) => number> = 
   },
   waiting_since: (a, b) => (waitingSince(a) === waitingSince(b) ? 0 : waitingSince(a) < waitingSince(b) ? -1 : 1),
   touched: (a, b) => touchTime(lastTouch(b)?.at ?? '') - touchTime(lastTouch(a)?.at ?? ''),
+  changed: (a, b) => touchTime(changedAt(b)) - touchTime(changedAt(a)),
   id: (a, b) => a.id - b.id,
   title: (a, b) => a.title.localeCompare(b.title),
   state: (a, b) => ITEM_STATUSES.indexOf(a.state) - ITEM_STATUSES.indexOf(b.state),

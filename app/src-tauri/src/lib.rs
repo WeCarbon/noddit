@@ -493,6 +493,9 @@ pub fn run() {
             watch::set_phrases,
             watch::waiting_get,
             watch::banner_hide,
+            watch::notice_banner,
+            watch::banner_fit,
+            watch::notice_system,
             watch::banner_open_main,
             watch::summoned,
             watch::press_hotkey

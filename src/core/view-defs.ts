@@ -37,7 +37,7 @@ export interface ViewDef {
 }
 
 export type SortKey = `${'' | '-'}${SortField}`
-export const SORT_FIELDS = ['bench', 'blocks_ai', 'flag', 'manual', 'urgency', 'due', 'created', 'updated', 'check_back', 'waiting_since', 'touched', 'id', 'title', 'state'] as const
+export const SORT_FIELDS = ['bench', 'blocks_ai', 'flag', 'manual', 'urgency', 'due', 'created', 'updated', 'check_back', 'waiting_since', 'touched', 'changed', 'id', 'title', 'state'] as const
 export type SortField = (typeof SORT_FIELDS)[number]
 
 /** `{ any: […] }` / `{ all: […] }` / `{ not: … }` nest; a leaf is one condition. */
@@ -81,21 +81,27 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
   { id: 'all', icon: 'list-tree', layout: 'tree', finished: 'fold', deferred: 'show', count: false },
   { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['check_back', 'flag', 'waiting_since'], deferred: 'fold', filter: parseFilter('state:waiting') },
   {
-    id: 'recent',
-    icon: 'history',
+    id: 'live',
+    icon: 'radio',
     layout: 'list',
     group: 'none',
-    sort: ['touched'],
+    sort: ['changed'],
     finished: 'show',
     deferred: 'show',
     window: { days: 30, max: 200 },
     count: false,
-    filter: parseFilter('is:touched'),
   },
 ]
 
 export const BUILTIN_IDS = BUILTIN_VIEWS.map((v) => v.id)
-export const builtinView = (id: string) => BUILTIN_VIEWS.find((v) => v.id === id)
+
+/** 实时 was 最近 (`recent`, the owner's own touches) before it listed every change: the old id still names it. */
+const RENAMED: Record<string, string> = { recent: 'live' }
+export const viewId = (id: string) => RENAMED[id] ?? id
+export const builtinView = (id: string) => BUILTIN_VIEWS.find((v) => v.id === viewId(id))
+
+/** 最近 as shipped: a views.json still holding it gets 实时 in its place. */
+const OLD_RECENT = JSON.stringify({ sort: ['touched'], filter: 'is:touched' })
 
 // ---------------------------------------------------------------------------
 // The filter's text form: what `nod view add --filter` takes and `nod views` prints.
@@ -163,8 +169,9 @@ const ID_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/
 export function validateView(v: unknown): ViewDef {
   if (!v || typeof v !== 'object') throw new Error(t('core.views.notAnObject'))
   const d = v as Record<string, unknown>
-  const id = String(d.id ?? '')
+  const id = viewId(String(d.id ?? ''))
   if (!ID_RE.test(id)) throw new Error(t('core.views.badId', { id }))
+  if (String(d.id) === 'recent' && JSON.stringify({ sort: d.sort, filter: typeof d.filter === 'string' ? d.filter : 'is:touched' }) === OLD_RECENT && !d.name) return builtinView('live')!
   const layout = d.layout ?? 'list'
   if (!LAYOUTS.includes(layout as never)) throw new Error(t('core.views.badValue', { key: 'layout', value: String(layout), values: LAYOUTS.join(' | ') }))
   const out: ViewDef = { id, layout: layout as ViewDef['layout'] }
@@ -266,7 +273,7 @@ export function resetViews(id?: string, path = viewsPath()): ViewDef[] {
   const shipped = builtinView(id)
   if (!shipped) throw new Error(t('core.views.notBuiltin', { id, ids: BUILTIN_IDS.join(' ') }))
   const views = loadViews(path)
-  const at = views.findIndex((v) => v.id === id)
+  const at = views.findIndex((v) => v.id === shipped.id)
   const next = at === -1 ? insertInBuiltinOrder(views, shipped) : views.map((v, i) => (i === at ? shipped : v))
   saveViews(next, path)
   return next

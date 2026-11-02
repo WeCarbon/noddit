@@ -2835,3 +2835,159 @@ figcaption {
 .prev-subs li {
   padding: 1px 0 1px 22px;
 }
+
+/* 实时: a row that just changed lights up as it lands, then fades back. */
+@keyframes arrived {
+  from {
+    background-color: var(--sel);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.row.node.arrived:not(.sel) {
+  animation: arrived 1600ms ease-out both;
+}
+
+.list-pane {
+  position: relative;
+}
+
+/* Scrolled down while rows arrived above: say so instead of moving the list. */
+.new-above {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 4px 12px;
+  border-radius: var(--chip-radius);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: var(--shadow-pop);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row.node.arrived:not(.sel) {
+    animation: none;
+  }
+}
+
+/* Notices: the compact top-right stack, in the window or in the banner window. */
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+}
+
+.notices.floating {
+  position: fixed;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 60;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  border-radius: var(--radius);
+  background: var(--raised);
+  box-shadow: var(--shadow-pop);
+  cursor: pointer;
+  animation: notice-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.notice .n-gem {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.notice.k-decision .n-gem,
+.notice.k-milestone .n-gem {
+  background: var(--yellow);
+}
+
+.notice .n-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.notice .n-top {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.notice .n-ref {
+  flex: none;
+  font: 600 11.5px var(--mono);
+  color: var(--text-3);
+  padding-top: 1px;
+}
+
+.notice .n-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.notice .n-what {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.notice .n-close {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text-3);
+}
+
+.notice .n-close:hover {
+  background: var(--code-bg);
+  color: var(--text);
+}
+
+.banner-notices {
+  padding: 1px;
+}
+
+.banner-notices .notices {
+  width: 100%;
+  max-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice {
+    animation: none;
+  }
+}

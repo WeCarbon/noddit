@@ -8,7 +8,7 @@ import { initLayout } from '../src/core/paths.ts'
 import { Store } from '../src/core/store.ts'
 import { BUILTIN_VIEWS, filterText, loadViews, parseFilter, resetViews, saveViews, validateView, type ViewDef } from '../src/core/view-defs.ts'
 import { benchJson } from '../src/tui/json.ts'
-import { inView, ownerRows, recentRows, rowsFor, viewCount, viewFromArg, viewIds, viewLabel, waitingRows } from '../src/tui/views.ts'
+import { inView, ownerRows, rowsFor, viewCount, viewFromArg, viewIds, viewLabel, waitingRows } from '../src/tui/views.ts'
 import { bench, has } from './tui-harness.ts'
 import { decs, decsResult, scratch } from './helpers.ts'
 
@@ -84,8 +84,7 @@ test('the built-in views, run from their definitions, list exactly what the hand
   const unscoped = rowsFor('decide', items).map(({ scope: _, ...r }) => r)
   assert.deepEqual(unscoped, ownerRows(items))
   assert.deepEqual(rowsFor('waiting', items, open), waitingRows(items, open))
-  assert.deepEqual(rowsFor('recent', items, open), recentRows(items, open))
-  assert.deepEqual(viewIds(), ['available', 'active', 'decide', 'all', 'waiting', 'recent'])
+  assert.deepEqual(viewIds(), ['available', 'active', 'decide', 'all', 'waiting', 'live'])
 })
 
 test('a list view groups by state or assignee, sorts by its keys, and leaves finished nodes out unless asked', (t) => {
@@ -123,12 +122,12 @@ test('views.json: saved in order, read back, a broken file means the built-ins, 
   const file = viewsFile(t)
   assert.deepEqual(loadViews(), [...BUILTIN_VIEWS])
   const mine = validateView({ id: 'mine', name: { en: 'Mine', 'zh-Hans': '我的' }, filter: 'assignee:human' })
-  saveViews([mine, ...BUILTIN_VIEWS.filter((v) => v.id !== 'recent')])
+  saveViews([mine, ...BUILTIN_VIEWS.filter((v) => v.id !== 'live')])
   assert.deepEqual(viewIds(), ['mine', 'available', 'active', 'decide', 'all', 'waiting'])
   assert.equal(viewLabel('mine'), 'Mine')
   assert.equal(viewFromArg('mine'), 'mine')
-  resetViews('recent')
-  assert.deepEqual(viewIds(), ['mine', 'available', 'active', 'decide', 'all', 'waiting', 'recent'], 'a restored built-in goes back after the one before it')
+  resetViews('live')
+  assert.deepEqual(viewIds(), ['mine', 'available', 'active', 'decide', 'all', 'waiting', 'live'], 'a restored built-in goes back after the one before it')
   assert.throws(() => resetViews('mine'), /not a built-in/)
   writeFileSync(file, '{ not json')
   assert.deepEqual(loadViews(), [...BUILTIN_VIEWS])
@@ -155,12 +154,12 @@ test('nod view add / edit / move / rm / reset, and nod views --json for a window
   decs(root, ['view', 'move', 'mine', '1'], env)
   const listed = JSON.parse(decs(root, ['views', '--json'], env))
   assert.equal(listed.file, file)
-  assert.deepEqual(listed.views.map((v: { id: string }) => v.id), ['mine', 'available', 'active', 'decide', 'all', 'waiting', 'recent'])
+  assert.deepEqual(listed.views.map((v: { id: string }) => v.id), ['mine', 'available', 'active', 'decide', 'all', 'waiting', 'live'])
   assert.equal(listed.views.find((v: { id: string }) => v.id === 'decide').label, 'Inbox')
   assert.equal(listed.views.find((v: { id: string }) => v.id === 'decide').pristine, false)
   assert.ok(listed.schema.sort.includes('waiting_since'))
   assert.ok(listed.schema.filter_fields.includes('assignee'))
-  decs(root, ['view', 'rm', 'mine', 'recent'], env)
+  decs(root, ['view', 'rm', 'mine', 'live'], env)
   assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')).views.map((v: { id: string }) => v.id), ['available', 'active', 'decide', 'all', 'waiting'])
   decs(root, ['view', 'reset', 'decide'], env)
   assert.equal(JSON.parse(decs(root, ['view', 'show', 'decide', '--json'], env)).pristine, true)
@@ -190,7 +189,7 @@ test('bench: the tabs are the user\'s views, and Tab walks them', async (t) => {
   viewsFile(t)
   const store = tmpStore(t)
   seed(store)
-  saveViews([validateView({ id: 'mine', name: 'Mine', filter: 'assignee:human' }), ...BUILTIN_VIEWS.filter((v) => v.id !== 'recent' && v.id !== 'all')])
+  saveViews([validateView({ id: 'mine', name: 'Mine', filter: 'assignee:human' }), ...BUILTIN_VIEWS.filter((v) => v.id !== 'live' && v.id !== 'all')])
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /Write release notes/))
   assert.match(b.frame()[0], /^decs +Mine 1 +Available \d+ +Active \d+ +Needs you \d+ +Waiting 1 *$/)

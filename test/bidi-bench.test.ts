@@ -307,7 +307,7 @@ test('ar (visual): tab clicks hit exactly the reversed, individually mirrored ta
     // user — mirroring put it at the rightmost span, not the leftmost.
     const byColumn = [...g.tabSpans].sort((a, b) => a.from - b.from)
     assert.equal(byColumn[byColumn.length - 1].view, 'available')
-    assert.equal(byColumn[0].view, 'recent')
+    assert.equal(byColumn[0].view, 'live')
   })
 })
 

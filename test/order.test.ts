@@ -65,7 +65,7 @@ test('a list keeps what it sorts by first; the order decides within a band, and 
   assert.notEqual(decide[0].scope, decide[1].scope, '★ and the rest are separate bands')
   assert.equal(decide[1].scope, decide[2].scope)
   store.note(store.get(a.id)!, { text: 'seen', role: 'human', author: 'owner' })
-  assert.ok(rowsFor('recent', store.all()).filter((r) => r.kind === 'node').every((r) => r.scope === undefined))
+  assert.ok(rowsFor('live', store.all()).filter((r) => r.kind === 'node').every((r) => r.scope === undefined))
 })
 
 test('nod bench --json gives each row its scope; nodes no longer carry can_pin', (t) => {
@@ -76,7 +76,7 @@ test('nod bench --json gives each row its scope; nodes no longer carry can_pin',
   const rows = all.rows.filter((r: { kind: string }) => r.kind === 'node')
   assert.equal(rows.length, 2)
   assert.ok(rows.every((r: { scope: string | null }) => typeof r.scope === 'string' && r.scope === rows[0].scope))
-  const recent = json.views.find((v: { view: string }) => v.view === 'recent')
+  const recent = json.views.find((v: { view: string }) => v.view === 'live')
   assert.ok(recent.rows.every((r: { scope?: string | null }) => !r.scope))
   assert.ok(Object.values(json.nodes).every((n) => !('can_pin' in (n as object))))
 })

@@ -291,6 +291,13 @@ export const summoned = (what: string) => (inDesktop ? invoke('summoned', { what
 
 export const bannerHide = () => (inDesktop ? invoke('banner_hide').catch(() => {}) : Promise.resolve())
 
+/** A notice for the banner window (the main window is not in front). */
+export const noticeBanner = (item: unknown) => (inDesktop ? invoke('notice_banner', { item }).catch(() => {}) : Promise.resolve())
+/** The banner window's notices need this much height. */
+export const bannerFit = (height: number) => (inDesktop ? invoke('banner_fit', { height }).catch(() => {}) : Promise.resolve())
+/** The OS notification, for a notice only the window knows about. */
+export const noticeSystem = (title: string, body: string) => (inDesktop ? invoke('notice_system', { title, body }).catch(() => {}) : Promise.resolve())
+
 export const bannerOpenMain = (key: string) => (inDesktop ? invoke('banner_open_main', { key }).catch(() => {}) : Promise.resolve())
 
 export interface WaitingNode {
@@ -551,10 +558,10 @@ const DEMO_VIEWS: ViewsList = {
     groups: ['project', 'state', 'assignee', 'none'],
     finished: ['hide', 'show', 'fold'],
     deferred: ['hide', 'show', 'fold'],
-    sort: ['bench', 'blocks_ai', 'flag', 'manual', 'urgency', 'due', 'created', 'updated', 'waiting_since', 'touched', 'id', 'title', 'state'],
+    sort: ['bench', 'blocks_ai', 'flag', 'manual', 'urgency', 'due', 'created', 'updated', 'waiting_since', 'touched', 'changed', 'id', 'title', 'state'],
     filter_fields: ['state', 'assignee', 'flag', 'kind', 'project', 'author', 'tag', 'is', 'due', 'updated', 'title'],
     is_values: ['startable', 'deferred', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'],
-    builtin: ['available', 'active', 'decide', 'all', 'waiting', 'recent'],
+    builtin: ['available', 'active', 'decide', 'all', 'waiting', 'live'],
   },
 }
 

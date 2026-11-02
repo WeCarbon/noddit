@@ -1,6 +1,6 @@
 import {
   BUILTIN_IDS, COND_FIELDS, GROUPS, IS_VALUES, LAYOUTS, SHOW, SORT_FIELDS, builtinView, filterText, isPristine, loadViews, resetViews, saveViews,
-  validateView, viewsPath, type ViewDef,
+  validateView, viewId, viewsPath, type ViewDef,
 } from '../../core/view-defs.ts'
 import { viewLabel } from '../../tui/views.ts'
 import { bool, one, type Args } from '../args.ts'
@@ -33,7 +33,10 @@ export function run(args: Args, verb: string): number {
     return 0
   }
   if (verb === 'views') return list(args)
-  const [sub, id, ...rest] = args._
+  const [sub, raw, ...more] = args._
+  // `recent` still names 实时 (live).
+  const id = raw === undefined ? undefined : viewId(raw)
+  const rest = more.map(viewId)
   switch (sub) {
     case undefined:
     case 'list':

@@ -7,7 +7,7 @@ export interface Seg {
   dim?: boolean
 }
 
-export type ViewName = 'available' | 'active' | 'decide' | 'all' | 'waiting' | 'recent'
+export type ViewName = 'available' | 'active' | 'decide' | 'all' | 'waiting' | 'live'
 
 export interface Row {
   key: string

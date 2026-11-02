@@ -22,6 +22,8 @@ import { popupNative } from './native-menu.ts'
 import { LetterPicker, RenameField, UnlinkConfirm } from './projects.tsx'
 import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
+import { useLiveMotion } from './motion.ts'
+import { NoticeStack, noticeWhat, useNoticeQueue, type Notice } from './notices.tsx'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, moveRow, patchNode, patchRows, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
@@ -52,7 +54,7 @@ const VIEW_ICON: Record<ViewName, string> = {
   decide: 'M8 1.8 14.2 8 8 14.2 1.8 8Z',
   all: 'M2.5 3.5h11v2h-11zm0 3.5h11v2h-11zm0 3.5h11v2h-11z',
   waiting: 'M5 3h2v10H5zm4 0h2v10H9z',
-  recent: 'M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 1.6a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8ZM7.2 4.5v4.1l3.1 1.9.8-1.3-2.3-1.4V4.5Z',
+  live: 'M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 1.6a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8ZM7.2 4.5v4.1l3.1 1.9.8-1.3-2.3-1.4V4.5Z',
 }
 
 function useToast(): [string | null, (msg: string) => void] {
@@ -94,7 +96,7 @@ export function Bench(props: {
   const views = bench.views
   const scopeName = scope ? (bench.projects.find((p) => p.project === scope)?.name ?? scope) : null
   const view = useMemo((): View => {
-    if (!scope) return views.find((v) => v.view === prefs.view) ?? views[0]
+    if (!scope) return views.find((v) => v.view === (prefs.view === ('recent' as string) ? 'live' : prefs.view)) ?? views[0]
     const own = bench.project_views?.find((p) => p.project === scope)
     if (own) return { view: 'all', label: scopeName ?? scope, count: own.count, empty: own.empty, rows: own.rows }
     const tree = scopeView(views.find((v) => v.view === 'all') ?? views[0], scope)
@@ -103,6 +105,7 @@ export function Bench(props: {
   }, [views, scope, scopeName, prefs.view, bench.project_views])
   const setScope = (project: string | null) => props.setPrefs({ project })
   const rows = useMemo(() => visibleRows(view, prefs.folds), [view, prefs.folds])
+  const liveList = !scope && view.view === 'live'
   // The composer belongs to the node it was opened on, so moving to another node closes it in the
   // same render — not in an effect that might land after the next keypress.
   const [composerOn, setComposerOn] = useState<{ c: Composer; key: string | undefined }>({ c: null, key: undefined })
@@ -196,6 +199,7 @@ export function Bench(props: {
   const [dialogError, setDialogError] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const motion = useLiveMotion(listRef, rows.filter((r) => r.kind === 'node').map((r) => r.key), liveList, view.view)
 
   const selectable = rows.filter(isSelectable)
   // The cursor follows the node; when the node leaves this view it stays at the same position.
@@ -279,13 +283,13 @@ export function Bench(props: {
   const finished = (key: string, state: string) =>
     both(
       patchNode(key, (n) => ({ ...n, status: state, terminal: true })),
-      dropRows(key, ['all', 'recent']),
+      dropRows(key, ['all', 'live']),
       patchRows(key, (r) => ({ ...r, state, glyph: r.glyph && { ...r.glyph, dim: true, color: undefined }, badge: [], badge_short: [] })),
     )
   const answered = (key: string, choice?: string) =>
     both(
       patchNode(key, (n) => ({ ...n, status: 'decided', answer: { choice, by: 'owner', at: now() } })),
-      dropRows(key, ['available', 'all', 'waiting', 'recent']),
+      dropRows(key, ['available', 'all', 'waiting', 'live']),
       patchRows(key, (r) => ({ ...r, state: 'decided', glyph: r.glyph && { ...r.glyph, color: 'green', bold: false, dim: false }, badge: [{ text: s('answered'), color: 'green' }], badge_short: [{ text: s('answered'), color: 'green' }] })),
     )
 
@@ -405,7 +409,7 @@ export function Bench(props: {
   const deferNode = (n: Node, date: string | null) => {
     setDeferFor(null)
     optimistic(
-      both(patchNode(n.key, (x) => ({ ...x, deferred_at: now(), deferred_until: date })), dropRows(n.key, ['all', 'waiting', 'recent']), patchRows(n.key, (r) => ({ ...r, deferred: true }))),
+      both(patchNode(n.key, (x) => ({ ...x, deferred_at: now(), deferred_until: date })), dropRows(n.key, ['all', 'waiting', 'live']), patchRows(n.key, (r) => ({ ...r, deferred: true }))),
       () => api.deferUntil(rootOf(n), n.id, date),
       date ? s('deferredUntil', { date }) : s('deferred'),
     )
@@ -418,22 +422,65 @@ export function Bench(props: {
     optimistic(
       off
         ? patchNode(key, (n) => ({ ...n, deferred_at: null }))
-        : both(patchNode(key, (n) => ({ ...n, deferred_at: now() })), dropRows(key, ['all', 'waiting', 'recent']), patchRows(key, (r) => ({ ...r, deferred: true }))),
+        : both(patchNode(key, (n) => ({ ...n, deferred_at: now() })), dropRows(key, ['all', 'waiting', 'live']), patchRows(key, (r) => ({ ...r, deferred: true }))),
       () => api.defer(rootOf(node), node.id, off),
       off ? s('undeferred') : s('deferred'),
     )
   }
-  // An agent answered something the owner wrote: say so, whichever node is on screen.
+  /*
+   * Notices: whatever an AI (or the clock) did that the owner should see, through one path
+   * the "notification style" setting picks. Banner: a stack in this window when it is in front,
+   * else in the banner window; System: the OS notification; Off: nothing.
+   * The app side already sends System for replies, decisions, milestones and uncollected answers.
+   */
+  const notices = useNoticeQueue()
+  const benchNow = useRef(bench)
+  benchNow.current = bench
+  const notify = async (n: Notice, osTooFromHere = false) => {
+    const style = api.inDesktop ? (await api.settingsGet()).settings.notify : 'banner'
+    if (style === 'off') return
+    if (style === 'system') {
+      if (osTooFromHere) void api.noticeSystem(`${n.ref} · ${noticeWhat(n)}`, n.title)
+      return
+    }
+    const inFront = (document.hasFocus() && document.visibilityState === 'visible') || document.documentElement.dataset.e2eFront === '1'
+    if (inFront) notices.push(n)
+    else void api.noticeBanner(n)
+  }
+  const nodeByRef = (ref: string) => Object.values(benchNow.current.nodes).find((x) => x.ref === ref)
   useEffect(() => {
+    void api.on<Notice>('notice', (n) => void notify(n))
     void api.on<string>('decs-event', (line) => {
       try {
-        const refs = (JSON.parse(line) as { owner_facing?: string[] }).owner_facing ?? []
-        if (refs.length) showToast(s('agentReplied', { refs: refs.join(' ') }))
+        const ev = JSON.parse(line) as { event?: string; owner_facing?: string[]; ref?: string; title?: string }
+        for (const ref of ev.owner_facing ?? []) {
+          const n = nodeByRef(ref)
+          void notify({ kind: 'replied', key: n?.key ?? '', ref, title: n?.title ?? '' })
+        }
+        if (ev.event === 'unclaimed' && ev.ref) void notify({ kind: 'uncollected', key: nodeByRef(ev.ref)?.key ?? '', ref: ev.ref, title: ev.title ?? '' })
       } catch {
         /* not JSON: an older CLI */
       }
     })
   }, [])
+  // What only a fresh bench shows: a brief an AI took, a wait whose check-back day came.
+  const seenBench = useRef<BenchData | null>(null)
+  useEffect(() => {
+    const before = seenBench.current
+    seenBench.current = props.bench
+    if (!before) return
+    for (const n of Object.values(props.bench.nodes)) {
+      const was = before.nodes[n.key]
+      if (!was) continue
+      if (was.brief === 'unclaimed' && n.brief === 'claimed') void notify({ kind: 'claimed', key: n.key, ref: n.ref, title: n.title }, true)
+    }
+    const due = (b: BenchData) => new Set(b.views.flatMap((v) => v.rows).filter((r) => r.wait_due && r.node).map((r) => r.node!))
+    const dueBefore = due(before)
+    for (const key of due(props.bench)) {
+      const n = props.bench.nodes[key]
+      if (n && !dueBefore.has(key)) void notify({ kind: 'checkBack', key, ref: n.ref, title: n.title }, true)
+    }
+  }, [props.bench])
   const toggleImportant = () => {
     if (!node || node.terminal) return
     const on = node.urgency !== 'high'
@@ -845,7 +892,7 @@ export function Bench(props: {
         case '!':
           return toggleImportant()
         case 'h':
-          return switchView(view.view === 'recent' ? 'available' : 'recent')
+          return switchView(view.view === 'live' ? 'available' : 'live')
         case 'N':
         case 'n':
         case 'r':
@@ -981,12 +1028,18 @@ export function Bench(props: {
         </footer>
       </aside>
 
+      <NoticeStack q={notices} onOpen={(key) => key && jump(key)} floating />
       <main class="list-pane" ref={listPaneRef}>
         <Divider which="sidebar" measure={measurePanes} onMove={setLivePanes} onDone={donePanes} onReset={resetPanes} />
         <header class="pane-head" data-tauri-drag-region>
           <h1>{view.label}</h1>
           {view.count !== null && <span class="head-count">{view.count}</span>}
         </header>
+        {motion.above > 0 && (
+          <button class="new-above" onClick={motion.toTop}>
+            ↑ {s('newAbove', { count: motion.above })}
+          </button>
+        )}
         <div class="list" ref={listRef} role="listbox">
           {!rows.length && (
             <div class="empty">
@@ -999,6 +1052,7 @@ export function Bench(props: {
               key={r.key}
               row={r}
               drag={drag}
+              arrived={motion.arrived.get(r.key)}
               selected={current?.key === r.key}
               open={isOpen(r)}
               hidden={r.kind === 'node' && !isOpen(r) ? hiddenCount(view, view.rows.indexOf(r)) : 0}
@@ -1196,7 +1250,7 @@ interface DragState {
   drop: (key: string, target: string, after: boolean) => void
 }
 
-function ListRow(p: { row: Row; drag: DragState; selected: boolean; open: boolean; hidden: number; onClick: () => void; onToggle: () => void; onMore: (el: HTMLElement) => void }) {
+function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boolean; open: boolean; hidden: number; onClick: () => void; onToggle: () => void; onMore: (el: HTMLElement) => void }) {
   const r = p.row
   if (r.kind === 'header') return <div class="row header">{r.text}</div>
   const indent = { paddingInlineStart: `${12 + r.depth * 18}px` }
@@ -1212,8 +1266,8 @@ function ListRow(p: { row: Row; drag: DragState; selected: boolean; open: boolea
   const landing = d.key && d.over === r.key && d.key !== r.key ? (d.after ? 'drop-after' : 'drop-before') : ''
   return (
     <div
-      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} state-${r.state} ${d.key === r.key ? 'dragging' : ''} ${landing}`}
-      style={indent}
+      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} state-${r.state} ${d.key === r.key ? 'dragging' : ''} ${landing} ${p.arrived !== undefined ? 'arrived' : ''}`}
+      style={p.arrived !== undefined ? { ...indent, animationDelay: `${p.arrived}ms` } : indent}
       draggable={Boolean(r.scope)}
       onDragStart={(e) => {
         if (!r.scope) return

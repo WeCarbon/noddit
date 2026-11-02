@@ -121,13 +121,13 @@ test('Waiting: waiting only', (t) => {
   assert.deepEqual(rowsFor('waiting', store.all()).map((r) => r.node!.id), [ids.f])
 })
 
-test('tab counts: Available / Active / Decide / Waiting count what each lists; All and Recent have none', (t) => {
+test('tab counts: Available / Active / Decide / Waiting count what each lists; All and Live have none', (t) => {
   const { store } = fixture(t)
   const items = store.all()
   const counts = Object.fromEntries(VIEWS.map((v) => [v, viewCount(v, items)]))
-  assert.deepEqual(counts, { available: 8, active: 5, decide: 2, all: undefined, waiting: 1, recent: undefined })
+  assert.deepEqual(counts, { available: 8, active: 5, decide: 2, all: undefined, waiting: 1, live: undefined })
   for (const v of VIEWS) {
-    if (v === 'all' || v === 'recent') continue
+    if (v === 'all' || v === 'live') continue
     const listed = rowsFor(v, items).filter((r) => r.kind === 'node' && !r.context).length
     assert.equal(listed, (counts as Record<string, number | undefined>)[v], `${v}: the number is what the view lists (context rows aside)`)
   }
@@ -148,7 +148,7 @@ test('a jump lands in the current view when it lists the node, else Available, e
 // The App
 // ---------------------------------------------------------------------------
 
-test('App: opens in Available, Tab walks Available Active Decide All Waiting Recent, and c does nothing', async (t) => {
+test('App: opens in Available, Tab walks Available Active Decide All Waiting Live, and c does nothing', async (t) => {
   const { store } = fixture(t)
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a startable/))
@@ -165,7 +165,7 @@ test('App: opens in Available, Tab walks Available Active Decide All Waiting Rec
     await b.quiet()
     // Which view is up, read from the left pane alone.
     const left = b.frame().slice(2).map((l) => l.split('│')[0]).join('\n')
-    const which = /Answered 1 ·/.test(left) ? 'recent'
+    const which = /Picked 1 ·/.test(left) ? 'live'
       : /✓ Finished/.test(left) ? 'all'
       : /f waiting externally/.test(left) && !/c AI stuck/.test(left) ? 'waiting'
       : /c AI stuck/.test(left) && !/P parent task/.test(left) ? 'decide'
@@ -173,7 +173,7 @@ test('App: opens in Available, Tab walks Available Active Decide All Waiting Rec
       : /P parent task/.test(left) ? 'active' : '?'
     seen.push(which)
   }
-  assert.deepEqual(seen, ['active', 'decide', 'all', 'waiting', 'recent', 'available'])
+  assert.deepEqual(seen, ['active', 'decide', 'all', 'waiting', 'live', 'available'])
 })
 
 /** Whether the right pane (what the cursor is on) mentions `re`. */

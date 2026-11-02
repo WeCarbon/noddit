@@ -235,7 +235,17 @@ fn remind(app: &AppHandle, milestones: &[Milestone]) {
             })
             .collect()
     };
-    if due.is_empty() || settings(app).notify == "off" || background() {
+    let style = settings(app).notify;
+    if due.is_empty() || style == "off" {
+        return;
+    }
+    if style == "banner" {
+        for (m, which) in due {
+            notice(app, serde_json::json!({ "kind": "milestone", "which": which, "key": m.key, "ref": m.reference, "title": m.title }));
+        }
+        return;
+    }
+    if background() {
         return;
     }
     let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
@@ -351,6 +361,7 @@ fn announce(app: &AppHandle, w: &Waiting, how_many: usize) {
         eprintln!("decs-app: announce {} ({how_many} new) as {style}", w.reference);
     }
     match style.as_str() {
+        "banner" if main_in_front(app) => notice(app, serde_json::json!({ "kind": "decision", "key": w.key, "ref": w.reference, "title": w.title, "more": how_many.saturating_sub(1) })),
         "banner" => show_banner(app, Some(w.clone()), false),
         "system" => {
             let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
@@ -367,7 +378,7 @@ fn announce(app: &AppHandle, w: &Waiting, how_many: usize) {
 /// An agent's first reply after something the owner wrote (`owner_facing` on an update line).
 fn announce_replies(app: &AppHandle, line: &Value) {
     let refs: Vec<&str> = line["owner_facing"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
-    if refs.is_empty() || settings(app).notify == "off" || background() {
+    if refs.is_empty() || settings(app).notify != "system" || background() {
         return;
     }
     let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
@@ -376,7 +387,7 @@ fn announce_replies(app: &AppHandle, line: &Value) {
 
 /// `decs monitor` says an answer has sat uncollected: the owner may want to nudge an agent.
 fn announce_unclaimed(app: &AppHandle, line: &Value) {
-    if settings(app).notify == "off" {
+    if settings(app).notify != "system" {
         return;
     }
     let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
@@ -386,6 +397,20 @@ fn announce_unclaimed(app: &AppHandle, line: &Value) {
     if !background() {
         let _ = app.notification().builder().title(head).body(title).show();
     }
+}
+
+/// The main window is up and in front: its own notices show there, not in the banner window.
+fn main_in_front(app: &AppHandle) -> bool {
+    app.get_webview_window("main").is_some_and(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false))
+}
+
+/// Something the owner should notice, in banner mode: the main window shows it in itself
+/// when in front, or hands it to `notice_banner` when not.
+fn notice(app: &AppHandle, item: Value) {
+    if noddit_env::is_set("APP_TIMING") {
+        eprintln!("decs-app: notice {} {}", item["kind"].as_str().unwrap_or_default(), item["ref"].as_str().unwrap_or_default());
+    }
+    let _ = app.emit_to("main", "notice", item);
 }
 
 // ---------------------------------------------------------------------------
@@ -581,6 +606,7 @@ fn place_banner(app: &AppHandle, w: &tauri::WebviewWindow) {
 /// `focus`: summoned by the hotkey, so keys answer at once; otherwise it is a notification and does not steal focus.
 pub fn show_banner(app: &AppHandle, node: Option<Waiting>, focus: bool) {
     let Some(w) = app.get_webview_window("banner") else { return };
+    let _ = w.set_size(tauri::LogicalSize::new(BANNER_WIDTH, BANNER_HEIGHT));
     let waiting = app.state::<Watch>().waiting.lock().unwrap().clone();
     let node = node.or_else(|| waiting.first().cloned());
     let Some(node) = node else {
@@ -673,6 +699,39 @@ pub async fn set_phrases(app: AppHandle, phrases: Phrases) {
 #[tauri::command]
 pub fn waiting_get(app: AppHandle) -> Vec<Waiting> {
     app.state::<Watch>().waiting.lock().unwrap().clone()
+}
+
+/// The main window is not in front: a notice goes to the banner window, which stacks it on
+/// top of the ones still up (at most three) and fits itself to them; shown without taking focus.
+#[tauri::command]
+pub fn notice_banner(app: AppHandle, item: Value) {
+    let Some(w) = app.get_webview_window("banner") else { return };
+    if noddit_env::is_set("APP_TIMING") {
+        eprintln!("decs-app: notice banner {}", item["ref"].as_str().unwrap_or_default());
+    }
+    let _ = app.emit_to("banner", "banner-notice", item);
+    if !background() {
+        let _ = w.show();
+    }
+}
+
+/// The banner window's notices took this much room: it fits itself to them, still at the corner.
+#[tauri::command]
+pub fn banner_fit(app: AppHandle, height: f64) {
+    let Some(w) = app.get_webview_window("banner") else { return };
+    let _ = w.set_size(tauri::LogicalSize::new(BANNER_WIDTH, height.clamp(48.0, BANNER_HEIGHT)));
+    place_banner(&app, &w);
+}
+
+/// System style, for a notice only the window knows about (a brief picked up, a check-back due).
+#[tauri::command]
+pub fn notice_system(app: AppHandle, title: String, body: String) {
+    if noddit_env::is_set("APP_TIMING") {
+        eprintln!("decs-app: notice system {title}");
+    }
+    if !background() {
+        let _ = app.notification().builder().title(title).body(body).show();
+    }
 }
 
 #[tauri::command]

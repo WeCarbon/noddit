@@ -1,7 +1,4 @@
-import {
-  Activity, AlertTriangle, ArrowDown, ArrowUp, Bell, Bookmark, Bot, Calendar, CheckSquare, Clock, Eye, Filter, Flag, Folder, Hand, History, Hourglass, Inbox,
-  Layers, ListTodo, ListTree, Plus, RotateCcw, Star, Tag, Target, Trash2, User, Zap, type LucideIcon,
-} from 'lucide-preact'
+import { Activity, AlertTriangle, ArrowDown, ArrowUp, Bell, Bookmark, Bot, Calendar, CheckSquare, Clock, Eye, Filter, Flag, Folder, Hand, History, Radio, Hourglass, Inbox, Layers, ListTodo, ListTree, Plus, RotateCcw, Star, Tag, Target, Trash2, User, Zap, type LucideIcon } from 'lucide-preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { useDialogFocus } from './focus.ts'
@@ -9,7 +6,7 @@ import { s } from './strings.ts'
 
 /** The icons a view can take: lucide's names, as views.json stores them. */
 export const VIEW_ICONS: Record<string, LucideIcon> = {
-  'list-todo': ListTodo, activity: Activity, hand: Hand, 'list-tree': ListTree, hourglass: Hourglass, history: History, star: Star, flag: Flag,
+  'list-todo': ListTodo, activity: Activity, hand: Hand, 'list-tree': ListTree, hourglass: Hourglass, history: History, radio: Radio, star: Star, flag: Flag,
   user: User, bot: Bot, inbox: Inbox, folder: Folder, calendar: Calendar, clock: Clock, tag: Tag, zap: Zap, target: Target, bookmark: Bookmark,
   'check-square': CheckSquare, eye: Eye, 'alert-triangle': AlertTriangle, layers: Layers, filter: Filter, bell: Bell,
 }

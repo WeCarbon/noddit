@@ -565,6 +565,45 @@
     // The runner files a decision from outside now; it must reach the bench (and be announced, which the runner checks).
     await until('the new decision on the bench', () => $$('.row.node').some((r) => r.textContent.includes('Pick a CDN')), 30000)
 
+    log('STEP live')
+    // 实时: any write by anyone puts the node at the top, glides it there and says what changed.
+    const cliAs = (args) => invoke('decs', { args, cwd: null, stdin: null })
+    $$('.nav-item').find((b) => b.dataset.view === 'live').click()
+    await until('the Live list', () => $('.pane-head h1')?.textContent === 'Live' && $$('.row.node').length > 2)
+    const firstTitle = () => $('.row.node .title')?.textContent ?? ''
+    if (firstTitle().includes('Tidy the logs')) throw new Error('Tidy the logs is already first')
+    await cliAs(['note', '4', 'Rotated the old logs', '--agent', '--author', 'lane-ops · logs'])
+    await until('the changed node at the top', () => firstTitle().includes('Tidy the logs'), 20000)
+    await until('it lights up as it lands', () => $('.row.node')?.classList.contains('arrived'))
+    if (!/Note ·/.test($('.row.node .badge.full')?.textContent ?? '')) throw new Error(`the row does not say what changed: ${$('.row.node .badge.full')?.textContent}`)
+    await shot('live')
+
+    log('STEP notices')
+    // One path for notices; in front, Banner style is a stack in this window: short, paused while hovered, a click opens the node.
+    const was = await invoke('settings_get')
+    await invoke('settings_set', { settings: { ...was.settings, notify: 'banner' } })
+    document.documentElement.dataset.e2eFront = '1'
+    const aiReplies = async (ask, text) => {
+      await cliAs(['note', '3', ask, '--human'])
+      await sleep(400)
+      await cliAs(['note', '3', text, '--agent', '--author', 'lane-pr · launch'])
+    }
+    await aiReplies('which channel first?', 'The blog first, then the newsletter.')
+    const notice = await until('the notice', () => $('.notices.floating .notice.k-replied'), 20000)
+    if (!/An AI replied to you/.test(notice.textContent) || !/Announce the launch/.test(notice.textContent)) throw new Error(`notice says: ${notice.textContent}`)
+    if ($('.toast.show')?.textContent.includes('replied')) throw new Error('the old reply toast is still shown')
+    await shot('notice')
+    $('.notices.floating').dispatchEvent(new MouseEvent('mouseenter'))
+    await sleep(7000)
+    if (!$('.notices.floating .notice')) throw new Error('a hovered notice went away')
+    $('.notices.floating').dispatchEvent(new MouseEvent('mouseleave'))
+    await until('gone after leave', () => !$('.notices.floating'), 9000)
+    await aiReplies('and social?', 'Social posts the day after.')
+    ;(await until('the next notice', () => $('.notices.floating .notice'), 20000)).click()
+    await until('the node opened', () => /Announce the launch/.test($('.nhead')?.textContent ?? ''))
+    delete document.documentElement.dataset.e2eFront
+    await invoke('settings_set', { settings: was.settings })
+
     const cli = await invoke('decs', { args: ['sessions', '--json'], cwd: null, stdin: null })
     if (cli.code === 0) {
       log('STEP brief')
