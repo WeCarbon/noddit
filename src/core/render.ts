@@ -228,6 +228,23 @@ export function toJSON(d: Decision): Record<string, unknown> {
     })),
     answers: d.answer?.answers ?? null,
     answer_notes: d.answer?.answerNotes ?? null,
+    // Earlier `## 选项（第 N 轮）` rounds — history, not live state (N161: an
+    // older round's sub-questions must never apply to a newer one's answer).
+    // A window/TUI shows these collapsed as "上一轮的答案".
+    previous_rounds: (d.previousRounds ?? []).map((r) => ({
+      round: r.round,
+      options: r.options.map((o) => ({ key: o.key, label: o.label, body: o.body })),
+      questions: r.questions.map((q) => ({
+        key: q.key,
+        label: q.label,
+        default: q.default ?? null,
+        options: q.options.map((o) => ({ key: o.key, label: o.label, body: o.body })),
+      })),
+      answer: r.answer ?? null,
+      sub_answers: r.subAnswers ?? null,
+      by: r.by ?? null,
+      at: r.at ?? null,
+    })),
     // `attachments` is every `## 附件` in the file, flat, file order — a lane
     // or the bench's own numbered picker wanting "everything" reads this.
     // To show them where they belong, read `body_attachments` for the body

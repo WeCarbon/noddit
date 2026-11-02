@@ -267,7 +267,8 @@
     "options": "الخيارات",
     "optionsRound": "الخيارات (الجولة {{round}})",
     "attachments": "المرفقات",
-    "questions": "الأسئلة الفرعية"
+    "questions": "الأسئلة الفرعية",
+    "questionsRound": "الأسئلة الفرعية (الجولة {{round}})"
   },
   "noteText": {
     "deferred": "لاحقًا. لا تلمسه حتى يُستأنف.",

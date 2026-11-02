@@ -11,7 +11,7 @@ import { projectDisplayName, projectLetter, readProjectConfig } from './project.
 import { parseBodyRefs, parseRef, refOf } from './ref.ts'
 import { dequeue, enqueue, readQueue } from './queue.ts'
 import { DEFAULT_MARK, HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
-import { OPTIONS_HEADING_RE, parseDecision, parseNoteHeading, parseNotes, parseOptions, sectionAttachments } from './parse.ts'
+import { OPTIONS_HEADING_RE, optionsRoundOf, parseDecision, parseNoteHeading, parseNotes, parseOptions, sectionAttachments } from './parse.ts'
 import { deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
 import { isHumanTask } from './assignee.ts'
 import { untilDay } from './fuzzy-date.ts'
@@ -1089,28 +1089,48 @@ export class Store {
     return { ...done, queued: undefined }
   }
 
-  /** A running node gets a new question — 待决策 again, without a new entry. New options go under `## 选项（第 N 轮）`, keeping earlier rounds as history. */
-  ask(d: Decision, q: { options: { key: string; label: string; body?: string }[]; default?: string; text?: string; author: string }): Decision {
+  /**
+   * A running node gets a new question — 待决策 again, without a new entry.
+   * New options go under `## 选项（第 N 轮）`, keeping earlier rounds as
+   * history. Sub-questions belong to the round that asks them (N161): `q.questions`
+   * is this round's own, never inherited from an earlier one — a round
+   * asked with none has none, however many an earlier round had.
+   */
+  ask(
+    d: Decision,
+    q: {
+      options: { key: string; label: string; body?: string }[]
+      default?: string
+      text?: string
+      author: string
+      /** This round's own `--question`s, if any. */
+      questions?: DecisionQuestion[]
+    },
+  ): Decision {
+    const questions = q.questions ?? []
+    if (questions.length) checkQuestions(questions)
     // No new options = ask the same question again. The text may already
     // contain `## 选项`; that block is adopted (or must match -o exactly).
     const text = q.text?.trim() ? q.text : undefined
     const inText = text ? parseOptions(text) : []
     if (text && text.split('\n').filter((l) => OPTIONS_HEADING_RE.test(l)).length > 1)
       throw new Error(t('core.store.multipleOptionsBlocks'))
+    if (questions.length && (q.options.length || inText.length)) throw new Error(t('core.store.questionsAndOptionsMixed'))
     if (inText.length && q.options.length) {
       const same = inText.length === q.options.length && inText.every((o, i) => o.key === q.options[i].key && o.label === q.options[i].label)
       if (!same) throw new Error(t('core.store.askTextOptionsMismatch', { diff: optionDiff(inText, q.options) }))
     }
     if (inText.length && !q.options.length && q.default === undefined) q = { ...q, default: bodyDefault(inText) }
-    const given = inText.length ? inText : q.options.length ? q.options : d.options
+    const given = questions.length ? questionOptions(questions) : inText.length ? inText : q.options.length ? q.options : d.options
     const options = given.map((o) => ({ key: o.key, label: o.label, body: o.body ?? '' }))
-    if (!inText.length && !q.options.length && q.default === undefined) q = { ...q, default: d.default }
+    if (questions.length) q = { ...q, default: '1' }
+    else if (!inText.length && !q.options.length && q.default === undefined) q = { ...q, default: d.default }
     if (!options.length) throw new Error(t('core.store.askNoOptions'))
     checkOptionKeys(options, q.default)
     const written = this.mutate(d, (d) => {
       const at = nowStamp()
       let body = d.body
-      const round = optionRounds(d.body) + 1
+      const round = optionsRoundOf(d.body) + 1
       if (inText.length && text) {
         // Renumbered to this round, so it outranks every earlier block.
         const heading = `## ${optionsHeading(round)}`
@@ -1120,6 +1140,7 @@ export class Store {
         if (text) body = appendSection(body, noteHeading(NOTE_KIND.newQuestion, 'agent', q.author, at), text)
         body = `${body.replace(/\s+$/, '')}\n\n${renderOptionsBlock(options, round).trim()}\n`
       }
+      if (questions.length) body = `${body.replace(/\s+$/, '')}\n\n${renderQuestionsBlock(questions, round).trim()}\n`
       const next: Decision = {
         ...d,
         body,
@@ -1127,6 +1148,9 @@ export class Store {
         default: q.default,
         // Old answer stays in the body; front matter now describes the new question.
         answer: undefined,
+        // This round's own sub-questions, however many an earlier round had —
+        // `frontMatterOf` writes `question_defaults` from this.
+        questions,
         reopenedAt: d.archived ? nowStamp(new Date(), { ms: true }) : d.reopenedAt,
       }
       return { next, move: d.archived ? 'unarchive' : undefined }
@@ -1134,6 +1158,15 @@ export class Store {
     const back = parseOptions(written.body)
     if (back.map((o) => `${o.key}·${o.label}`).join('\n') !== options.map((o) => `${o.key}·${o.label}`).join('\n'))
       throw new Error(t('core.store.optionsDidNotRoundTrip', { ref: refOf(written) }))
+    if (questions.length) {
+      const backQ = written.questions ?? []
+      const sameQ =
+        backQ.length === questions.length &&
+        backQ.every(
+          (wq, i) => wq.key === questions[i].key && wq.label === questions[i].label && wq.options.map((o) => `${o.key}${o.label}`).join() === questions[i].options.map((o) => `${o.key}${o.label}`).join(),
+        )
+      if (!sameQ) throw new Error(t('core.store.questionsBlockMismatch'))
+    }
     dequeue(this.layoutOf(written), written.id)
     return { ...written, queued: undefined }
   }
@@ -1541,16 +1574,6 @@ function checkOptionKeys(options: DecisionOption[], def?: string): void {
   if (dupe) throw new Error(t('core.store.optionKeyUsedTwice', { key: dupe }))
   if (def && !options.some((o) => o.key === def))
     throw new Error(t('core.store.defaultNotAnOption', { default: def, keys: options.map((o) => o.key).join(', ') || t('core.store.noneWord') }))
-}
-
-/** How many option rounds a body already has: 0 with no block, 1 for a plain `## 选项`. */
-function optionRounds(body: string): number {
-  let max = 0
-  for (const line of body.split('\n')) {
-    const m = OPTIONS_HEADING_RE.exec(line)
-    if (m) max = Math.max(max, Number(m[1] ?? 1))
-  }
-  return max
 }
 
 /** Two screenshots both called `after.png` must not overwrite each other. */

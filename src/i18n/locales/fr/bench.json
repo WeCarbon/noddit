@@ -258,7 +258,8 @@
     "options": "Options",
     "optionsRound": "Options (tour {{round}})",
     "attachments": "Pièces jointes",
-    "questions": "Sous-questions"
+    "questions": "Sous-questions",
+    "questionsRound": "Sous-questions (tour {{round}})"
   },
   "noteText": {
     "deferred": "Pour plus tard. N’y touchez pas avant la reprise.",

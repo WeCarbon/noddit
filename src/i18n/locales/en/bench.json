@@ -255,7 +255,8 @@
     "options": "Options",
     "optionsRound": "Options (round {{round}})",
     "attachments": "Attachments",
-    "questions": "Questions"
+    "questions": "Questions",
+    "questionsRound": "Questions (round {{round}})"
   },
   "noteText": {
     "deferred": "Later. Leave it alone until it’s resumed.",

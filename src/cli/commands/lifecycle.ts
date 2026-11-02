@@ -3,7 +3,7 @@ import { untilDay } from '../../core/fuzzy-date.ts'
 import { nowStamp } from '../../core/store.ts'
 import { dayText } from '../../i18n/time.ts'
 import { statusLabel } from '../../core/status.ts'
-import { bool, many, one, optionsAndDefault, type Args } from '../args.ts'
+import { bool, many, one, optionsAndDefault, questionsFromArgs, type Args } from '../args.ts'
 import { guardOtherAuthor, readStdin, requireDecision, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
 import { isHumanTask } from '../../core/assignee.ts'
 import { refOf } from '../../core/ref.ts'
@@ -40,8 +40,9 @@ export async function run(args: Args, verb = ''): Promise<number> {
     const d = requireDecision(store, args._[0], args)
     guardOtherAuthor(store, d, args)
     const { options, default: def } = optionsAndDefault(args)
+    const questions = questionsFromArgs(args)
     const text = one(args, 'text') ?? ((await readStdin()).trim() || undefined)
-    let next = store.ask(d, { options, default: def, text, author: resolveAuthor(args) })
+    let next = store.ask(d, { options, default: def, text, author: resolveAuthor(args), questions })
     // --attach: the draft goes with the question that presents it (its own section when there is text).
     const sources = many(args, 'attach')
     if (sources.length) {

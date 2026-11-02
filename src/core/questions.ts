@@ -1,4 +1,4 @@
-import { HEADING, OPTION_LABEL, allDefaultsLabel, itemByItemLabel } from './format.ts'
+import { OPTION_LABEL, allDefaultsLabel, itemByItemLabel, questionsHeading } from './format.ts'
 import type { DecisionOption } from './types.ts'
 import { t } from '../i18n/index.ts'
 
@@ -34,7 +34,9 @@ export interface DecisionQuestion {
 }
 
 export const QUESTION_KEY_RE = /^[A-Z]\d{1,3}$/
-export const QUESTIONS_HEADING_RE = /^##[ \t]+(子问题|Questions)[ \t　]*[:：]?[ \t]*$/
+/** `## 子问题（第 2 轮）` — only the suffix differs from `OPTIONS_HEADING_RE`
+ *  in `core/parse.ts`; group 2 is the round, absent meaning round 1. */
+export const QUESTIONS_HEADING_RE = /^##[ \t]+(子问题|Questions)(?:[（(]第[ \t]*(\d+)[ \t]*轮[）)])?[ \t　]*[:：]?[ \t]*$/
 const QUESTION_RE = /^###[ \t]+([A-Z]\d{1,3})[ \t]*(?:[·:：．.\-—–]{1,2}[ \t]*(.*))?$/
 const SUB_OPTION_RE = /^####[ \t]+([A-Za-z0-9]{1,4})[ \t]*(?:[·:：．.\-—–]{1,2}[ \t]*(.*))?$/
 const H2_RE = /^##[ \t]+\S/
@@ -48,9 +50,18 @@ export const REVIEW_OPTIONS: DecisionOption[] = [
 /** Not sending is the reversible default for an outgoing draft nobody looked at. */
 export const REVIEW_DEFAULT = '2'
 
-export function parseQuestions(body: string, defaults: Record<string, string> = {}): DecisionQuestion[] {
+/**
+ * Sub-questions belong to the round that asked them: a `## 子问题` with no
+ * `（第 N 轮）` suffix is round 1; a later `decs ask --question` writes its
+ * own `## 子问题（第 N 轮）`. Only the block matching `currentRound` (the
+ * node's current options round — see `core/parse.ts#optionsRoundOf`) is
+ * returned; older rounds' blocks stay in the file as history (surfaced via
+ * `parsePreviousRounds`) but never apply to the node's live answer.
+ */
+export function parseQuestions(body: string, defaults: Record<string, string> = {}, currentRound = 1): DecisionQuestion[] {
   const out: DecisionQuestion[] = []
   let inSection = false
+  let collecting = false
   let q: DecisionQuestion | null = null
   let opt: DecisionOption | null = null
   let buf: string[] = []
@@ -61,18 +72,22 @@ export function parseQuestions(body: string, defaults: Record<string, string> = 
     buf = []
   }
   for (const line of body.split('\n')) {
-    if (QUESTIONS_HEADING_RE.test(line)) {
+    const hm = QUESTIONS_HEADING_RE.exec(line)
+    if (hm) {
       flush()
       inSection = true
+      collecting = Number(hm[2] ?? 1) === currentRound
+      q = opt = null
       continue
     }
     if (inSection && H2_RE.test(line)) {
       flush()
       inSection = false
+      collecting = false
       q = opt = null
       continue
     }
-    if (!inSection) continue
+    if (!collecting) continue
     const qm = QUESTION_RE.exec(line)
     if (qm) {
       flush()
@@ -94,9 +109,9 @@ export function parseQuestions(body: string, defaults: Record<string, string> = 
   return out
 }
 
-export function renderQuestionsBlock(qs: DecisionQuestion[]): string {
+export function renderQuestionsBlock(qs: DecisionQuestion[], round = 1): string {
   if (!qs.length) return ''
-  const parts = [`## ${HEADING.questions}`, '']
+  const parts = [`## ${questionsHeading(round)}`, '']
   for (const q of qs) {
     parts.push(`### ${q.key}${q.label ? ` · ${q.label}` : ''}`, '')
     if (q.body.trim()) parts.push(q.body.trim(), '')

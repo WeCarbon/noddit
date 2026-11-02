@@ -252,7 +252,8 @@
     "options": "選項",
     "optionsRound": "選項（第 {{round}} 輪）",
     "attachments": "附件",
-    "questions": "子問題"
+    "questions": "子問題",
+    "questionsRound": "子問題（第 {{round}} 輪）"
   },
   "noteText": {
     "deferred": "之後再做。解除延遲之前先別動它。",

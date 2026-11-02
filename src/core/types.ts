@@ -118,6 +118,27 @@ export interface DecisionNote {
   attachments: Attachment[]
 }
 
+/**
+ * A settled `## 选项（第 N 轮）` round, older than the node's current one —
+ * history, not live state. Reconstructed from the body on every read (the
+ * round's own `## 已答` note is the only copy); never applies to the node's
+ * live `answer`/`questions`. See `core/parse.ts#parsePreviousRounds`.
+ */
+export interface PreviousRound {
+  round: number
+  options: DecisionOption[]
+  /** That round's own sub-questions (if `--question` asked any), for
+   *  labelling `subAnswers`' keys — never the node's current `questions`. */
+  questions: DecisionQuestion[]
+  /** The rendered `<choice> —— <label>` headline from that round's `## 已答`,
+   *  or undefined if the round was superseded before anyone answered it. */
+  answer?: string
+  /** Per sub-question answers recorded for that round, if it asked any. */
+  subAnswers?: Record<string, string>
+  by?: string
+  at?: string
+}
+
 /** 「做完了，等你看一眼」 — a decision whose only option is `验收通过`. */
 export const ACCEPTANCE_OPTION = { key: '1', label: OPTION_LABEL.accept }
 /** An fyi entry needs no answer, but one key to clear it from the bench is still handy. */
@@ -232,8 +253,12 @@ export interface Decision {
   body: string
   /** Parsed out of `## 选项` in the body; empty when the entry has no options. */
   options: DecisionOption[]
-  /** Parsed out of `## 子问题`; empty for an ordinary node. */
+  /** Parsed out of the current round's `## 子问题`; empty for an ordinary
+   *  node, or once a later `decs ask` round didn't ask any of its own. */
   questions?: DecisionQuestion[]
+  /** Earlier `## 选项（第 N 轮）` rounds, each with whatever it was answered —
+   *  history for the app/TUI to show collapsed. See `PreviousRound`. */
+  previousRounds?: PreviousRound[]
   /** Every `## 附件` in the body, flat and in file order — the concatenation
    *  of `bodyAttachments` and every note's own `attachments`. Kept for
    *  whatever wants one flat numbered list (the bench's picker, `nod open`). */

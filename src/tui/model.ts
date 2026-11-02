@@ -57,7 +57,11 @@ function sectionLabel(line: string): string | undefined {
     return round > 1 ? t('bench.heading.optionsRound', { round }) : t('bench.heading.options')
   }
   if (ATTACHMENTS_HEADING_RE.test(line)) return t('bench.heading.attachments')
-  if (QUESTIONS_HEADING_RE.test(line)) return t('bench.heading.questions')
+  const questions = QUESTIONS_HEADING_RE.exec(line)
+  if (questions) {
+    const round = Number(questions[2] ?? 1)
+    return round > 1 ? t('bench.heading.questionsRound', { round }) : t('bench.heading.questions')
+  }
   return undefined
 }
 

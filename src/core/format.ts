@@ -16,6 +16,13 @@ export function optionsHeading(round = 1): string {
   return round > 1 ? `${HEADING.options}（第 ${round} 轮）` : HEADING.options
 }
 
+/** `## 子问题（第 2 轮）` — sub-questions belong to the round that asked them;
+ *  `decs ask --question` on a later round writes one of these instead of
+ *  reusing round 1's plain `## 子问题`. */
+export function questionsHeading(round = 1): string {
+  return round > 1 ? `${HEADING.questions}（第 ${round} 轮）` : HEADING.questions
+}
+
 /** The word in an appended `## <kind>（role · author · time）` heading. */
 export const NOTE_KIND = {
   answered: '已答',

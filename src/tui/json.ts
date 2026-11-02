@@ -1,6 +1,6 @@
 import { staleTasksOf } from '../core/checkins.ts'
 import { parseBodyRefs, refOf } from '../core/ref.ts'
-import { OPTIONS_HEADING_RE } from '../core/parse.ts'
+import { OPTIONS_HEADING_RE, optionsRoundOf } from '../core/parse.ts'
 import { QUESTIONS_HEADING_RE } from '../core/questions.ts'
 import { toJSON } from '../core/render.ts'
 import { descriptionOf } from '../core/edit.ts'
@@ -118,16 +118,28 @@ function withFolds(rows: Row[]): (string | null)[] {
 
 /**
  * The body minus the current round's options and sub-questions: a window
- * draws those from `options` / `questions` as things to click. Older rounds stay.
+ * draws those from `options` / `questions` as things to click. Older rounds
+ * stay — including a `## 子问题` from an earlier round than the current
+ * one, since a round asked without `--question` has none of its own (N161)
+ * and that older block is history, not something `questions` duplicates.
  */
 function withoutLiveChoices(body: string): string {
   const lines = body.split('\n')
-  for (const re of [OPTIONS_HEADING_RE, QUESTIONS_HEADING_RE]) {
-    const start = lines.findLastIndex((l) => re.test(l))
-    if (start === -1) continue
+  const currentRound = optionsRoundOf(body)
+  const start = lines.findLastIndex((l) => OPTIONS_HEADING_RE.test(l))
+  if (start !== -1) {
     let end = start + 1
     while (end < lines.length && !/^##[ \t]+\S/.test(lines[end])) end++
     lines.splice(start, end - start)
+  }
+  const qStart = lines.findLastIndex((l) => {
+    const m = QUESTIONS_HEADING_RE.exec(l)
+    return Boolean(m) && Number(m![2] ?? 1) === currentRound
+  })
+  if (qStart !== -1) {
+    let end = qStart + 1
+    while (end < lines.length && !/^##[ \t]+\S/.test(lines[end])) end++
+    lines.splice(qStart, end - qStart)
   }
   return lines.join('\n')
 }

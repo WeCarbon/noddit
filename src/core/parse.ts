@@ -1,6 +1,7 @@
 import { basename } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { ATTACHMENT_GROUP_END } from './serialize.ts'
+import { isAnswerKind } from './format.ts'
 import { ENTRY_NAME_RE } from './paths.ts'
 import { parseQuestions } from './questions.ts'
 import {
@@ -15,6 +16,7 @@ import {
   type DecisionStatus,
   type ItemStatus,
   type NoteRole,
+  type PreviousRound,
 } from './types.ts'
 
 const FM_RE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?/
@@ -68,12 +70,28 @@ export function splitFrontMatter(text: string): { data: Record<string, unknown>;
   return { data, body: text.slice(m[0].length) }
 }
 
-/** Pulls options out of the body's `## 选项` block — the label lives only
- *  here, never duplicated into front matter. */
-export function parseOptions(body: string): DecisionOption[] {
+/** The node's current options round: 0 with no `## 选项` block at all, 1 for
+ *  a plain one, higher once `decs ask` has renumbered it. Drives which
+ *  `## 子问题` block (if any) is still live — see `core/questions.ts`. */
+export function optionsRoundOf(body: string): number {
+  let max = 0
+  for (const line of body.split('\n')) {
+    const m = OPTIONS_HEADING_RE.exec(line)
+    if (m) max = Math.max(max, Number(m[1] ?? 1))
+  }
+  return max
+}
+
+/**
+ * Pulls options out of the body's `## 选项` block — the label lives only
+ * here, never duplicated into front matter. With no `round`, only the
+ * highest-numbered block counts (the node's live options); passing one
+ * pulls that specific round instead, for history (`parsePreviousRounds`).
+ */
+export function parseOptions(body: string, round?: number): DecisionOption[] {
   const lines = body.split('\n')
   let out: DecisionOption[] = []
-  let round = 0
+  let curRound = 0
   let inBlock = false
   let current: DecisionOption | null = null
   let buf: string[] = []
@@ -92,11 +110,15 @@ export function parseOptions(body: string): DecisionOption[] {
     if (head) {
       flush()
       const r = Number(head[1] ?? 1)
-      if (r > round) {
-        round = r
-        out = []
+      if (round === undefined) {
+        if (r > curRound) {
+          curRound = r
+          out = []
+        }
+        inBlock = r === curRound
+      } else {
+        inBlock = r === round
       }
-      inBlock = r === round
       continue
     }
     if (inBlock && H2_RE.test(line)) {
@@ -274,6 +296,71 @@ export function parseNotes(body: string): DecisionNote[] {
   return out
 }
 
+/** `- Q1 = B —— change it back to Amount [%]（默认）` — one line of the
+ *  per-question breakdown `Store.answer` writes under `## 已答`. */
+const SUB_ANSWER_LINE_RE = /^-[ \t]+(\S+)[ \t]*=[ \t]*(\S+)[ \t]*——/
+
+/**
+ * Earlier `## 选项（第 N 轮）` rounds — history, never the node's live state.
+ * Each round's own `## 已答` note is the only copy of what it was answered,
+ * so this is reconstructed from the body on every read rather than stored:
+ * no file ever needs rewriting for a round to show up here. N161: an older
+ * round's sub-questions must not leak into a newer round's live `answer`;
+ * this is where they stay visible instead, labelled by their own round.
+ */
+export function parsePreviousRounds(body: string): PreviousRound[] {
+  const currentRound = optionsRoundOf(body)
+  if (currentRound < 2) return []
+  const lines = body.split('\n')
+  const starts = new Map<number, number>()
+  for (let i = 0; i < lines.length; i++) {
+    const m = OPTIONS_HEADING_RE.exec(lines[i])
+    if (m) starts.set(Number(m[1] ?? 1), i)
+  }
+  const out: PreviousRound[] = []
+  for (let r = 1; r < currentRound; r++) {
+    const start = starts.get(r)
+    if (start === undefined) continue
+    const later = [...starts.values()].filter((s) => s > start)
+    const limit = Math.min(lines.length, ...later)
+
+    let answerAt = -1
+    let heading: NoteHeading | null = null
+    for (let i = start + 1; i < limit; i++) {
+      const h = parseNoteHeading(lines[i])
+      if (h && isAnswerKind(h.kind)) {
+        heading = h
+        answerAt = i
+      }
+    }
+
+    let headline: string | undefined
+    const subAnswers: Record<string, string> = {}
+    if (answerAt !== -1) {
+      let end = answerAt + 1
+      while (end < limit && !H2_RE.test(lines[end])) end++
+      let text = lines.slice(answerAt + 1, end).join('\n').trim()
+      const wm = WRITER_MARKER_RE.exec(text)
+      if (wm) text = text.slice(0, wm.index).trim()
+      for (const line of text.split('\n')) {
+        const sm = SUB_ANSWER_LINE_RE.exec(line.trim())
+        if (sm) subAnswers[sm[1]] = sm[2]
+        else if (!headline && line.trim()) headline = line.trim()
+      }
+    }
+
+    out.push({
+      round: r,
+      options: parseOptions(body, r),
+      questions: parseQuestions(body, {}, r),
+      ...(headline ? { answer: headline } : {}),
+      ...(Object.keys(subAnswers).length ? { subAnswers } : {}),
+      ...(heading ? { by: heading.author, at: heading.at } : {}),
+    })
+  }
+  return out
+}
+
 /**
  * Splits every `## 附件` block in the body by which section it belongs to —
  * the body's own top prose, or whichever note heading most recently came
@@ -445,7 +532,8 @@ export function parseDecision(
     tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
     body,
     options,
-    questions: parseQuestions(body, strMap(data.question_defaults) ?? {}),
+    questions: parseQuestions(body, strMap(data.question_defaults) ?? {}, Math.max(1, optionsRoundOf(body))),
+    previousRounds: parsePreviousRounds(body),
     attachments: [...bodyAttachments, ...notes.flatMap((n) => n.attachments)],
     bodyAttachments,
     notes,
