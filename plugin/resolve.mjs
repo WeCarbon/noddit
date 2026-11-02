@@ -9,7 +9,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const HAS_DIST = existsSync(join(ROOT, 'dist'))
+// A git checkout runs its .ts source even if a publish left a dist/ behind;
+// only an installed package (no .git) uses the compiled files.
+const HAS_DIST = existsSync(join(ROOT, 'dist')) && !existsSync(join(ROOT, '.git'))
 
 /** Filesystem path to a repo-relative `.ts` file, resolved to its compiled
  *  dist/*.js counterpart when `dist/` exists. */
