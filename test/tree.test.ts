@@ -53,6 +53,30 @@ test('children live in the parent folder; get --json shows parent and children',
   assert.match(decs(root, ['show']), /whether to ship/, 'a child that needs a decision is in the owner list like any other')
 })
 
+test('nod tree never shows "waiting on deps" for a completed/closed node, whatever its own after deps are doing (N47)', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 'still not started', '--task'])
+  decs(root, ['add', 'done anyway', '--task', '--after', '1'])
+  decs(root, ['start', '2', '--force'])
+  decs(root, ['done', '2'])
+
+  // X2's own dependency (X1) is still not_started — before the fix this alone made a
+  // finished node read "waiting on deps", which makes no sense once it's done.
+  assert.equal(JSON.parse(decs(root, ['get', '1', '--json'])).status, 'not_started')
+  const tree = decs(root, ['tree', '--all'])
+  const line2 = tree.split('\n').find((l) => l.includes('X2'))
+  assert.ok(line2 && !line2.includes('waiting on deps'), tree)
+
+  // Closed nodes too.
+  decs(root, ['add', 'closed anyway', '--task', '--after', '1'])
+  decs(root, ['close', '3', '--reason', 'obsolete'])
+  const tree2 = decs(root, ['tree', '--all'])
+  const line3 = tree2.split('\n').find((l) => l.includes('X3'))
+  assert.ok(line3 && !line3.includes('waiting on deps'), tree2)
+})
+
 test('a child completing stays put; the root completing archives the whole tree; a reply on a child brings it back', (t) => {
   const root = scratch()
   t.after(() => rmSync(root, { recursive: true, force: true }))

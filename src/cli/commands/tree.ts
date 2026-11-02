@@ -2,7 +2,7 @@ import { bool, one, type Args } from '../args.ts'
 import { requireDecision, resolveStore } from '../context.ts'
 import { refOf } from '../../core/ref.ts'
 import { alignRow, cyan, dim, toJSON, yellow } from '../../core/render.ts'
-import { isStartable, rollup, statusLabel } from '../../core/status.ts'
+import { isStartable, isTerminal, rollup, statusLabel } from '../../core/status.ts'
 import { type Decision } from '../../core/types.ts'
 import { t } from '../../i18n/index.ts'
 
@@ -41,9 +41,11 @@ export function run(args: Args): number {
   const lines: string[] = []
   const draw = (d: Decision, prefix: string, last: boolean, top: boolean) => {
     const r = rollup(d, items)
+    // A completed/closed node is done regardless of what its `after` deps do
+    // later (one reopened after the fact, say) — never show it waiting.
     const marks = [
       d.state === 'needs_decision' ? yellow(statusLabel(d.state)) : dim(statusLabel(d.state)),
-      d.after?.length && !isStartable(d, items) ? dim(t('cli.tree.waitingOnDeps')) : null,
+      !isTerminal(d.state) && d.after?.length && !isStartable(d, items) ? dim(t('cli.tree.waitingOnDeps')) : null,
       r.needsOwner ? yellow('◆') : null,
     ].filter(Boolean)
     lines.push(`${prefix}${top ? '' : last ? '└─ ' : '├─ '}${cyan(refOf(d))} · ${marks.join(' ')} · ${d.title}`)
