@@ -129,7 +129,10 @@
     "cycleMore": " et {{count}} de plus",
     "colon": " : ",
     "extraSeparator": ", ",
-    "extraParen": " ({{text}})"
+    "extraParen": " ({{text}})",
+    "staleTasks_one": " {{count}} tâche en sommeil — pas commencée, ne demande pas de décision (nod show not_started)",
+    "staleTasks_other": " {{count}} tâches en sommeil — pas commencées, ne demandent pas de décision (nod show not_started)",
+    "staleTasks_many": " {{count}} tâches en sommeil — pas commencées, ne demandent pas de décision (nod show not_started)"
   },
   "zoom": {
     "switchImages": "←→ changer d’image  ",

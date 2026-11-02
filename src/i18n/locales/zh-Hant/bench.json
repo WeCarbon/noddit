@@ -127,6 +127,7 @@
     "workingNoneUpNext": "沒有執行中的；接下來 ",
     "cycle": " 依賴成環：{{chain}}{{more}}（nod check）",
     "cycleMore": " 等 {{count}} 處",
+    "staleTasks_other": " {{count}} 個 stale task——沒開始、也不待決策（nod show not_started）",
     "colon": "：",
     "extraSeparator": "，",
     "extraParen": "（{{text}}）"

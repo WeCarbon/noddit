@@ -525,3 +525,65 @@ test('--all in a teammate session watches everything, as the lead does', async (
   assert.match(out, /for lane-a/)
   assert.match(out, /for lane-b/)
 })
+
+// ---------------------------------------------------------------------------
+// owner_facing (N47): an agent's first reply after a human post is an event
+// worth notifying on, not just a record — for the desktop app.
+// ---------------------------------------------------------------------------
+
+test('store.changes: an agent note is ownerFacing only when it is the first reply after a human post', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.start(store.create({ title: 't', author: 'lane · x', task: true }))
+  const since = new Date(Date.now() - 1000).toISOString()
+
+  // An agent's own note with no preceding human post: not owner-facing.
+  d = store.note(d, { text: 'just working', role: 'agent', author: 'lane · x' })
+  const notesOf = () => store.changes(since).filter((e) => e.event === 'note')
+  assert.equal(notesOf().at(-1)?.ownerFacing, undefined)
+
+  // The owner writes; the agent's first reply after it is owner-facing.
+  d = store.note(d, { text: 'any update?', role: 'human', author: 'owner' })
+  d = store.note(d, { text: 'almost done', role: 'agent', author: 'lane · x' })
+  assert.equal(notesOf().at(-1)?.ownerFacing, true)
+
+  // A second agent note before the owner writes again is not a fresh reply.
+  d = store.note(d, { text: 'done now', role: 'agent', author: 'lane · x' })
+  assert.equal(notesOf().at(-1)?.ownerFacing, undefined)
+
+  // The owner never gets ownerFacing on their own note.
+  store.note(d, { text: 'thanks', role: 'human', author: 'owner' })
+  assert.equal(notesOf().at(-1)?.ownerFacing, undefined)
+})
+
+test('nod monitor --updates --json flags owner_facing refs for the desktop app', async (t) => {
+  const root = scratch()
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 'ship it', '--task'])
+  decs(root, ['start', '1'])
+  const { spawn } = await import('node:child_process')
+  const home = join(root, 'home')
+  const child = spawn(process.execPath, [BIN, 'monitor', '--updates', '--json', '--interval', '150'], {
+    cwd: root,
+    env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
+  })
+  let out = ''
+  child.stdout.on('data', (b) => (out += b))
+  t.after(() => killAndWait(child))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const lines = () => out.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l))
+  const until = async (ok: () => boolean, what: string) => {
+    for (const end = Date.now() + 10_000; !ok(); await new Promise((r) => setTimeout(r, 50)))
+      if (Date.now() > end) throw new Error(`timed out waiting for ${what}: ${out}`)
+  }
+  // reportUpdates' first pass only takes a silent baseline snapshot — nothing prints yet.
+  await until(monitorReady(home), 'the monitor to start')
+
+  // No DECS_AUTHOR: a real owner's own terminal has none.
+  decs(root, ['note', '1', '--human', "how's it going?"], { DECS_AUTHOR: undefined })
+  await until(() => lines().some((l) => l.event === 'updated' && l.refs.includes('X1') && !l.owner_facing?.length), 'the owner note update')
+
+  decs(root, ['note', '1', '--agent', 'almost there'])
+  await until(() => lines().some((l) => l.event === 'updated' && l.owner_facing?.includes('X1')), 'the owner-facing agent reply')
+})

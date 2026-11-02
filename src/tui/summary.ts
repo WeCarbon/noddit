@@ -144,6 +144,12 @@ export function cyclesLine(ov: Overview): Line | null {
   return [{ text: t('bench.summary.cycle', { chain: c.map((x) => x.ref).join(' → '), more }), color: 'red', bold: true }]
 }
 
+/** N47: not_started, not deferred nodes — neither waiting on a decision nor being worked on. */
+export function staleTasksLine(ov: Overview): Line | null {
+  if (!ov.staleTasks) return null
+  return [{ text: t('bench.summary.staleTasks', { count: ov.staleTasks }), color: 'yellow' }]
+}
+
 /**
  * The whole strip. On a short terminal only the first line survives — it is
  * the one question the owner opens bench to answer.
@@ -179,6 +185,8 @@ export function summaryLines(ov: Overview, items: Item[], width: number, height:
   if (ov.sources.length && height >= 12) lines.push(sourcesLine(ov, width))
   const cyc = cyclesLine(ov)
   if (cyc && height >= 12) lines.push(cyc)
+  const stale = staleTasksLine(ov)
+  if (stale && height >= 12) lines.push(stale)
   return lines.map((l) => l.map((s) => ({ ...s, text: s.text })).filter((s) => s.text.length)).map((l) => clip(l, width))
 }
 

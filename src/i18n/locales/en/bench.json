@@ -127,6 +127,8 @@
     "workingNoneUpNext": "nothing running; up next ",
     "cycle": " dependency cycle: {{chain}}{{more}} (nod check)",
     "cycleMore": " and {{count}} more",
+    "staleTasks_one": " {{count}} stale task — not started, not needing a decision (nod show not_started)",
+    "staleTasks_other": " {{count}} stale tasks — not started, not needing a decision (nod show not_started)",
     "colon": ": ",
     "extraSeparator": ", ",
     "extraParen": " ({{text}})"

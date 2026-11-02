@@ -23,7 +23,9 @@
     "superseded": "Remplacé",
     "newQuestion": "Nouvelle question",
     "original": "Mots d’origine",
-    "claimed": "Pris en charge"
+    "claimed": "Pris en charge",
+    "heartbeat": "Signal de vie",
+    "received": "Reçu"
   },
   "lang": {
     "unknown": "langue inconnue « {{code}} » — utilisez l’une de : {{codes}}",

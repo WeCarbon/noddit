@@ -12,7 +12,7 @@ import { parseDuration, parseSince } from '../../core/duration.ts'
 import { currentIdentity } from '../../core/identity.ts'
 import { findLayout } from '../../core/paths.ts'
 import { listSources, sourceEventsSince } from '../../core/sources.ts'
-import { lastHumanAt, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
+import { isLatestNoteOwnerFacing, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
 import { isUnclaimedBrief, originalWords } from '../../core/intake.ts'
 import { HEARTBEAT_MS, harnessOf, removeHeartbeat, writeHeartbeat } from '../../core/listeners.ts'
 import type { Decision } from '../../core/types.ts'
@@ -291,9 +291,7 @@ export async function run(args: Args): Promise<number> {
       const version = JSON.stringify([d.updatedAt, d.state, d.archived, d.notes.length, d.answer?.at, d.deferredAt, d.progress, d.title])
       if (versions.get(key) !== version && !first) {
         changed.push(refOfNode(d))
-        const latestNote = d.notes.at(-1)
-        const lastHuman = lastHumanAt(d)
-        if (latestNote?.role === 'agent' && (!lastHuman || Date.parse(latestNote.at) > Date.parse(lastHuman))) ownerFacing.push(refOfNode(d))
+        if (isLatestNoteOwnerFacing(d)) ownerFacing.push(refOfNode(d))
       }
       versions.set(key, version)
     }
@@ -451,7 +449,7 @@ export async function run(args: Args): Promise<number> {
           process.stdout.write(
             asJson
               ? `${JSON.stringify({ event: 'stale_tasks', refs, count: due.length })}\n`
-              : `NODDIT-STALE ${refs.join(' ')} ${t('cli.monitor.stale', { count: due.length, more: due.length - shown.length })}\n`,
+              : `NODDIT-STALE ${refs.join(' ')} ${t('cli.monitor.stale', { count: due.length })}\n`,
           )
         }
       } catch (err) {

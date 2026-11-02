@@ -127,9 +127,15 @@
     "workingNoneUpNext": "لا شيء قيد التنفيذ؛ التالي ",
     "cycle": " حلقة تبعية: {{chain}}{{more}} (nod check)",
     "cycleMore": " و {{count}} أخرى",
+    "staleTasks_other": " {{count}} مهمة راكدة لم تبدأ، ولا تنتظر قرارًا (nod show not_started)",
     "colon": ": ",
     "extraSeparator": "، ",
-    "extraParen": " ({{text}})"
+    "extraParen": " ({{text}})",
+    "staleTasks_zero": "لا مهام راكدة لم تبدأ، ولا تنتظر قرارًا (nod show not_started)",
+    "staleTasks_one": "مهمة راكدة واحدة لم تبدأ، ولا تنتظر قرارًا (nod show not_started)",
+    "staleTasks_two": "مهمتان راكدتان لم تبدأ، ولا تنتظر قرارًا (nod show not_started)",
+    "staleTasks_few": " {{count}} مهام راكدة لم تبدأ، ولا تنتظر قرارًا (nod show not_started)",
+    "staleTasks_many": " {{count}} مهمة راكدة لم تبدأ، ولا تنتظر قرارًا (nod show not_started)"
   },
   "zoom": {
     "switchImages": "←→ تبديل الصورة  ",

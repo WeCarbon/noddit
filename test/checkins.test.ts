@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { askIfDue, checkinOf, resetCheckin, UNANSWERED_AFTER } from '../src/core/checkins.ts'
+import { askIfDue, checkinOf, resetCheckin, staleNagDue, staleTasksOf, UNANSWERED_AFTER } from '../src/core/checkins.ts'
 import { initLayout, type Layout } from '../src/core/paths.ts'
 import type { Decision } from '../src/core/types.ts'
 import { BIN, decs, killAndWait, scratch } from './helpers.ts'
@@ -58,6 +58,39 @@ test('askIfDue: never for a deferred node, a not-in_progress node, or one still 
   assert.equal(askIfDue(l, node({ updatedAt: old, activeAt: old, deferredAt: old }), far), undefined)
   assert.equal(askIfDue(l, node({ updatedAt: old, activeAt: old, state: 'needs_decision' }), far), undefined)
   assert.equal(askIfDue(l, node({ updatedAt: new Date(far - 60_000).toISOString(), activeAt: new Date(far - 60_000).toISOString() }), far), undefined, 'well inside its own 10m span')
+})
+
+// ---------------------------------------------------------------------------
+// Stale tasks (N47): not_started, not deferred — neither waiting on a
+// decision nor being worked on.
+// ---------------------------------------------------------------------------
+
+test('staleTasksOf: only not_started, not deferred; oldest created first', () => {
+  const mk = (id: number, created: string, overrides: Partial<Decision> = {}) =>
+    ({ id, state: 'not_started', created, deferredAt: undefined, ...overrides }) as Pick<Decision, 'state' | 'deferredAt' | 'created'> & { id: number }
+  const items = [
+    mk(1, '2026-01-03T00:00:00Z'),
+    mk(2, '2026-01-01T00:00:00Z'),
+    mk(3, '2026-01-02T00:00:00Z', { state: 'in_progress' }),
+    mk(4, '2026-01-02T00:00:00Z', { deferredAt: '2026-01-02T00:00:00Z' }),
+    mk(5, '2026-01-02T12:00:00Z'),
+  ]
+  assert.deepEqual(staleTasksOf(items).map((d) => d.id), [2, 5, 1])
+})
+
+test('staleNagDue: same spacing as askIfDue, but for not_started nodes (never in_progress, never deferred)', (t) => {
+  const l = tmpLayout(t)
+  const write = Date.parse('2026-01-01T00:00:00.000Z')
+  const old = new Date(write).toISOString()
+  const task = node({ state: 'not_started', updatedAt: old, activeAt: old, created: old })
+  const min = 60_000
+
+  assert.equal(staleNagDue(l, task, write + 5 * min), undefined, 'only 5m idle, span is 10m')
+  const first = staleNagDue(l, task, write + 11 * min)
+  assert.equal(first?.asked, 1)
+  assert.equal(staleNagDue(l, task, write + 15 * min), undefined, 'too soon since the last nag')
+  assert.equal(staleNagDue(l, { ...task, state: 'in_progress' }, write + 100 * min), undefined, 'in_progress is askIfDue\'s job, not this one\'s')
+  assert.equal(staleNagDue(l, { ...task, deferredAt: old }, write + 100 * min), undefined)
 })
 
 test('askIfDue: no staleAfter on the node falls back to the checkin-after setting', (t) => {
@@ -129,4 +162,35 @@ test('a check-in ask rides along the next monitor line when there is one, but st
   // (several polls fit in 600ms; the count must not grow past 1 here).
   await new Promise((r) => setTimeout(r, 600))
   assert.equal(lines().filter((l) => l.event === 'checkin').length, 1, 'at most once per span, not once per poll')
+})
+
+test('a bare (lead) monitor nags about stale (not_started, not deferred) tasks on its own, oldest first, top few shown', async (t) => {
+  const root = scratch()
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 'old one', '--task', '--stale-after', '2s'])
+  decs(root, ['add', 'needs a decision', '-o', '1=a', '2=b'])
+  decs(root, ['add', 'newer one', '--task', '--stale-after', '2s'])
+  const { spawn } = await import('node:child_process')
+  const home = join(root, 'home')
+  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--json'], {
+    cwd: root,
+    env: { ...process.env, NO_COLOR: '1', CLAUDECODE: '1', DECS_HOME: home },
+  })
+  let out = ''
+  child.stdout.on('data', (b) => (out += b))
+  t.after(() => killAndWait(child))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const lines = () => out.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l))
+  const until = async (ok: () => boolean, what: string) => {
+    for (const end = Date.now() + 10_000; !ok(); await new Promise((r) => setTimeout(r, 50)))
+      if (Date.now() > end) throw new Error(`timed out waiting for ${what}: ${out}`)
+  }
+  // Both not_started tasks are expected eventually — they needn't go stale in the very
+  // same pass (the three `add`s above don't all land in the same millisecond, and each
+  // is nagged on its own per-node schedule), so accumulate across events rather than
+  // requiring one combined line.
+  const seenRefs = () => new Set(lines().filter((l) => l.event === 'stale_tasks').flatMap((l) => l.refs as string[]))
+  await until(() => seenRefs().has('X1') && seenRefs().has('X3'), 'both stale tasks nagged, over one or more events')
+  assert.equal(seenRefs().has('X2'), false, 'the needs_decision node is never "stale"')
 })

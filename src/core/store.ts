@@ -629,16 +629,7 @@ export class Store {
       // owner-facing event the desktop app notifies on (see `cli/commands/
       // monitor.ts`'s `reportUpdates`). Later agent notes before the next
       // human post are just further work, not a fresh reply.
-      let repliedSinceHuman = false
-      const ownerFacing = d.notes.map((n) => {
-        if (n.role === 'human') {
-          repliedSinceHuman = false
-          return false
-        }
-        if (repliedSinceHuman) return false
-        repliedSinceHuman = true
-        return true
-      })
+      const ownerFacing = ownerFacingFlags(d)
       d.notes.forEach((n, i) => {
         const precision = parseNoteHeading(`## ${n.heading}`)?.precisionMs ?? 60_000
         if (!after(n.at, precision)) return
@@ -1231,6 +1222,33 @@ export function lastHumanAt(d: Decision): string | undefined {
     .filter((t): t is string => Boolean(t) && !Number.isNaN(Date.parse(t!)))
     .sort((a, b) => Date.parse(a) - Date.parse(b))
   return times[times.length - 1]
+}
+
+/**
+ * Per note, in order: is this the first agent note after a human post —
+ * the reply to it, an owner-facing event (see `changes()` / `cli/commands/
+ * monitor.ts`'s `reportUpdates`)? By array order, not timestamps — two
+ * notes written within the same second get identical second-precision
+ * headings, so comparing `at` strings can't tell them apart.
+ */
+export function ownerFacingFlags(d: Pick<Decision, 'notes'>): boolean[] {
+  let sawHuman = false
+  let repliedSinceHuman = false
+  return d.notes.map((n) => {
+    if (n.role === 'human') {
+      sawHuman = true
+      repliedSinceHuman = false
+      return false
+    }
+    if (!sawHuman || repliedSinceHuman) return false
+    repliedSinceHuman = true
+    return true
+  })
+}
+
+/** Whether the latest note (if any) is the owner-facing reply — what a redrawing window checks per changed node. */
+export function isLatestNoteOwnerFacing(d: Pick<Decision, 'notes'>): boolean {
+  return ownerFacingFlags(d).at(-1) ?? false
 }
 
 /** 「归档后有新回复」: a human reply brought it back and it has not been filed again since. */

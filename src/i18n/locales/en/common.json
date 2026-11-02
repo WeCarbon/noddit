@@ -23,7 +23,9 @@
     "superseded": "Superseded",
     "newQuestion": "New question",
     "original": "Original words",
-    "claimed": "Picked up"
+    "claimed": "Picked up",
+    "heartbeat": "Heartbeat",
+    "received": "Received"
   },
   "lang": {
     "unknown": "unknown language \"{{code}}\" — use one of: {{codes}}",

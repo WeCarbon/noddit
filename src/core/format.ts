@@ -32,6 +32,8 @@ export const NOTE_KIND = {
   newQuestion: '新问题',
   original: '原话',
   claimed: '接活',
+  heartbeat: '心跳',
+  received: '已收到',
 } as const
 
 export type NoteKindKey = keyof typeof NOTE_KIND

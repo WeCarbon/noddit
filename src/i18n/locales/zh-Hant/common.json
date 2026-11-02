@@ -23,7 +23,9 @@
     "superseded": "被取代",
     "newQuestion": "新問題",
     "original": "原話",
-    "claimed": "接活"
+    "claimed": "接活",
+    "heartbeat": "心跳",
+    "received": "已收到"
   },
   "lang": {
     "unknown": "無法辨識的語言「{{code}}」——可用：{{codes}}",

@@ -23,7 +23,9 @@
     "superseded": "استُبدل",
     "newQuestion": "سؤال جديد",
     "original": "الكلمات الأصلية",
-    "claimed": "تم الاستلام"
+    "claimed": "تم الاستلام",
+    "heartbeat": "نبضة",
+    "received": "تم الإقرار"
   },
   "lang": {
     "unknown": "لغة غير معروفة \"{{code}}\" — استخدم إحدى: {{codes}}",

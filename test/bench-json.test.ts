@@ -10,9 +10,9 @@ interface Seg { text: string; color?: string; bold?: boolean; dim?: boolean }
 interface JsonRow { key: string; kind: string; depth: number; fold: string | null; node?: string; ref?: string; glyph?: Seg; badge?: Seg[]; collapsed?: boolean; text?: string; count?: number }
 interface BenchJson {
   lang: string
-  projects: { project: string; letter: string; root: string }[]
+  projects: { project: string; letter: string; root: string; stale_count: number }[]
   views: { view: string; count: number | null; rows: JsonRow[] }[]
-  nodes: Record<string, { ref: string; options: { key: string; body: string }[]; parent_node: { ref: string }; after_nodes: { ref: string }[]; blocking_nodes: { ref: string }[]; status: string; status_line: Seg[]; meta: Seg[][]; body_rows: { text: string; image?: number; style?: Seg }[]; images: { name: string; path: string }[]; can_default: boolean; backlinks: string[] }>
+  nodes: Record<string, { ref: string; options: { key: string; body: string }[]; parent_node: { ref: string }; after_nodes: { ref: string }[]; blocking_nodes: { ref: string }[]; status: string; status_line: Seg[]; meta: Seg[][]; body_rows: { text: string; image?: number; style?: Seg }[]; images: { name: string; path: string }[]; can_default: boolean; backlinks: string[]; checkin: { asked: number; last_asked_at: string; unanswered: boolean } | null; staleness: string }>
 }
 
 /** Retries past a lingering lock on Windows — a just-killed child can hold its cwd open
@@ -64,6 +64,20 @@ test('decs bench --json: every view with its rows, glyphs and badges, without a 
   assert.equal(d.parent_node.ref, 'X1')
   assert.deepEqual(d.blocking_nodes.map((n) => n.ref), ['X3'])
   assert.deepEqual(j.nodes[`${j.projects[0].project}#3`].after_nodes.map((n) => n.ref), ['X2'])
+})
+
+test('decs bench --json: stale_count is not_started/not-deferred nodes; a node\'s checkin is null until it has been asked', (t) => {
+  const root = project(t)
+  decs(root, ['add', 'not started yet', '--task'])
+  decs(root, ['add', 'also not started', '--task'])
+  decs(root, ['add', 'running', '--task'])
+  decs(root, ['start', '3'])
+  decs(root, ['defer', '1'])
+
+  const j = benchJson(root)
+  assert.equal(j.projects[0].stale_count, 1, 'node 1 is deferred, so only node 2 counts')
+  assert.equal(j.nodes[`${j.projects[0].project}#3`].checkin, null, 'never asked yet')
+  assert.equal(j.nodes[`${j.projects[0].project}#3`].staleness, 'fresh')
 })
 
 test('decs bench --json: finished children sit under their fold row in All; attachments come with an absolute path', (t) => {

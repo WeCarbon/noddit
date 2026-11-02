@@ -1,3 +1,4 @@
+import { staleTasksOf } from './checkins.ts'
 import { compareUrgency } from './order.ts'
 import { refOf } from './ref.ts'
 import { buildSchedule, dependentsOf, findCycles, type Cycle, type ScheduleRow } from './sequence.ts'
@@ -56,6 +57,8 @@ export interface Overview {
   cycles: Cycle[][]
   /** Per project: is a session's `nod monitor` running there (see core/listeners.ts)? */
   sessions: ProjectSessions[]
+  /** N47: not_started, not deferred — neither waiting on a decision nor being worked on. */
+  staleTasks: number
 }
 
 export type ProjectSessions = ReturnType<typeof projectSessions>[number]
@@ -97,6 +100,7 @@ export function buildOverview(items: Item[], now = Date.now(), sources: SourceSu
     sources,
     cycles: findCycles(items),
     sessions,
+    staleTasks: staleTasksOf(items).length,
   }
 }
 

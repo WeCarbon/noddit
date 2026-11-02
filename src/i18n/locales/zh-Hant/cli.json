@@ -42,7 +42,7 @@
     "attach": "nod attach <id> <路徑或 URL>...\n\n  --link              只記路徑，不復制進 decisions/attachments/\n  --name              自定義鏈接文字（只在附一個東西時有意義）\n  --replace           同名檔案直接覆蓋最新版，舊版本挪進 .history/，\n                      正文裡的鏈接永遠指向最新版；不給這個 flag 時同名\n                      檔案會變成 name-2.ext，兩個都保留\n  --label \"選項 1\" a.png --label \"選項 2\" b.png\n                      給緊跟著的那個檔案分組；同一組在看板裡可以\n                      左右切換對比。按出現順序和檔案一一對應——每個\n                      檔案前面放一個 --label，別漏、別多\n  --caption \"…\"       同上，給緊跟著的檔案配一行說明，顯示在圖下方\n  --approval-content  標記為「待發出去之前要你批准」的內容，記下\n                      sha256；你在看板裡批這個節點時順帶批准它，\n                      之後用 `nod approved <id> --check <path>` 核對\n  --approve-on 1,3    哪些答覆算批准這份內容（逗號分隔；子問題寫 Q2:1）。\n                      只有一個選項的節點（驗收）預設就是那個選項；\n                      有多個選項或子問題時必須給。負責人選了別的，內容\n                      就不算批准\n\n截圖預設會被複制進 decisions/attachments/<編號>/，因為暫存區\n遲早會被清掉，而驗收節點下個月還要看。圖片寫成 ![](…)，\n所以在任何 markdown 檢視器裡直接就是圖。",
     "note": "nod note <id> <文字>          追加一段補充；不答覆、不歸檔\n\n  --human           這是負責人本人的回覆（會進隊列、會把歸檔的條目拉回來）\n  --agent           這是工作線記的補充（不進隊列、不喚醒任何人）\n  --role human|agent\n  --author / --by   署名；`agent` 預設取 --author / NODDIT_AUTHOR / 分支名，`human` 預設 `owner`\n  --heading <詞>    段落標題，預設 `human`「回覆」、`agent`「補充」\n\n不給 --human/--agent 時看是誰在跑：Claude Code 的終端機（設了 CLAUDECODE）\n或 NODDIT_ROLE=agent 算 AI 代理——記下自己做了什麼、補一條事實，**不會**進隊列，\n也不會喚醒任何人；其餘（負責人在自己的終端裡敲）算 `human`，會進隊列。\nNODDIT_ROLE=human 強制算 `human`。\n\n寫出來的段落標題帶角色、署名和時間，例如：\n  ## 補充（agent · lead/ship-v2 · 2026-10-28 10:51:30）\n  ## 回覆（human · owner · 2026-10-28 11:02:07）",
     "archive": "nod archive <id>...        這個節點做完了 → 已完成，收進 archived/（同 nod done）\nnod archive <id> --seen    看過了、不用處理 → 記一句然後歸檔\nnod archive <id> --undo    拿回 active/\n\n  --force   連還沒答覆的條目也歸檔（很少是對的）\n\n--seen 是給驗收類條目用的：它記下「看過了，不用處理」，然後歸檔，\n**不進隊列**——提出它的工作線不需要為這件事被喚醒。\n\n歸檔是「我做完了」，不是「我看到了」。看到用 nod read——\n它把條目從隊列裡劃掉，但留在 active/，因為活還沒幹完。",
-    "read": "nod read <id>...        取走這幾條更新（nod pop 是同一個命令）\n\n  --mine / --author <s>   只是過濾檢查用；id 仍然必須給\n  --peek                  只看不取，不出隊\n  --done                  取走並且歸檔——這件事已經解決、或者不再需要解決\n  --json\n\nid 是必須的。沒有「取隊列最前面那條」的寫法：幾條工作線同時在跑的時候，\n盲取會把別人的答覆取走，而且是靜默丟失。先看隊列，再指名取：\n\n  nod queue --mine\n  nod read 415\n\n**取走不等於歸檔。** read = 「我看到了」，archive = 「我做完了」，\n這兩件事常常隔著好幾天。做完之後自己收尾：\n\n  nod archive 415\n\n只有讀完當場就辦完的（例如答覆是「不用做了」），才用 --done 一步到位。",
+    "read": "nod read <id>...        取走這幾條更新（nod pop 是同一個命令）\n\n  --mine / --author <s>   只是過濾檢查用；id 仍然必須給\n  --peek                  只看不取，不出隊\n  --done                  取走並且歸檔——這件事已經解決、或者不再需要解決\n  --ack \"…\"               取走加回覆一步到位：寫一條「已收到」加準備怎麼處理——\n                          負責人看得到的回覆，別圖省事跳過\n  --json\n\nid 是必須的。沒有「取隊列最前面那條」的寫法：幾條工作線同時在跑的時候，\n盲取會把別人的答覆取走，而且是靜默丟失。先看隊列，再指名取：\n\n  nod queue --mine\n  nod read 415\n\n**取走不等於歸檔。** read = 「我看到了」，archive = 「我做完了」，\n這兩件事常常隔著好幾天。做完之後自己收尾：\n\n  nod archive 415\n\n只有讀完當場就辦完的（例如答覆是「不用做了」），才用 --done 一步到位。",
     "watch": "nod watch [flags]        一直跑，把變化往外流\n\n  --mine / --author <s>   只看某個提出者的\n  --json                  一行一個 JSON 事件\n  --dir <專案>            可重複\n\n這個命令**不會退出**，所以它是給人開一個終端窗格看的。\nAI 代理要等答覆請用 `nod wait`——那個拿到答覆就退出，\n放進後臺終端機才會把你喚醒。",
     "changes": "nod changes --since <時間> [flags]     這之後發生的所有事\n\n  --since <ISO|時長>     2026-10-28T10:00:00+08:00，或 2h / 30m（從現在往回）\n  --mine / --author <s>  只看某個提出者的條目\n  --role human|agent     只看負責人的 / 只看 AI 代理的\n  --json                 { since, until, next_since, events: [...], source_events: [...] }\n\n列出答覆、追問、AI 代理補充、新建、完成、關閉、歸檔後被拉回，以及外部來源\n（nod source）裡新出現、變化、消失的條目。--role 只篩節點，給了就不列來源；\n--mine / --author 對來源按它註冊時的 owner_agent 篩，沒登記 owner_agent 的\n來源誰都看得到。\n沒有守護進程，也沒有事件日誌——全是從條目裡的段落標題和檔頭\n時間戳推出來的，所以工作階段斷了、wait 進程沒了，回來跑一次就能補齊：\n\n  nod changes --since 2026-10-28T10:00:00+08:00 --mine --json\n\n輸出裡的 next_since 就是下次該傳的 --since。老條目的段落標題只精確到\n分鐘，同一分鐘內的事件可能出現兩次——寧可重複，不會漏。",
     "wait": "nod wait [<id>...] [flags]        阻塞到隊列裡有東西，然後退出\n\n  --mine / --author <s>   只等某個提出者的條目\n  --timeout <秒>          超時退出，退出碼 2；預設無限等\n  --json\n\n它**只告訴你「有更新」**，不告訴你更新的內容——因為你可能一口氣答了好幾條，\n把內容塞進這一次退出裡會漏掉後面的。拿內容用 nod read：\n\n  nod wait --mine        (run_in_background: true) → 退出時你被喚醒\n  nod queue --mine       → 看有哪些\n  nod read <id>          → 指名取走（不歸檔；做完再 nod archive）\n\n退出時會打印一個 --since 值。wait 進程會隨工作階段一起消失——\n回來以後先跑一次，補齊這段時間裡的所有答覆和追問：\n\n  nod changes --since <它打印的值> --mine\n\n給人看的流式版本是 nod watch，那個不退出。",
@@ -57,7 +57,8 @@
     "briefs": "nod briefs [--all] [--json]   負責人派了、還沒有 AI 接的活，以及誰在線\n\n派活是負責人用幾個字建的節點（nod add --brief，或者負責人自己終端裡的裸 nod add），交給 AI 展開。\n「在線」是說這個專案裡有主控工作階段的 nod monitor 在跑；沒有的話，派的活要等有會話開起來。\n\n  --all       連已經有人接、還沒做完的也列出來\n  --project, -p <名字>\n  --json      `{\"projects\": [{project, letter, root, listening, listeners: [{author, lead, started_at, at}]}], \"briefs\": [節點…]}`",
     "session": "nod sessions [--json]                     每個專案裡有哪些 AI 會話在線\nnod session start [--agent claude|codex|kimi] [--dir <專案>] [--dry-run] [--json]\n                                          在那裡開一個新終端視窗，跑這個 AI 代理\n\n會話在線，是說它的 nod monitor 在這個專案裡跑著（外掛在每個會話裡都會自動啟動一個）。\n每個監聽在 $NODDIT_HOME/sessions/ 下維持一個心跳（pid、署名、所在終端程式、主控還是子 AI 代理、\n開始時間、最後一次心跳）；pid 已經不在或者心跳超過 90 秒的不算。\n\n`session start` 開一個新的前景視窗：macOS 上裝了 iTerm2 用 iTerm2，否則用「終端機」；Windows 上用\nWindows Terminal，否則 cmd；Linux 上用找到的第一個終端，找不到就把命令印出來。它在專案的真實根目錄\n裡啟動 AI 代理，第一句話讓它去接等著的派活。這裡已經有主控工作階段在線時不開，並說明是誰。\n\n  --agent     claude（預設，或 $NODDIT_AGENT）| codex | kimi\n  --dry-run   只印出確切的 AppleScript / 命令，什麼都不打開\n  --json      `sessions`：`{\"projects\": [{project, letter, root, listening, sessions: [{pid, author, harness, role, started_at, last_seen}]}]}`\n              `start`：`{\"ok\": true, \"started\": bool, \"plan\": {agent, root, terminal, command, exec, script?}}`\n                     或 `{\"ok\": false, \"reason\": \"already_listening\", \"session\": {…}}`",
     "whoami": "nod whoami [--json]     這個行程現在的身份（core/identity.ts）\n\n每次寫入會打在看不見的 `<!-- nod:by=… -->` 標記裡（這樣 nod monitor 能分清是不是\n自己寫的，轉記負責人的話時不會反過來推給轉記的那個人自己）；也是 --mine 比對的依據。\n\n  NODDIT_IDENTITY / DECS_IDENTITY   每個 AI 代理設一次就固定住——跟 NODDIT_AGENT\n                                     （nod session start 選 claude/codex/kimi 用的）\n                                     是兩個不同的變數\n  沒設的話：署名裡「 · 」前面的名字（NODDIT_AUTHOR）加上工作階段 id\n             （CLAUDE_SESSION_ID 或 NODDIT_SESSION）\n\n兩個都沒有 → 沒有身份：寫入不帶標記，也不會被跳過，--mine 還是只按名字比對。\n\n  --json    `{identity, explicit, author, session, harness}`",
-    "flag": "nod flag <編號> important                   標為很重要：每個列表裡排最前，看板上帶 ★\nnod flag <編號> milestone --due 2026-11-15   關鍵時間節點：排最前，倒數計時（⚑ 3 天後）\nnod flag <編號> normal                      兩個標記都拿掉（也可以寫 off）\n\n  --due <日期|4h|3d>   里程碑的日期；只寫日期就是那天結束\n  --json               輸出改完的節點\n  --force              AI 也直接改（負責人在對話裡說了）\n\n由負責人來定。AI 執行時（有 CLAUDECODE 或 NODDIT_ROLE=agent）只在節點上記一條建議，\n負責人標了才算。重要就是 urgency high；里程碑是 due 加 milestone: true。"
+    "flag": "nod flag <編號> important                   標為很重要：每個列表裡排最前，看板上帶 ★\nnod flag <編號> milestone --due 2026-11-15   關鍵時間節點：排最前，倒數計時（⚑ 3 天後）\nnod flag <編號> normal                      兩個標記都拿掉（也可以寫 off）\n\n  --due <日期|4h|3d>   里程碑的日期；只寫日期就是那天結束\n  --json               輸出改完的節點\n  --force              AI 也直接改（負責人在對話裡說了）\n\n由負責人來定。AI 執行時（有 CLAUDECODE 或 NODDIT_ROLE=agent）只在節點上記一條建議，\n負責人標了才算。重要就是 urgency high；里程碑是 due 加 milestone: true。",
+    "beat": "nod beat [<id>…] [--note \"…\"]     「我還在做」——算一次 check-in 回覆\n\n跟其他寫入一樣會更新 updated_at、清零 check-in 的詢問次數（core/checkins.ts），\n不給 --note 就不留可見記錄。不給 <id> 就用 NODDIT_NODE（跟 nod progress 預設取的一樣）。\n\n  --note \"…\"    寫成一條「心跳」記錄，而不是只悄悄更新時間\n  --json"
   },
   "send": {
     "badUrgency": "--urgency 只能是 {{urgencies}}，收到「{{value}}」",
@@ -168,7 +169,8 @@
     "brief": "{{ref}} 負責人新派了：{{title}}{{extra}} —— nod claim {{ref}} 接走，展開、拆分後用 nod ask 請負責人確認",
     "briefUnclaimed": "{{ref}} 負責人派的活 {{duration}}沒人接：{{title}} —— nod claim {{ref}}",
     "noProjectHere": "不在 nod 專案裡——沒什麼可監聽的。cd 進專案，或者加 --all-projects 監聽所有登記過的專案。",
-    "checkin": "{{duration}}沒更新——用 nod progress / nod note 回報"
+    "checkin": "{{duration}}沒更新——用 nod progress / nod note 回報",
+    "stale_other": "{{count}} 個 stale task——沒開始、也不待決策：nod start / nod defer / nod close，或者重新規劃"
   },
   "defer": {
     "undeferred": "已解除延後",
@@ -300,7 +302,8 @@
     "cantDoneUnanswered": "{{refs}} 只有回覆、還沒選選項，--done 不能替它歸檔。先 nod read 取走；辦完了再 nod archive <id> --force",
     "archivedHint": "已歸檔：{{refs}}（拿回來：nod archive <id> --undo）",
     "doneNextHint": "做完之後：nod archive {{ids}}",
-    "leftInQueue_other": "隊列裡還有 {{count}} 條：{{refs}}"
+    "leftInQueue_other": "隊列裡還有 {{count}} 條：{{refs}}",
+    "ackHint": "取走了，{{refs}} 還沒回覆——負責人看得到：這次用 nod note --agent，或下次直接 nod read <id> --ack \"…\""
   },
   "watch": {
     "fileGone": "{{project}}:{{id}} 檔案不在了",
@@ -438,5 +441,9 @@
     "proposal": "建議：標為{{what}}。由負責人決定（nod flag）。",
     "proposed": "{{ref}}：已向負責人建議（{{what}}），沒有改動",
     "done": "{{ref}} 已標為{{what}}"
+  },
+  "beat": {
+    "whichNode": "改哪個節點？給個 id，或者設 NODDIT_NODE",
+    "done": "還在做"
   }
 }

@@ -1,4 +1,4 @@
-import { isAnswerKind } from '../../core/format.ts'
+import { isAnswerKind, NOTE_KIND } from '../../core/format.ts'
 import { bool, one, type Args } from '../args.ts'
 import { refOf } from '../../core/ref.ts'
 import { requireDecision, resolveAuthor, resolveStore } from '../context.ts'
@@ -64,10 +64,12 @@ export function run(args: Args): number {
   if (unanswered.length) {
     throw new Error(t('cli.read.cantDoneUnanswered', { refs: unanswered.map((d) => refOf(d)).join(' ') }))
   }
+  const ack = one(args, 'ack')
   const delivered = picked.map((d) => {
     const got = store.deliver(d)
     const filed = done && !got.archived ? store.archive(got) : got
-    return { ...filed, options: d.options, body: got.body, notes: got.notes }
+    const noted = ack ? store.note(filed, { text: ack, role: 'agent', author: resolveAuthor(args), kind: NOTE_KIND.received }) : filed
+    return { ...noted, options: d.options, body: noted.body, notes: noted.notes }
   })
 
   if (asJson) {
@@ -77,6 +79,8 @@ export function run(args: Args): number {
   console.log(delivered.map(describe).join('\n\n'))
   if (done) console.log(dim(`\n${t('cli.read.archivedHint', { refs: delivered.map((d) => refOf(d)).join(' ') })}`))
   else console.log(dim(`\n${t('cli.read.doneNextHint', { ids: delivered.map((d) => d.id).join(' ') })}`))
+  // The owner can see a reply; collecting without one is easy to forget (N47).
+  if (!ack) console.log(dim(`\n${t('cli.read.ackHint', { refs: delivered.map((d) => refOf(d)).join(' ') })}`))
 
   const left = store.queue({ author, project: one(args, 'project', 'p') })
   if (left.length) console.log(dim(t('cli.read.leftInQueue', { count: left.length, refs: left.map((d) => refOf(d)).join(' ') })))

@@ -1,3 +1,4 @@
+import { staleTasksOf } from '../core/checkins.ts'
 import { parseBodyRefs, refOf } from '../core/ref.ts'
 import { OPTIONS_HEADING_RE } from '../core/parse.ts'
 import { QUESTIONS_HEADING_RE } from '../core/questions.ts'
@@ -226,6 +227,8 @@ export function benchJson(store: Store, opts: { project?: string; now?: number }
     rtl: isRtl(),
     labels: { defaultMark: t('bench.detail.defaultMark') },
     // `listening`: a main session's `nod monitor` is running there, so a new brief will be picked up.
+    // `stale_count` (N47): not_started, not deferred nodes in this project — neither
+    // waiting on a decision nor being worked on.
     projects: store.layouts.map((l, i) => ({
       project: store.projectName(l),
       name: store.displayName(l),
@@ -234,6 +237,7 @@ export function benchJson(store: Store, opts: { project?: string; now?: number }
       root: l.projectRoot,
       listening: sessions[i].listening,
       sessions: sessions[i].sessions,
+      stale_count: staleTasksOf(items.filter((d) => d.project === store.projectName(l))).length,
     })),
     views,
     nodes,
