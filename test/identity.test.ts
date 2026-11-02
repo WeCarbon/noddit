@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
@@ -125,7 +126,7 @@ function writeTeamConfig(home: string, team: string, members: Record<string, unk
   writeFileSync(join(dir, 'config.json'), JSON.stringify({ name: team, members }))
 }
 
-test('teammateFromTeamConfig: finds the member whose cwd matches (or is an ancestor of) ours, skips the lead and inactive ones', (t) => {
+test('teammateFromTeamConfig: finds the member whose cwd is exactly ours, skips the lead and inactive ones', (t) => {
   const home = fakeHome(t)
   writeTeamConfig(home, 'proj', [
     { agentId: 'team-lead@proj', name: 'team-lead', agentType: 'team-lead', cwd: '/home/alice/code/proj', backendType: 'tmux' },
@@ -133,7 +134,7 @@ test('teammateFromTeamConfig: finds the member whose cwd matches (or is an ances
     { agentId: 'lane-b@proj', name: 'lane-b', agentType: 'general-purpose', cwd: '/home/alice/code/proj-other', backendType: 'tmux', isActive: false },
   ])
   assert.equal(teammateFromTeamConfig('/home/alice/code/proj/.worktrees/lane-a', home), 'lane-a')
-  assert.equal(teammateFromTeamConfig('/home/alice/code/proj/.worktrees/lane-a/sub/dir', home), 'lane-a', 'a subdirectory of the member\'s cwd still matches')
+  assert.equal(teammateFromTeamConfig('/home/alice/code/proj/.worktrees/lane-a/sub/dir', home), undefined, 'only the exact directory matches')
   assert.equal(teammateFromTeamConfig('/home/alice/code/proj-other', home), undefined, 'inactive — does not count')
   assert.equal(teammateFromTeamConfig('/home/alice/code/unrelated', home), undefined)
   // The lead's own cwd — never the lead itself, whatever else is in the config.
@@ -313,4 +314,15 @@ test('nod monitor --json: auto-detecting as a teammate (DECS_TEAMMATE, no --mine
   })
   const explicitLines = parseJsonLines(explicit.stdout)
   assert.equal(explicitLines.some((l) => l.event === 'warn'), false)
+})
+
+test('teammateFromTeamConfig: another team\'s teammate recorded at a broad parent folder never claims a project underneath it', (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'nod-teams-'))
+  t.after(() => rmSync(home, { recursive: true, force: true }))
+  mkdirSync(join(home, '.claude', 'teams', 'other'), { recursive: true })
+  writeFileSync(join(home, '.claude', 'teams', 'other', 'config.json'), JSON.stringify({ members: [
+    { name: 'team-lead', agentType: 'team-lead', cwd: '/home/alice/code/other-proj', backendType: 'in-process' },
+    { name: 'research', agentType: 'claude', cwd: '/home/alice/code', backendType: 'iterm2', isActive: true },
+  ] }))
+  assert.equal(teammateFromTeamConfig('/home/alice/code/web', home), undefined)
 })

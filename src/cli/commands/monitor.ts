@@ -140,7 +140,9 @@ export function teammateFromTeamConfig(cwd: string = process.cwd(), home: string
   // this (broader) cwd — says nothing about who's asking; a lead running from
   // a repo root isn't "covered by" a teammate's deeper worktree just because
   // that worktree happens to live under the same root.
-  const within = (recorded: string) => cwd === recorded || cwd.startsWith(`${recorded}${sep}`)
+  // Exact directory only: a member recorded at a broad folder (another team's
+  // teammate at ~/Code) must not claim every project underneath it.
+  const within = (recorded: string) => cwd === recorded
   let best: { name: string; len: number } | undefined
   let ambiguous = false
   for (const team of teams) {
@@ -261,7 +263,10 @@ export async function run(args: Args): Promise<number> {
   const store = resolveStore(args, { allowRegistry: allProjects, preferRegistry: allProjects })
   const explicitlyScoped = Boolean(one(args, 'author')) || bool(args, 'mine') || bool(args, 'all')
   // A teammate watches only its own nodes even when the plugin starts it without --mine; a lead watches everything.
-  const teammate = explicitlyScoped ? undefined : teammateName(sessionCommand()) ?? teammateFromTeamConfig()
+  // The session's own argv decides when it can be read; the team config is
+  // only a fallback when it can't (no ps, an unrecognised build).
+  const command = explicitlyScoped ? '' : sessionCommand()
+  const teammate = explicitlyScoped ? undefined : command ? teammateName(command) : teammateFromTeamConfig()
   const author = one(args, 'author') ?? (bool(args, 'mine') ? resolveAuthor(args) : teammate)
   // N141: this session wasn't told to filter (no --mine/--author/--all) but
   // detected itself as a teammate anyway — surprising enough, and wrong
