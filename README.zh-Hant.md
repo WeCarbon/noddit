@@ -14,7 +14,7 @@
   <img alt="Noddit 桌面 app：「可用」視圖，打開一個待決策問題，兩個選項是卡片，還有進度條和一條等 AI 來接的新任務" src="https://raw.githubusercontent.com/WeCarbon/noddit/main/docs/app.zh-Hant.png">
 </picture>
 
-<sub>桌面 app——目前從 <code>app/</code> 建置，還沒有發布版</sub>
+<sub>桌面 app——<a href="https://github.com/WeCarbon/noddit/releases/latest">下載 macOS、Windows、Linux 版</a></sub>
 
 ![示範：nod 看板一打開就是一棵進行中的任務樹；讀一個待決策問題，按一個鍵回覆，然後 agent 用 nod read 取走回覆](https://raw.githubusercontent.com/WeCarbon/noddit/main/docs/demo.gif)
 

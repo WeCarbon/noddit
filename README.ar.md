@@ -17,7 +17,7 @@
   <img alt="تطبيق Noddit لسطح المكتب: عرض «متاح» وفيه قرار معلّق مفتوح، وخياراه بطاقتان، مع أشرطة تقدّم وطلب جديد بانتظار وكيل" src="https://raw.githubusercontent.com/WeCarbon/noddit/main/docs/app.ar.png">
 </picture>
 
-<sub>تطبيق سطح المكتب — يُبنى من <code>app/</code> حاليًا، ولا إصدار منشورًا بعد</sub>
+<sub>تطبيق سطح المكتب — <a href="https://github.com/WeCarbon/noddit/releases/latest">نزّله لنظام macOS وWindows وLinux</a></sub>
 
 ![عرض توضيحي: تُفتح لوحة nod على شجرة العمل الجاري؛ قراءة قرار معلّق والإجابة عنه بضغطة مفتاح، ثم يستلم وكيلٌ الإجابة عبر nod read](https://raw.githubusercontent.com/WeCarbon/noddit/main/docs/demo.gif)
 
