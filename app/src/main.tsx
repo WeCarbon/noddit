@@ -2,6 +2,7 @@ import { render } from 'preact'
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { Bench, type Prefs } from './bench.tsx'
+import { ResizeEdges } from './resize.tsx'
 import { Onboarding, envReady } from './onboarding.tsx'
 import { Banner } from './banner.tsx'
 import { s, setLanguage, whenLanguageSet } from './strings.ts'
@@ -148,7 +149,13 @@ async function boot() {
   if (params.get('view')) prefs.view = params.get('view') as Prefs['view']
   if (params.get('sel')) prefs.selected = params.get('sel')
   if (params.get('screen') === 'onboarding') prefs.onboarded = false
-  render(<App prefs0={prefs} snapshot={snapshot} />, document.getElementById('app')!)
+  render(
+    <>
+      <App prefs0={prefs} snapshot={snapshot} />
+      <ResizeEdges />
+    </>,
+    document.getElementById('app')!,
+  )
   setTimeout(() => void api.ready(snapshot ? 'first frame (cached bench)' : 'first frame'), 0)
 }
 

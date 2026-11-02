@@ -1779,3 +1779,55 @@ figcaption {
   opacity: 0.6;
   cursor: default;
 }
+
+/* Window edges: a hit area and the right cursor for resizing (see resize.tsx). */
+.rz > div {
+  position: fixed;
+  z-index: 10000;
+}
+.rz-n, .rz-s { left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+.rz-n { top: 0; }
+.rz-s { bottom: 0; }
+.rz-e, .rz-w { top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+.rz-e { right: 0; }
+.rz-w { left: 0; }
+.rz-ne, .rz-nw, .rz-se, .rz-sw { width: 10px; height: 10px; }
+.rz-ne { top: 0; right: 0; cursor: nesw-resize; }
+.rz-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.rz-nw { top: 0; left: 0; cursor: nwse-resize; }
+.rz-se { bottom: 0; right: 0; cursor: nwse-resize; }
+
+/* Pane dividers: drag to resize, double-click to reset (see panes.tsx). */
+.list-pane {
+  position: relative;
+}
+
+.divider {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -4px;
+  width: 7px;
+  z-index: 5;
+  cursor: col-resize;
+}
+
+.divider::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 3px;
+  width: 1px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.divider:hover::after,
+.dragging-divider .divider::after {
+  background: var(--accent);
+}
+
+.dragging-divider,
+.dragging-divider * {
+  cursor: col-resize !important;
+  user-select: none;
+}

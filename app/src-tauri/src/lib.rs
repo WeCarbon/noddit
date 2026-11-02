@@ -1,4 +1,5 @@
 mod noddit_env;
+mod resize;
 mod watch;
 
 use serde::{Deserialize, Serialize};
@@ -358,6 +359,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, _, event| watch::on_hotkey(app, event.state)).build())
         .manage(watch::Watch::default())
+        .manage(resize::ResizeStart::default())
         .manage(AppState {
             started,
             #[cfg(debug_assertions)]
@@ -378,6 +380,8 @@ pub fn run() {
             log,
             is_debug,
             is_background,
+            resize::resize_begin,
+            resize::resize_to,
             pick_folder,
             e2e_shot,
             watch::settings_get,

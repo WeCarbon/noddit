@@ -182,6 +182,42 @@
     await invoke('banner_open_main', { key: '' })
     await sleep(300)
 
+    log('STEP window-resize')
+    // The edge handles: dragging the bottom-right corner 40×30 points grows the window by that much.
+    const size = async () => {
+      const s = await invoke('plugin:window|inner_size', { label: 'main' })
+      const f = await invoke('plugin:window|scale_factor', { label: 'main' })
+      return { w: Math.round(s.width / f), h: Math.round(s.height / f) }
+    }
+    if ($$('.rz > div').length !== 8) throw new Error('no resize handles on the window edges')
+    const before = await size()
+    await invoke('resize_begin')
+    await invoke('resize_to', { edge: 'se', dx: 40, dy: 30 })
+    await sleep(300)
+    const grown = await size()
+    if (grown.w !== before.w + 40 || grown.h !== before.h + 30) throw new Error(`corner resize: ${JSON.stringify(before)} → ${JSON.stringify(grown)}`)
+    await invoke('resize_begin')
+    await invoke('resize_to', { edge: 'nw', dx: 40, dy: 30 })
+    await sleep(300)
+    const back = await size()
+    if (back.w !== before.w || back.h !== before.h) throw new Error(`back from the other corner: ${JSON.stringify(back)}`)
+
+    log('STEP pane-dividers')
+    const divider = $('.divider-list')
+    const listWidth = () => $('.list-pane').offsetWidth
+    const w0 = listWidth()
+    const at = divider.getBoundingClientRect().left + 3
+    const pointer = (type, x) => divider.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: 300, pointerId: 1, button: 0, buttons: 1 }))
+    pointer('pointerdown', at)
+    pointer('pointermove', at + 60)
+    pointer('pointerup', at + 60)
+    await until('list wider by 60', () => listWidth() === w0 + 60)
+    await sleep(300)
+    const saved = JSON.parse((await invoke('prefs_load')) ?? '{}')
+    if (saved.panes?.list !== w0 + 60) throw new Error(`pane widths not remembered: ${JSON.stringify(saved.panes)}`)
+    divider.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    await until('default layout again', () => listWidth() === w0)
+
     log('STEP settings')
     key(',', { metaKey: true })
     await until('settings', () => $('.settings'))

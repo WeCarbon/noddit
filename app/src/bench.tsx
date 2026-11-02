@@ -18,6 +18,7 @@ import { popupNative } from './native-menu.ts'
 import { LetterPicker, RenameField, UnlinkConfirm } from './projects.tsx'
 import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
+import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
 import type { Bench as BenchData, Node, Project, Row, View, ViewName } from './types.ts'
 
@@ -26,6 +27,8 @@ export interface Prefs {
   selected: string | null
   folds: Folds
   onboarded: boolean
+  /** Dragged pane widths; absent = the default layout. */
+  panes?: PaneWidths | null
 }
 
 type Composer =
@@ -606,9 +609,28 @@ export function Bench(props: {
     }
   }
 
+  const sidebarRef = useRef<HTMLElement>(null)
+  const listPaneRef = useRef<HTMLElement>(null)
+  const [livePanes, setLivePanes] = useState<PaneWidths | null>(null)
+  const [winWidth, setWinWidth] = useState(window.innerWidth)
+  useEffect(() => {
+    const on = () => setWinWidth(window.innerWidth)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  const measurePanes = (): PaneWidths => ({ sidebar: sidebarRef.current?.offsetWidth ?? 216, list: listPaneRef.current?.offsetWidth ?? 420 })
+  const donePanes = (w: PaneWidths) => {
+    setLivePanes(null)
+    setPrefs({ panes: w })
+  }
+  const resetPanes = () => {
+    setLivePanes(null)
+    setPrefs({ panes: null })
+  }
+  const panes = livePanes ?? prefs.panes
   return (
-    <div class="shell">
-      <aside class="sidebar">
+    <div class="shell" style={panes ? { gridTemplateColumns: paneColumns(clampPanes(panes, winWidth)) } : undefined}>
+      <aside class="sidebar" ref={sidebarRef}>
         <div class="drag" data-tauri-drag-region />
         <nav>
           <div class="section-label">{s('views')}</div>
@@ -677,7 +699,8 @@ export function Bench(props: {
         </footer>
       </aside>
 
-      <main class="list-pane">
+      <main class="list-pane" ref={listPaneRef}>
+        <Divider which="sidebar" measure={measurePanes} onMove={setLivePanes} onDone={donePanes} onReset={resetPanes} />
         <header class="pane-head" data-tauri-drag-region>
           <h1>{view.label}</h1>
           {view.count !== null && <span class="head-count">{view.count}</span>}
@@ -705,6 +728,7 @@ export function Bench(props: {
       </main>
 
       <section class="detail-pane">
+        <Divider which="list" measure={measurePanes} onMove={setLivePanes} onDone={donePanes} onReset={resetPanes} />
         <div class="drag" data-tauri-drag-region />
         {node ? (
           <Detail

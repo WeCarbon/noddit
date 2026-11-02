@@ -10,7 +10,7 @@ export const inDesktop = '__TAURI_INTERNALS__' in window
 
 type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>
 let invokeFn: Invoke | null = null
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!invokeFn) invokeFn = (await import('@tauri-apps/api/core')).invoke as Invoke
   return invokeFn<T>(cmd, args)
 }
