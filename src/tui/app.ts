@@ -46,6 +46,7 @@ import {
   rowsFor,
   stepIndex,
   viewCount,
+  viewDueCount,
   type Row,
   type View,
 } from './views.ts'
@@ -1326,7 +1327,10 @@ function tabSegments(s: FrameInput): Segment[] {
   const needs = viewCount('decide', s.items) ?? 0
   return viewIds().map((v): Segment => {
     const n = viewCount(v, s.items)
-    const text = ` ${VIEW_LABEL[v]}${n ? ` ${n}` : ''} `
+    // Waiting: the nodes due to be checked on are counted on their own, marked ⏰, before the rest.
+    const due = v === 'waiting' ? viewDueCount(v, s.items, s.now) : 0
+    const rest = n === undefined ? undefined : n - due
+    const text = ` ${VIEW_LABEL[v]}${due ? ` ⏰${due}` : ''}${rest ? ` ${rest}` : ''} `
     return v === s.view ? { text, bold: true, inverse: true } : { text, dim: v !== 'decide' || !needs, color: v === 'decide' && needs ? 'yellow' : undefined }
   })
 }

@@ -37,7 +37,7 @@ function input(store: Store, view: View, now = Date.now()): FrameInput {
 /** A waiting node whose `decs hold` happened at `heldAt` (and maybe was written to later). */
 function held(id: number, heldAt: string, on: string, updatedAt = heldAt): Decision {
   return {
-    id, project: 'p', title: `waiting ${id}`, state: 'waiting', status: 'open', waitingOn: on,
+    id, project: 'p', title: `waiting ${id}`, state: 'waiting', status: 'open', waitingOn: on, waitingUntil: '2099-01-01T00:00:00+00:00',
     body: `body text\n\n## ${noteHeading(NOTE_KIND.waiting, 'agent', 'lane', heldAt)}\n\n${NOTE_TEXT.waitingOn(on)}\n`,
     created: '2026-10-01T09:00:00+08:00', updatedAt, attachments: [], approvals: [], options: [],
   } as unknown as Decision
@@ -49,9 +49,9 @@ test('the tabs are Available Active Needs-you All Waiting Recent, with counts on
   const running = store.create({ title: 'running', author: 'a · x', task: true })
   store.start(running)
   const w1 = store.create({ title: 'waiting on the customer', author: 'a · x', task: true })
-  store.hold(w1, 'a reply from the customer', 'a · x')
+  store.hold(w1, 'a reply from the customer', 'a · x', { until: '2099-01-01T00:00:00+00:00' })
   const w2 = store.create({ title: 'waiting on the service', author: 'a · x', task: true })
-  store.hold(w2, 'ADO to recover', 'a · x')
+  store.hold(w2, 'ADO to recover', 'a · x', { until: '2099-01-01T00:00:00+00:00' })
 
   assert.deepEqual(VIEWS.map((v) => VIEW_LABEL[v]), ['Available', 'Active', 'Needs you', 'All', 'Waiting', 'Recent'])
   const header = text(buildFrame(input(store, 'available'))[0])
@@ -80,7 +80,7 @@ test('Waiting lists only waiting nodes, the longest wait first, each with whom a
   assert.deepEqual(rows.map((r) => r.node!.id), [2, 1, 3])
   assert.deepEqual(rowsFor('waiting', items).map((r) => r.node!.id), [2, 1, 3])
   const row2 = text(nodeRowSegments(rows[0], items, 70, now))
-  assert.match(row2, /Waiting on the vendor quote · 7 days ago/, 'whom, and since the hold — not since the later write')
+  assert.match(row2, /Waiting on the vendor quote · back /, 'whom, and the day to check back')
   assert.match(row2, /⏸/)
 })
 

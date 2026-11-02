@@ -397,6 +397,19 @@ export async function run(args: Args): Promise<number> {
     }
   }
 
+  /** A waiting node's check-back day has come: one NODDIT-CHECK-BACK line for its agent. */
+  const reportCheckBacks = () => {
+    store.remindDueWaits()
+    for (const d of store.all()) {
+      if (d.state !== 'waiting' || (author && !ownedBy(d, author))) continue
+      const note = d.notes.findLast((n) => n.author === DEFERRAL_CLOCK && n.kind === NOTE_KIND.addendum)
+      if (!note || Date.parse(note.at) < Date.parse(cursor) - 60_000) continue
+      emit(`w|${d.project}|${d.id}|${note.at}`, note.at, `NODDIT-CHECK-BACK ${t('cli.monitor.checkBack', { ref: refOfNode(d), on: d.waitingOn ?? '', title: d.title })}`, {
+        event: 'check_back', ref: refOfNode(d), id: d.id, project: d.project, title: d.title, on: d.waitingOn ?? null, at: note.at,
+      })
+    }
+  }
+
   const pass = (first = false) => {
     const startedAt = nowStamp(new Date(), { ms: true })
     if (updates) {
@@ -458,6 +471,11 @@ export async function run(args: Args): Promise<number> {
     }
     try {
       reportBackFromDeferral()
+    } catch (err) {
+      process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
+    }
+    try {
+      reportCheckBacks()
     } catch (err) {
       process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
     }

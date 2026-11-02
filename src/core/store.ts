@@ -12,7 +12,7 @@ import { parseBodyRefs, parseRef, refOf } from './ref.ts'
 import { dequeue, enqueue, readQueue } from './queue.ts'
 import { DEFAULT_MARK, HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
 import { OPTIONS_HEADING_RE, parseDecision, parseNoteHeading, parseOptions } from './parse.ts'
-import { deferralOver, findRef, isDeferred, isStartable, isTerminal, statusLabel } from './status.ts'
+import { deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
 import { isHumanTask } from './assignee.ts'
 import { untilDay } from './fuzzy-date.ts'
 import { withDescription } from './intake.ts'
@@ -840,19 +840,56 @@ export class Store {
     })
   }
 
-  /** 等待: held up on something outside — not the owner (待决策), not another node (`after`). `start` resumes it. */
-  hold(d: Decision, on: string, author: string): Decision {
-    if (!on.trim()) throw new Error(t('core.store.holdNeedsOn'))
+  /**
+   * 等待: held up on something outside — not the owner (待决策), not another node (`after`).
+   * `until` (an ISO stamp) is the day to check back; on a node already waiting, `on` may be
+   * left out to move only that day. `start` resumes it.
+   */
+  hold(d: Decision, on: string | undefined, author: string, opts: { until?: string; role?: NoteRole } = {}): Decision {
+    const who = on?.trim() || (d.state === 'waiting' ? d.waitingOn : undefined)
+    if (!who) throw new Error(t('core.store.holdNeedsOn'))
     if (d.state === 'needs_decision') throw new Error(t('core.store.holdNotForOwner', { ref: refOf(d) }))
+    const day = opts.until ? (untilDay(opts.until) ?? opts.until) : undefined
+    const onlyDate = !on?.trim() && d.state === 'waiting'
+    const text = onlyDate && day ? NOTE_TEXT.waitingMoved(day) : day ? NOTE_TEXT.waitingOnUntil(who, day) : NOTE_TEXT.waitingOn(who)
     return this.mutate(d, (d) => ({
       next: {
         ...d,
         state: 'waiting',
-        waitingOn: on.trim(),
-        body: appendSection(d.body, noteHeading(NOTE_KIND.waiting, 'agent', author, nowStamp()), NOTE_TEXT.waitingOn(on.trim())),
+        waitingOn: who,
+        waitingUntil: opts.until ?? (d.state === 'waiting' ? d.waitingUntil : undefined),
+        body: appendSection(d.body, noteHeading(NOTE_KIND.waiting, opts.role ?? 'agent', author, nowStamp()), text),
       },
       move: d.archived ? 'unarchive' : undefined,
     }))
+  }
+
+  /**
+   * Waiting nodes whose check-back day has come get one note signed `nod` — "time to check
+   * on …" — the first time anything looks after that day (the monitor turns it into a
+   * message for the node's agent). Once per hold: a new hold or a moved day starts over.
+   */
+  remindDueWaits(now = Date.now()): Decision[] {
+    const out: Decision[] = []
+    for (const d of this.all()) {
+      if (d.state !== 'waiting' || !d.waitingUntil || !isWaitDue(d, now) || this.waitReminded(d)) continue
+      let done = false
+      const next = this.mutate(d, (d) => {
+        if (d.state !== 'waiting' || !isWaitDue(d, now) || this.waitReminded(d)) return { next: d }
+        done = true
+        return { next: { ...d, body: appendSection(d.body, noteHeading(NOTE_KIND.addendum, 'agent', DEFERRAL_CLOCK, nowStamp()), NOTE_TEXT.checkBack(d.waitingOn ?? '')) } }
+      })
+      if (done) out.push(next)
+    }
+    return out
+  }
+
+  /** A `nod` reminder came after the latest hold. */
+  private waitReminded(d: Decision): boolean {
+    const notes = d.notes
+    const hold = notes.findLastIndex((n) => n.kind === NOTE_KIND.waiting)
+    const reminded = notes.findLastIndex((n) => n.author === DEFERRAL_CLOCK && n.kind === NOTE_KIND.addendum)
+    return reminded > hold
   }
 
   /**

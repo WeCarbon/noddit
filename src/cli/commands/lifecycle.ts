@@ -1,3 +1,7 @@
+import { deferUntil } from './defer.ts'
+import { untilDay } from '../../core/fuzzy-date.ts'
+import { nowStamp } from '../../core/store.ts'
+import { dayText } from '../../i18n/time.ts'
 import { statusLabel } from '../../core/status.ts'
 import { bool, one, optionsAndDefault, type Args } from '../args.ts'
 import { guardOtherAuthor, readStdin, requireDecision, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
@@ -55,9 +59,19 @@ export async function run(args: Args, verb = ''): Promise<number> {
       report(args, store.start(node, { force }), t('cli.lifecycle.started'))
     }
     else if (verb === 'hold') {
-      const on = one(args, 'on')
-      if (!on || on === 'true') throw new Error(`${t('cli.lifecycle.needOn')}\n\n${help('hold')}`)
-      report(args, store.hold(d, on, resolveAuthor(args)), t('cli.lifecycle.waitingOnWhat', { on }))
+      const raw = one(args, 'on')
+      const on = raw && raw !== 'true' ? raw : undefined
+      const untilRaw = one(args, 'until')
+      const waiting = d.state === 'waiting'
+      // Already waiting: --until alone moves the day, --on alone changes who and keeps the day.
+      if (!on && !(waiting && untilRaw)) throw new Error(`${t('cli.lifecycle.needOn')}\n\n${help('hold')}`)
+      // Every wait has a day to check back on.
+      if (!untilRaw && !(waiting && d.waitingUntil)) throw new Error(`${t('cli.lifecycle.needUntil')}\n\n${help('hold')}`)
+      const until = untilRaw ? nowStamp(deferUntil(untilRaw)) : undefined
+      const role = shellRole()
+      const next = store.hold(d, on, role === 'human' ? (one(args, 'by') ?? 'owner') : resolveAuthor(args), { until, role })
+      const day = next.waitingUntil ? dayText(untilDay(next.waitingUntil) ?? next.waitingUntil) : ''
+      report(args, next, day ? t('cli.lifecycle.waitingOnUntil', { on: next.waitingOn ?? '', date: day }) : t('cli.lifecycle.waitingOnWhat', { on: next.waitingOn ?? '' }))
     }
     else if (verb === 'done') {
       if (d.state === 'needs_decision' && !force)

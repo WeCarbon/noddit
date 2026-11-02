@@ -29,6 +29,17 @@ export function isDeferred(i: Pick<Item, 'deferredAt' | 'state'> & Partial<Pick<
   return Boolean(i.deferredAt) && !isTerminal(i.state) && !deferralOver(i, now)
 }
 
+/**
+ * 等待 and its check-back day has come: time to follow up on whoever it waits on. A node
+ * waiting from before check-back days existed has none, and counts as due — it gets one.
+ */
+export function isWaitDue(i: Pick<Item, 'state'> & Partial<Pick<Item, 'waitingUntil'>>, now = Date.now()): boolean {
+  if (i.state !== 'waiting') return false
+  if (!i.waitingUntil) return true
+  const at = Date.parse(i.waitingUntil)
+  return Number.isNaN(at) || at <= now
+}
+
 /** Deferred `--until` a moment that has now come. */
 export function deferralOver(i: Partial<Pick<Item, 'deferredAt' | 'deferredUntil'>>, now = Date.now()): boolean {
   if (!i.deferredAt || !i.deferredUntil) return false

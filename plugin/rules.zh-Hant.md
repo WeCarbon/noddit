@@ -18,10 +18,10 @@
   多步流程用 `nod steps` / `nod step`。`nod progress --from-file x.jsonl` 會自動識別 noddit 的
   JSONL 事件格式（Python 套件的 `progress_events` / pytest 插件寫的）。或者整件事交給
   `nod run <id> -- <cmd…>`：開始、跟進度（自動設好 `NODDIT_EVENTS`），退出碼 0 就 `nod done`，
-  失敗就 `nod hold --on "failing: …"` 並附上輸出的尾段。超過 check-in 的時限（預設 30 分鐘，
+  失敗就 `nod hold --on "failing: …" --until 明天` 並附上輸出的尾段。超過 check-in 的時限（預設 30 分鐘，
   `nod config checkin-after` 可改）沒更新會收到一條 `NODDIT-CHECKIN`——見下。還在做但沒新內容可報？
   `nod beat <id>` 本身就算回報。
-- **等外部**：卡在同事、客戶、供應商或某個服務上，`nod hold <id> --on "<誰/什麼>"`（狀態「等待」，不算卡住）；等到了 `nod start <id>`。
+- **等外部**：卡在同事、客戶、供應商或某個服務上，`nod hold <id> --on "<誰/什麼>" --until <日期>`（必須給回來看的日子，到期 monitor 會提醒你去問）（狀態「等待」，不算卡住）；等到了 `nod start <id>`。
 - **要負責人拍板**：在目前節點上 `nod ask <id> -o …`，或新建帶選項的子節點；回覆會從 nod monitor 來（見下）。
 - **做完自己標完成，不要等別人**：工作合併進去、檢查（測試、關卡）通過，當下就 `nod done <id> --note "<結果、提交>"`。
   核對的人發現不對，用 `nod start <id>` 重新開啟——核對不等於收尾。派子 AI 代理時**不要**寫「做完別標完成、等我核對」；

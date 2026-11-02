@@ -37,7 +37,7 @@ function fixture(t: { after: (fn: () => void) => void }) {
   const c = store.create({ title: 'c AI stuck', author: A, options: opt, default: '1', ...under })
   const d = store.create({ title: 'd early decidable', author: A, options: opt, default: '1', ...under, after: [`${b.id}`] })
   const e = store.answer(store.create({ title: 'e answered', author: A, options: opt, default: '1', ...under }), { choice: '1' })
-  const f = store.hold(task('f waiting externally', under), 'the customer', A)
+  const f = store.hold(task('f waiting externally', under), 'the customer', A, { until: '2099-01-01T00:00:00+00:00' })
   const g = store.complete(store.start(task('g completed', under)))
   const h = store.close(task('h closed', under), 'obsolete')
   const Q = task('Q completed parent')

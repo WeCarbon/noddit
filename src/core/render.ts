@@ -6,6 +6,7 @@ import { isHumanTask } from './assignee.ts'
 import { untilDay } from './fuzzy-date.ts'
 import { briefState, originalWords } from './intake.ts'
 import { overdue } from './order.ts'
+import { isWaitDue } from './status.ts'
 import { formatRef, refOf } from './ref.ts'
 import { minutesSince, stalenessOf } from './staleness.ts'
 import { isDeferred, statusLabel } from './status.ts'
@@ -172,6 +173,8 @@ export function toJSON(d: Decision): Record<string, unknown> {
     status_label: statusLabel(d.state),
     close_reason: d.closeReason ?? null,
     waiting_on: d.waitingOn ?? null,
+    waiting_until: d.state === 'waiting' ? (d.waitingUntil ?? null) : null,
+    wait_due: isWaitDue(d),
     deferred_at: d.deferredAt ?? null,
     deferred_by: d.deferredBy ?? null,
     /** `nod defer --until`: when it comes back on its own; null = deferred until undeferred (or not deferred). */

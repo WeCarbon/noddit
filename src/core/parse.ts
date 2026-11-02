@@ -341,7 +341,7 @@ export function legacyStatus(state: ItemStatus, answered: boolean): DecisionStat
 const KNOWN_KEYS = new Set([
   'id', 'title', 'author', 'status', 'created', 'updated_at', 'default', 'pin', 'pinned_at',
   'urgency', 'due', 'milestone', 'if_no_answer', 'reversible', 'kind', 'session', 'superseded_by', 'supersedes',
-  'close_reason', 'waiting_on', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'answer', 'answered_by', 'answered_at', 'archived_at', 'reopened_at', 'tags',
+  'close_reason', 'waiting_on', 'waiting_until', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'answer', 'answered_by', 'answered_at', 'archived_at', 'reopened_at', 'tags',
   'question_defaults', 'progress', 'progress_msg', 'after', 'est', 'when', 'stale_after', 'steps', 'owner_agent',
   'approvals', 'intake', 'claimed_by', 'claimed_at',
 ])
@@ -397,6 +397,7 @@ export function parseDecision(
     status: legacyStatus(state, Boolean(hasAnswer)),
     closeReason: str(data.close_reason),
     waitingOn: str(data.waiting_on),
+    waitingUntil: str(data.waiting_until),
     deferredAt: str(data.deferred_at),
     deferredBy: data.deferred_at ? str(data.deferred_by) : undefined,
     deferredUntil: data.deferred_at ? str(data.deferred_until) : undefined,

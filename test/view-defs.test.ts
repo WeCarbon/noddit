@@ -40,7 +40,7 @@ function seed(store: Store) {
   const todo = store.create({ title: 'Call the vendor', author: 'owner', task: true, assignee: 'human', parent: String(root.id) })
   const ask = store.create({ title: 'Pick a CDN', author: A, options: [{ key: '1', label: 'keep' }, { key: '2', label: 'switch' }], parent: String(root.id) })
   const run = store.start(store.create({ title: 'Write release notes', author: A, task: true, parent: String(root.id) }))
-  const held = store.hold(store.create({ title: 'Wait for legal', author: A, task: true }), 'legal', A)
+  const held = store.hold(store.create({ title: 'Wait for legal', author: A, task: true }), 'legal', A, { until: '2099-01-01T00:00:00+00:00' })
   const done = store.complete(store.create({ title: 'Old chore', author: A, task: true, parent: String(root.id) }))
   store.flag(todo, { important: true })
   return { root, todo, ask, run, held, done }

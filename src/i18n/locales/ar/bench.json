@@ -65,7 +65,11 @@
     "decide": "بانتظار قرار",
     "forYou": "لك",
     "deferredUntil": "مؤجَّل حتى {{date}} · {{relative}}",
-    "deferredUntilShort": "حتى {{date}}"
+    "deferredUntilShort": "حتى {{date}}",
+    "checkBackDue": "حان وقتها",
+    "checkOn": "اسأل {{who}}",
+    "waitingOnUntil": "بانتظار {{who}} · المتابعة {{date}}",
+    "backOn": "المتابعة {{date}}"
   },
   "detail": {
     "aiStuck": "الوكيل متعطل",

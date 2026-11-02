@@ -37,7 +37,7 @@ export interface ViewDef {
 }
 
 export type SortKey = `${'' | '-'}${SortField}`
-export const SORT_FIELDS = ['bench', 'blocks_ai', 'flag', 'pin', 'urgency', 'due', 'created', 'updated', 'waiting_since', 'touched', 'id', 'title', 'state'] as const
+export const SORT_FIELDS = ['bench', 'blocks_ai', 'flag', 'pin', 'urgency', 'due', 'created', 'updated', 'check_back', 'waiting_since', 'touched', 'id', 'title', 'state'] as const
 export type SortField = (typeof SORT_FIELDS)[number]
 
 /** `{ any: […] }` / `{ all: […] }` / `{ not: … }` nest; a leaf is one condition. */
@@ -79,7 +79,7 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     filter: parseFilter('state:needs_decision or assignee:human state:in_progress,waiting,decided or assignee:human state:not_started is:startable'),
   },
   { id: 'all', icon: 'list-tree', layout: 'tree', finished: 'fold', deferred: 'show', count: false },
-  { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['flag', 'waiting_since'], deferred: 'fold', filter: parseFilter('state:waiting') },
+  { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['check_back', 'flag', 'waiting_since'], deferred: 'fold', filter: parseFilter('state:waiting') },
   {
     id: 'recent',
     icon: 'history',

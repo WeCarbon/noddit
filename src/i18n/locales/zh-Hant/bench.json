@@ -65,7 +65,11 @@
     "decide": "待決",
     "forYou": "你來做",
     "deferredUntil": "延後到 {{date}} · {{relative}}",
-    "deferredUntilShort": "到 {{date}}"
+    "deferredUntilShort": "到 {{date}}",
+    "checkBackDue": "到期",
+    "checkOn": "問問 {{who}}",
+    "waitingOnUntil": "等 {{who}} · {{date}} 回來看",
+    "backOn": "{{date}} 回來看"
   },
   "detail": {
     "aiStuck": "AI 卡住",

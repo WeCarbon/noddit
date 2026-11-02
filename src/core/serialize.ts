@@ -7,7 +7,7 @@ import type { Attachment, Decision, DecisionOption, NoteRole, AttachmentApproval
 
 /** Front matter key order — stable so diffs stay readable. */
 const KEY_ORDER = [
-  'id', 'title', 'author', 'status', 'close_reason', 'waiting_on', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'created', 'updated_at',
+  'id', 'title', 'author', 'status', 'close_reason', 'waiting_on', 'waiting_until', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'created', 'updated_at',
   'after', 'progress', 'progress_msg', 'est', 'when', 'stale_after', 'steps', 'owner_agent', 'intake', 'claimed_by', 'claimed_at',
   'kind', 'urgency', 'due', 'milestone', 'default', 'question_defaults', 'if_no_answer', 'reversible',
   'pin', 'pinned_at', 'tags', 'session', 'supersedes', 'superseded_by', 'answer', 'approvals',
@@ -24,6 +24,7 @@ export function frontMatterOf(d: Decision): Record<string, unknown> {
   }
   if (d.closeReason) fm.close_reason = d.closeReason
   if (d.waitingOn) fm.waiting_on = d.waitingOn
+  if (d.state === 'waiting' && d.waitingUntil) fm.waiting_until = d.waitingUntil
   if (d.deferredAt) fm.deferred_at = d.deferredAt
   if (d.deferredAt && d.deferredBy) fm.deferred_by = d.deferredBy
   if (d.deferredAt && d.deferredUntil) fm.deferred_until = d.deferredUntil

@@ -8,7 +8,7 @@ import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isHumanTask } from '../core/assignee.ts'
 import { builtinView, filterText, isPristine, loadViews, type ViewDef } from '../core/view-defs.ts'
-import { dependenciesOf, isDeferred, isTerminal } from '../core/status.ts'
+import { dependenciesOf, isDeferred, isTerminal, isWaitDue } from '../core/status.ts'
 import { projectSessions } from '../core/listeners.ts'
 import type { Store } from '../core/store.ts'
 import type { Decision as Item } from '../core/types.ts'
@@ -19,7 +19,7 @@ import { bodyRows, canPin, canUseDefault, type BodyRow, type Segment } from './m
 import { imageName, nodeImages } from './images.ts'
 import {
   DEFERRED_GROUP, RECENT_OLDER_GROUP, blocksAnAi, defOf, olderGroupKey, projectTreeRows, touchLabel, viewEmpty, viewLabel, doneGroupKey, glyphOf, isCollapsed, isDeferHidden, isTreeView,
-  keyOf, progressOf, rowsFor, subtreeWaiting, suffixOf, viewCount, type Row, type View,
+  keyOf, progressOf, rowsFor, subtreeWaiting, suffixOf, viewCount, viewDueCount, type Row, type View,
 } from './views.ts'
 
 /** The window does its own wrapping. */
@@ -81,6 +81,9 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
     badge_short: plain(forms.at(-1) ?? []),
     // The owner's marks: 'important' (★) or 'milestone' (⚑, counted down to `due`).
     flag: isTerminal(d.state) ? null : d.milestone && d.due ? 'milestone' : d.urgency === 'high' ? 'important' : null,
+    // 等待: the check-back day, and whether it has come.
+    waiting_until: d.state === 'waiting' ? (d.waitingUntil ?? null) : null,
+    wait_due: isWaitDue(d, now),
     due: d.due ?? null,
     // Who does it: 'human' (the owner's own to-do — no agent works on it) or 'ai'.
     assignee: isHumanTask(d) ? (d.assignee ?? 'human') : 'ai',
@@ -245,6 +248,8 @@ export function benchJson(store: Store, opts: { project?: string; now?: number; 
       builtin: Boolean(builtinView(def.id)),
       pristine: isPristine(def),
       count: viewCount(def, items) ?? null,
+      // Waiting nodes due to be checked on, among those counted (shown as their own number).
+      due_count: viewDueCount(def, items, now),
       rows: rows.map((r, i) => rowJson(view, r, items, now, folds[i])),
     }
   })

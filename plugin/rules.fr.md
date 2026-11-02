@@ -30,7 +30,7 @@ suite — tout est dans `nod bench`. Hors nod, invisible. Détails :
   voir plus bas. Toujours en cours mais rien de nouveau à dire ?
   `nod beat <id>` seul compte
   comme une réponse.
-- **En attente côté extérieur** : `nod hold <id> --on "<qui/quoi>"`
+- **En attente côté extérieur** : `nod hold <id> --on "<qui/quoi>" --until <date>` — un jour où revenir voir est obligatoire
   (statut « en attente », pas bloqué) ; `nod start <id>` une fois
   réglé.
 - **Décision requise** : `nod ask <id> -o …` sur le nœud courant, ou un

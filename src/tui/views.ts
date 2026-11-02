@@ -9,7 +9,7 @@ import { parseNotes } from '../core/parse.ts'
 import { refOf } from '../core/ref.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isStale, minutesSince } from '../core/staleness.ts'
-import { ITEM_STATUSES, deferHidden, dependenciesOf, isDeferred, isStartable, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
+import { ITEM_STATUSES, deferHidden, dependenciesOf, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps, stepProgress } from '../core/steps.ts'
 import type { Decision as Item } from '../core/types.ts'
 import { isRtl, lang, t } from '../i18n/index.ts'
@@ -194,6 +194,19 @@ export function viewCount(view: View | ViewDef, items: Item[]): number | undefin
   const def = defOf(view)
   if (def.count === false) return undefined
   return items.filter((d) => inView(def, d, items)).length
+}
+
+/** How many of what `view` lists are waiting nodes whose check-back day has come. */
+export function viewDueCount(view: View | ViewDef, items: Item[], now = Date.now()): number {
+  const def = defOf(view)
+  return items.filter((d) => isWaitDue(d, now) && inView(def, d, items)).length
+}
+
+/** Waiting nodes due to be checked on first (the longest overdue first; one without a day first of all), then by their day. */
+function checkBackKey(d: Item, now = Date.now()): [number, number] {
+  if (d.state !== 'waiting') return [2, 0]
+  const at = d.waitingUntil ? Date.parse(d.waitingUntil) : -Infinity
+  return [isWaitDue(d, now) ? 0 : 1, Number.isNaN(at) ? -Infinity : at]
 }
 
 export const keyOf = (d: Pick<Item, 'project' | 'id'>) => `${d.project}#${d.id}`
@@ -645,6 +658,11 @@ const SORTERS: Record<SortField, (a: Item, b: Item, items: Item[]) => number> = 
   due: (a, b) => asc(dueOf(a), dueOf(b)),
   created: (a, b) => asc(timeOf(a.created), timeOf(b.created)),
   updated: (a, b) => asc(timeOf(b.updatedAt || b.created), timeOf(a.updatedAt || a.created)),
+  check_back: (a, b) => {
+    const [ra, ta] = checkBackKey(a)
+    const [rb, tb] = checkBackKey(b)
+    return ra - rb || (ta === tb ? 0 : ta < tb ? -1 : 1)
+  },
   waiting_since: (a, b) => (waitingSince(a) === waitingSince(b) ? 0 : waitingSince(a) < waitingSince(b) ? -1 : 1),
   touched: (a, b) => touchTime(lastTouch(b)?.at ?? '') - touchTime(lastTouch(a)?.at ?? ''),
   id: (a, b) => a.id - b.id,
@@ -864,8 +882,17 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
     }
     case 'waiting': {
       const since = ago(minutesSince({ updatedAt: waitingSince(d), created: d.created }, now))
+      if (isWaitDue(d, now)) {
+        // Time to follow up: an inverse badge, the one thing in the row that stands out.
+        const due: Segment = { text: ` ${t('bench.badge.checkBackDue')} `, color: 'magenta', inverse: true, bold: true }
+        if (d.waitingOn) forms.push([...fold, due, { text: ` ${t('bench.badge.checkOn', { who: d.waitingOn })}`, color: 'magenta' }])
+        forms.push([due])
+        break
+      }
+      const back = d.waitingUntil ? dayText(untilDay(d.waitingUntil) ?? d.waitingUntil) : ''
+      if (d.waitingOn && back) forms.push([...fold, { text: t('bench.badge.waitingOnUntil', { who: d.waitingOn, date: back }), color: 'magenta' }])
       if (d.waitingOn) forms.push([...fold, { text: t('bench.badge.waitingOnSince', { who: d.waitingOn, since }), color: 'magenta' }])
-      forms.push([...fold, { text: `${statusLabel('waiting')} · ${since}`, color: 'magenta' }])
+      forms.push([...fold, { text: back ? t('bench.badge.backOn', { date: back }) : `${statusLabel('waiting')} · ${since}`, color: 'magenta' }])
       break
     }
     case 'needs_decision': {

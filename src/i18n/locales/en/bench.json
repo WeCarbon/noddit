@@ -65,7 +65,11 @@
     "decide": "Decide",
     "forYou": "For you",
     "deferredUntil": "Deferred until {{date}} · {{relative}}",
-    "deferredUntilShort": "Until {{date}}"
+    "deferredUntilShort": "Until {{date}}",
+    "checkBackDue": "Check back",
+    "checkOn": "on {{who}}",
+    "waitingOnUntil": "Waiting on {{who}} · back {{date}}",
+    "backOn": "Back {{date}}"
   },
   "detail": {
     "aiStuck": "AI stuck",

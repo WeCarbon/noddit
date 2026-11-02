@@ -65,7 +65,11 @@
     "decide": "À décider",
     "forYou": "À vous",
     "deferredUntil": "Reporté au {{date}} · {{relative}}",
-    "deferredUntilShort": "Au {{date}}"
+    "deferredUntilShort": "Au {{date}}",
+    "checkBackDue": "À relancer",
+    "checkOn": "{{who}}",
+    "waitingOnUntil": "Attend {{who}} · revoir {{date}}",
+    "backOn": "Revoir {{date}}"
   },
   "detail": {
     "aiStuck": "IA bloquée",

@@ -147,6 +147,8 @@ export interface Decision {
   closeReason?: string
   /** 等待: who/what outside this is held up on. Not a decs ref — that's `after`. */
   waitingOn?: string
+  /** 等待: the day (an ISO stamp) to check back on whoever it waits on. Read only while waiting. */
+  waitingUntil?: string
   /** 延迟: a flag on top of `state`, not a state of its own; hides the subtree. */
   deferredAt?: string
   /** Who deferred it — `owner`, or the lane that did it for them. */
