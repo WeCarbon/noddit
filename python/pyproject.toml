@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "noddit"
+version = "0.1.0"
+description = "Write JSON Lines progress events from a long-running script or pytest run, for anything that wants to watch along"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "WeCarbon" }]
+keywords = ["progress", "pytest", "pytest-plugin", "jsonl", "jsonlines"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Framework :: Pytest",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/wecarbon/noddit"
+Repository = "https://github.com/wecarbon/noddit"
+Issues = "https://github.com/wecarbon/noddit/issues"
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+test-xdist = ["pytest>=7", "pytest-xdist>=3"]
+
+[project.entry-points.pytest11]
+noddit = "noddit.pytest"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noddit"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/noddit", "tests", "README.md", "LICENSE", "docs"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
