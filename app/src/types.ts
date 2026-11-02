@@ -119,6 +119,8 @@ export interface Node {
   body_rows: BodyRow[]
   images: Image[]
   attachments: Attachment[]
+  /** The description as written (markdown), for editing it. */
+  description?: string
   /** The body's own attachments (each note carries its own). */
   body_attachments?: Attachment[]
   terminal: boolean

@@ -24,7 +24,7 @@ export function Inline({ text }: { text: string }) {
 
 type Block =
   | { kind: 'heading'; row: BodyRow }
-  | { kind: 'note'; row: BodyRow; human: boolean; rows: Block[] }
+  | { kind: 'note'; row: BodyRow; human: boolean; rows: Block[]; index: number }
   | { kind: 'para'; lines: string[] }
   | { kind: 'list'; items: string[]; ordered: boolean }
   | { kind: 'quote'; lines: string[] }
@@ -71,7 +71,7 @@ function blocks(rows: BodyRow[], images: Image[]): Block[] {
     if (r.style) {
       flush()
       if (isNoteHeading(r)) {
-        const note: Block = { kind: 'note', row: r, human: r.style.color === 'magenta', rows: [] }
+        const note: Block = { kind: 'note', row: r, human: r.style.color === 'magenta', rows: [], index: out.filter((b) => b.kind === 'note').length }
         out.push(note)
         target = note.rows
       } else target.push({ kind: 'heading', row: r })
@@ -118,7 +118,7 @@ function blocks(rows: BodyRow[], images: Image[]): Block[] {
 }
 
 /** `AI | lane-a | 3 hours ago` / `User | 3 hours ago`, as decs words it, laid out on one line: name · when, role. */
-function NoteHead({ text }: { text: string }) {
+function NoteHead({ text, tools }: { text: string; tools?: preact.ComponentChildren }) {
   const parts = text.split(' | ')
   const role = parts[0]
   const when = parts.length > 1 ? parts.at(-1)! : ''
@@ -129,11 +129,18 @@ function NoteHead({ text }: { text: string }) {
       <span class="who">{who}</span>
       {when && <span class="when">· {when}</span>}
       {who !== role && <span class="role">{role}</span>}
+      {tools && <span class="note-tools">{tools}</span>}
     </header>
   )
 }
 
-function Blocks({ list, images, onImage }: { list: Block[]; images: Image[]; onImage: (i: number) => void }) {
+/** What a caller can add to a note: tools in its header, or something (an editor) in place of its text. */
+export interface NoteHooks {
+  tools?: (index: number, human: boolean) => preact.ComponentChildren
+  replace?: (index: number) => preact.ComponentChildren | null
+}
+
+function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks }) {
   return (
     <>
       {list.map((b, i) => {
@@ -143,10 +150,8 @@ function Blocks({ list, images, onImage }: { list: Block[]; images: Image[]; onI
           case 'note':
             return (
               <section key={i} class={`note ${b.human ? 'human' : 'agent'}`} data-ctx="note">
-                <NoteHead text={b.row.text} />
-                <div class="note-body">
-                  <Blocks list={b.rows} images={images} onImage={onImage} />
-                </div>
+                <NoteHead text={b.row.text} tools={notes?.tools?.(b.index, b.human)} />
+                <div class="note-body">{notes?.replace?.(b.index) ?? <Blocks list={b.rows} images={images} onImage={onImage} />}</div>
               </section>
             )
           case 'para':
@@ -292,10 +297,10 @@ export function withoutComments(rows: BodyRow[]): BodyRow[] {
   return out
 }
 
-export function Body({ rows, images, onImage }: { rows: BodyRow[]; images: Image[]; onImage: (i: number) => void }) {
+export function Body({ rows, images, onImage, notes }: { rows: BodyRow[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks }) {
   return (
     <div class="prose">
-      <Blocks list={blocks(withoutComments(rows), images)} images={images} onImage={onImage} />
+      <Blocks list={blocks(withoutComments(rows), images)} images={images} onImage={onImage} notes={notes} />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { NodeHeader } from './header.tsx'
 import { QuickEntry, StartSession } from './quick.tsx'
 import { DeferDialog, NewNode } from './newnode.tsx'
 import { Viewer, itemsAround, type ViewItem } from './viewer.tsx'
+import { BodyEditor } from './editor.tsx'
 import {
   ArrowDownToLine, ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Pin, PinOff, Play, Plus, RotateCcw,
@@ -244,7 +245,7 @@ export function Bench(props: {
    * after the write arrives. Failure: the patch goes (the rollback), the error shows, and
    * `undo` puts back whatever the action cleared (a composer's text).
    */
-  const optimistic = (patch: (b: BenchData) => BenchData, fn: () => Promise<unknown>, done: string, undo?: () => void) => {
+  const optimistic = (patch: (b: BenchData) => BenchData, fn: () => Promise<unknown>, done: string, undo?: (e: Error) => void) => {
     const id = ++opSeq.current
     setOps((o) => [...o, { id, patch }])
     setError(null)
@@ -260,7 +261,7 @@ export function Bench(props: {
         setOps((o) => o.filter((x) => x.id !== id))
         setError(e.message)
         showToast(s('actionFailed', { error: e.message.split('\n')[0] }))
-        undo?.()
+        undo?.(e)
         void refresh()
       },
     )
@@ -412,6 +413,19 @@ export function Bench(props: {
     )
   }
   const [newOpen, setNewOpen] = useState(false)
+  /** The description (`body`) or a note (its index) being edited, on which node. */
+  const [editing, setEditing] = useState<{ key: string; target: 'body' | number } | null>(null)
+  const [editConflict, setEditConflict] = useState<{ n: Node; target: 'body' | number; markdown: string } | null>(null)
+  const saveEdit = (n: Node, target: 'body' | number, markdown: string, overwrite = false) => {
+    setEditing(null)
+    const patch =
+      target === 'body'
+        ? patchNode(n.key, (x) => ({ ...x, description: markdown, body_rows: [...markdown.split('\n').map((text) => ({ text })), { text: '' }, ...afterDescription(x.body_rows)] }))
+        : patchNode(n.key, (x) => ({ ...x, notes: x.notes.map((note, i) => (i === target ? { ...note, text: markdown } : note)) }))
+    optimistic(patch, () => api.editNode(rootOf(n), n.id, target, markdown, overwrite ? undefined : (n.updated_at ?? undefined)), s('editSaved'), (e) => {
+      if (/changed since|改过|改過|a changé|تغيّرت/.test(e.message)) setEditConflict({ n, target, markdown })
+    })
+  }
   // A deferral that ended with this read: say it once.
   const backSeen = useRef(new Set<string>())
   useEffect(() => {
@@ -674,7 +688,7 @@ export function Bench(props: {
         if (scope) return setScope(null)
         return
       }
-      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || milestoneFor || isTyping(e)) return
+      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || milestoneFor || editing || editConflict || isTyping(e)) return
       if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault()
         return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
@@ -775,6 +789,10 @@ export function Bench(props: {
           return setPalette(true)
         case 'w':
           return nextStuck()
+        case 'e':
+        case 'E':
+          e.preventDefault()
+          return node && setEditing({ key: node.key, target: 'body' })
         case '!':
           return toggleImportant()
         case 'h':
@@ -960,6 +978,11 @@ export function Bench(props: {
             })()}
             onImage={setLightbox}
             onFile={(path) => openView(node, path)}
+            editing={editing?.key === node.key ? editing.target : null}
+            onEdit={(target) => setEditing({ key: node.key, target })}
+            onSaveEdit={(target, md) => saveEdit(node, target, md)}
+            onCancelEdit={() => setEditing(null)}
+            onFiles={(target, files) => void api.attachFiles(rootOf(node), node.id, files, target).then(() => (showToast(s('attachedFiles', { count: files.length })), refresh()), (e: Error) => setError(e.message))}
             onQuestions={(picks) => act(() => api.answerQuestions(rootOf(node), node.id, picks), s('sent'))}
           />
         ) : current?.kind === 'fold' ? (
@@ -1010,6 +1033,21 @@ export function Bench(props: {
             showToast(s('added', { ref: made.ref }))
             pendingJump.current = `${made.project}#${(made as { id?: number }).id ?? ''}`
             void refresh()
+          }}
+        />
+      )}
+      {editConflict && (
+        <EditConflict
+          onReload={() => (setEditConflict(null), void refresh())}
+          onOverwrite={() => {
+            const c = editConflict
+            setEditConflict(null)
+            saveEdit(c.n, c.target, c.markdown, true)
+          }}
+          onKeep={() => {
+            const c = editConflict
+            setEditConflict(null)
+            setEditing({ key: c.n.key, target: c.target })
           }}
         />
       )}
@@ -1185,6 +1223,12 @@ function Detail(p: {
   onImage: (i: number) => void
   /** Opens an attachment in the big viewer. */
   onFile: (path: string) => void
+  /** The description (`body`) or note index being edited here, if any. */
+  editing: 'body' | number | null
+  onEdit: (target: 'body' | number) => void
+  onSaveEdit: (target: 'body' | number, markdown: string) => void
+  onCancelEdit: () => void
+  onFiles: (target: 'body' | number, files: File[]) => void
   onQuestions: (picks: Record<string, string>) => void
 }) {
   const n = p.node
@@ -1262,7 +1306,36 @@ function Detail(p: {
           </section>
         )}
 
-        <Body rows={n.body_rows} images={n.images} onImage={p.onImage} />
+        {p.editing === 'body' ? (
+          <>
+            <BodyEditor markdown={n.description ?? ''} onSave={(md) => p.onSaveEdit('body', md)} onCancel={p.onCancelEdit} onFiles={(f) => p.onFiles('body', f)} />
+            <Body rows={afterDescription(n.body_rows)} images={n.images} onImage={p.onImage} />
+          </>
+        ) : (
+          <div class="body-wrap">
+            <button class="ghost edit-body" onClick={() => p.onEdit('body')} title={`${s('edEdit')} (E)`}>
+              <PenLine size={13} strokeWidth={1.75} />
+              {s('edEdit')}
+            </button>
+            <Body
+              rows={n.body_rows}
+              images={n.images}
+              onImage={p.onImage}
+              notes={{
+                tools: (i, human) =>
+                  human && p.editing === null ? (
+                    <button class="note-edit" onClick={() => p.onEdit(i)} title={s('edEdit')} aria-label={s('edEdit')}>
+                      <PenLine size={12} strokeWidth={1.75} />
+                    </button>
+                  ) : null,
+                replace: (i) =>
+                  p.editing === i ? (
+                    <BodyEditor markdown={n.notes[i]?.text ?? ''} onSave={(md) => p.onSaveEdit(i, md)} onCancel={p.onCancelEdit} onFiles={(f) => p.onFiles(i, f)} />
+                  ) : null,
+              }}
+            />
+          </div>
+        )}
 
         {files.length > 0 && (
           <section class="files">
@@ -1531,6 +1604,34 @@ function MilestoneDialog(p: { node: Node; busy: boolean; onClose: () => void; on
           </button>
           <button class="primary" disabled={!date || p.busy} onClick={save}>
             {s('milestoneSave')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The body's rows after its description: from the first heading (a note, a section) on. */
+function afterDescription(rows: Node['body_rows']): Node['body_rows'] {
+  const at = rows.findIndex((r) => r.style)
+  return at === -1 ? [] : rows.slice(at)
+}
+
+/** The node changed while the owner was editing: take theirs, keep mine, or go back to editing. */
+function EditConflict(p: { onReload: () => void; onOverwrite: () => void; onKeep: () => void }) {
+  return (
+    <div class="overlay" onClick={p.onKeep}>
+      <div class="confirm" role="alertdialog" onClick={(e) => e.stopPropagation()}>
+        <h3>{s('editConflict')}</h3>
+        <div class="confirm-actions">
+          <button class="ghost" onClick={p.onReload}>
+            {s('editReload')}
+          </button>
+          <button class="ghost" onClick={p.onKeep}>
+            {s('editKeep')}
+          </button>
+          <button class="primary" onClick={p.onOverwrite}>
+            {s('editOverwrite')}
           </button>
         </div>
       </div>

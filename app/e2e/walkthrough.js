@@ -118,6 +118,28 @@
     await sleep(800)
     await shot('replied')
 
+    log('STEP edit-body')
+    // E edits the description in place; ⌘S saves only that part of the file through nod edit.
+    $$('.nav-item').find((b) => b.dataset.view === 'all').click()
+    await sleep(300)
+    $$('.row.node').find((r) => r.textContent.includes('Pick a database')).click()
+    await sleep(300)
+    key('E')
+    const prose = await until('the editor', () => $('.body-editor .ProseMirror'))
+    await until('editor focused', () => document.activeElement?.closest('.body-editor'))
+    const sel = window.getSelection()
+    sel.selectAllChildren(prose)
+    sel.collapseToEnd()
+    document.execCommand('insertText', false, ' Revisit in March.')
+    await sleep(300)
+    await shot('edit-body')
+    prose.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true, bubbles: true }))
+    await toast('Saved')
+    await until('editor closed', () => !$('.body-editor'))
+    await sleep(800)
+    const edited = JSON.parse((await invoke('decs', { args: ['get', '1', '--json'], cwd: null, stdin: null })).stdout)
+    if (!/Revisit in March/.test(edited.body ?? edited.description ?? '')) throw new Error('the edit did not reach the file')
+
     log('STEP preview')
     // An attachment opens in the window: markdown read in place, ←→ to the next one, Esc closes.
     $$('.row.node').find((r) => r.textContent.includes('Write the schema')).click()

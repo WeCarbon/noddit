@@ -2188,3 +2188,110 @@ figcaption {
 .viewer .viewer-open:hover {
   background: rgba(255, 255, 255, 0.24);
 }
+
+/* Editing the description or one of the owner's notes in place. */
+.body-wrap {
+  position: relative;
+}
+
+.edit-body {
+  position: absolute;
+  inset-inline-end: 0;
+  top: -4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.detail:hover .edit-body,
+.edit-body:focus-visible {
+  opacity: 1;
+}
+
+.note-tools {
+  margin-inline-start: auto;
+}
+
+.note-edit {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-3);
+  opacity: 0;
+}
+
+.note:hover .note-edit {
+  opacity: 1;
+}
+
+.note-edit:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.body-editor {
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--panel);
+  margin: 4px 0 16px;
+}
+
+.ed-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ed-tool {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-2);
+}
+
+.ed-tool:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ed-toolbar .grow {
+  flex: 1;
+}
+
+.ed-keys {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.ed-host {
+  padding: 8px 14px 12px;
+  min-height: 80px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.ed-host .ProseMirror {
+  outline: none;
+  white-space: pre-wrap;
+}
+
+.ed-host .ProseMirror p {
+  margin: 0.4em 0;
+}
+
+.ed-host .ProseMirror li[data-item-type='task'] {
+  list-style: none;
+}

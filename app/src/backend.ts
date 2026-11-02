@@ -476,3 +476,19 @@ export async function readPreview(path: string): Promise<{ text: string; truncat
   }
   return invoke('read_preview', { path, max: 1_048_576 })
 }
+
+/** `nod edit`: the description (`body`) or note `index` (0-based) becomes `markdown`. `expect`: the updated_at it was opened at. */
+export const editNode = (root: string, id: number, target: 'body' | number, markdown: string, expect?: string) =>
+  ok(['edit', String(id), ...(target === 'body' ? ['--body'] : ['--note', String(target + 1)]), ...(expect ? ['--expect', expect] : []), '--human', '--dir', root], undefined, markdown)
+
+/** Files pasted or dropped into the editor: saved, then attached to that part of the node. */
+export async function attachFiles(root: string, id: number, files: File[], to: 'body' | number): Promise<void> {
+  if (!inDesktop) return
+  for (const f of files) {
+    const bytes = new Uint8Array(await f.arrayBuffer())
+    let bin = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    const path = await invoke<string>('save_upload', { name: f.name || 'pasted.png', data: btoa(bin) })
+    await ok(['attach', String(id), path, '--to', to === 'body' ? 'body' : String(to + 1), '--dir', root])
+  }
+}

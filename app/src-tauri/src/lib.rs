@@ -59,6 +59,21 @@ async fn read_preview(path: String, max: Option<u64>) -> Result<Preview, String>
     .map_err(|e| e.to_string())?
 }
 
+/// A file pasted or dropped into the editor, written where `nod attach` can copy it from.
+/// Returns its path. Only the name's last component is used.
+#[tauri::command]
+async fn save_upload(app: AppHandle, name: String, data: String) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(data).map_err(|e| e.to_string())?;
+    let safe = std::path::Path::new(&name).file_name().and_then(|n| n.to_str()).filter(|n| !n.is_empty()).unwrap_or("pasted.png").to_string();
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or_default();
+    let dir = data_dir(&app).join("uploads").join(stamp.to_string());
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(safe);
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 /// Debug builds: the next `decs <command>` calls wait `delayMs`, and fail if `fail`. `null` clears it.
 #[tauri::command]
 fn e2e_cli_fault(state: State<'_, AppState>, fault: Option<CliFault>) -> Result<(), String> {
@@ -468,6 +483,7 @@ pub fn run() {
             is_background,
             e2e_cli_fault,
             read_preview,
+            save_upload,
             resize::resize_begin,
             resize::resize_to,
             pick_folder,
