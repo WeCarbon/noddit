@@ -18,6 +18,7 @@ import { popupNative } from './native-menu.ts'
 import { LetterPicker, RenameField, UnlinkConfirm } from './projects.tsx'
 import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
+import { applyOps, both, dropRows, patchNode, patchRows, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
 import type { Bench as BenchData, Node, Project, Row, View, ViewName } from './types.ts'
@@ -74,7 +75,13 @@ export function Bench(props: {
   onAddProject: () => void
   onNoProjects: () => void
 }) {
-  const { bench, prefs, setPrefs, refresh } = props
+  const { prefs, setPrefs, refresh } = props
+  // Actions show at once; the CLI catches up behind them (see optimistic.ts).
+  const [ops, setOps] = useState<PendingOp[]>([])
+  const [loadedAt, setLoadedAt] = useState(() => Date.now())
+  useEffect(() => setLoadedAt(Date.now()), [props.bench])
+  useEffect(() => setOps((o) => (o.some((x) => x.doneAt && x.doneAt <= loadedAt) ? o.filter((x) => !x.doneAt || x.doneAt > loadedAt) : o)), [loadedAt])
+  const bench = useMemo(() => applyOps(props.bench, ops, loadedAt), [props.bench, ops, loadedAt])
   // A project picked in the sidebar narrows every view; one that is gone (unlinked) no longer does.
   const scope = prefs.project && bench.projects.some((p) => p.project === prefs.project) ? prefs.project : null
   const views = useMemo(() => bench.views.map((v) => scopeView(v, scope)), [bench, scope])
@@ -212,6 +219,48 @@ export function Bench(props: {
   }
   const isOpen = (r: Row) => (r.kind === 'fold' ? Boolean(prefs.folds.groups[r.key]) : !nodeCollapsed(r, prefs.folds))
 
+  const opSeq = useRef(0)
+  /**
+   * Shows `patch` now and runs `fn` behind it. Success: the patch stays until a bench read
+   * after the write arrives. Failure: the patch goes (the rollback), the error shows, and
+   * `undo` puts back whatever the action cleared (a composer's text).
+   */
+  const optimistic = (patch: (b: BenchData) => BenchData, fn: () => Promise<unknown>, done: string, undo?: () => void) => {
+    const id = ++opSeq.current
+    setOps((o) => [...o, { id, patch }])
+    setError(null)
+    setComposer(null)
+    setDraft('')
+    showToast(done)
+    fn().then(
+      () => {
+        setOps((o) => o.map((x) => (x.id === id ? { ...x, doneAt: Date.now() } : x)))
+        void refresh()
+      },
+      (e: Error) => {
+        setOps((o) => o.filter((x) => x.id !== id))
+        setError(e.message)
+        showToast(s('actionFailed', { error: e.message.split('\n')[0] }))
+        undo?.()
+        void refresh()
+      },
+    )
+  }
+  const now = () => new Date().toISOString()
+  /** Out of every list but the ones that keep finished nodes. */
+  const finished = (key: string, state: string) =>
+    both(
+      patchNode(key, (n) => ({ ...n, status: state, terminal: true })),
+      dropRows(key, ['all', 'recent']),
+      patchRows(key, (r) => ({ ...r, state, glyph: r.glyph && { ...r.glyph, dim: true, color: undefined }, badge: [], badge_short: [] })),
+    )
+  const answered = (key: string, choice?: string) =>
+    both(
+      patchNode(key, (n) => ({ ...n, status: 'decided', answer: { choice, by: 'owner', at: now() } })),
+      dropRows(key, ['available', 'all', 'waiting', 'recent']),
+      patchRows(key, (r) => ({ ...r, state: 'decided', glyph: r.glyph && { ...r.glyph, color: 'green', bold: false, dim: false }, badge: [{ text: s('answered'), color: 'green' }], badge_short: [{ text: s('answered'), color: 'green' }] })),
+    )
+
   const act = async (fn: () => Promise<unknown>, done: string) => {
     setBusy(true)
     setError(null)
@@ -249,18 +298,29 @@ export function Bench(props: {
     if (!node || !composer) return
     const text = typed.trim()
     const root = rootOf(node)
-    if (composer.kind === 'answer') return act(() => api.answer(root, node.id, composer.key, text || undefined), s('sent')).then(() => setUnlocked(null))
-    if (composer.kind === 'free' && text) return act(() => api.answerFreeText(root, node.id, text), s('sent'))
-    if (composer.kind === 'reply' && text) return act(() => api.reply(root, node.id, text), s('replied'))
-    if (composer.kind === 'close') return act(() => api.close(root, node.id, text || 'obsolete'), s('closed'))
+    const key = node.key
+    const reopen = (c: Composer) => () => (setComposerOn({ c, key }), setDraft(typed))
+    if (composer.kind === 'answer') {
+      setUnlocked(null)
+      return optimistic(answered(key, composer.key), () => api.answer(root, node.id, composer.key, text || undefined), s('sent'), reopen(composer))
+    }
+    if (composer.kind === 'free' && text) return optimistic(answered(key), () => api.answerFreeText(root, node.id, text), s('sent'), reopen(composer))
+    if (composer.kind === 'reply' && text)
+      return optimistic(
+        patchNode(key, (n) => ({ ...n, body_rows: [...n.body_rows, { text: '' }, { text: `${s('you')} | ${s('justNow')}`, style: { text: '', bold: true, color: 'magenta' } }, { text: '' }, ...text.split('\n').map((t) => ({ text: t }))] })),
+        () => api.reply(root, node.id, text),
+        s('replied'),
+        reopen(composer),
+      )
+    if (composer.kind === 'close') return optimistic(finished(key, 'closed'), () => api.close(root, node.id, text || 'obsolete'), s('closed'), reopen(composer))
   }
   const pin = (where: 'top' | 'bottom' | 'off') => {
     if (!node?.can_pin) return
-    act(() => api.pin(rootOf(node), node.id, where), where === 'off' ? s('unpinned') : s('pinned'))
+    optimistic(patchNode(node.key, (n) => ({ ...n, pin: where === 'off' ? null : where })), () => api.pin(rootOf(node), node.id, where), where === 'off' ? s('unpinned') : s('pinned'))
   }
   const seen = () => {
     if (!node || node.terminal) return
-    act(() => api.seen(rootOf(node), node.id), s('dismissed'))
+    optimistic(finished(node.key, 'completed'), () => api.seen(rootOf(node), node.id), s('dismissed'))
   }
   const startClose = () => {
     if (node && !node.terminal) setComposer({ kind: 'close' })
@@ -268,7 +328,14 @@ export function Bench(props: {
   const toggleDefer = () => {
     if (!node || node.terminal) return
     const off = Boolean(node.deferred_at)
-    act(() => api.defer(rootOf(node), node.id, off), off ? s('undeferred') : s('deferred'))
+    const key = node.key
+    optimistic(
+      off
+        ? patchNode(key, (n) => ({ ...n, deferred_at: null }))
+        : both(patchNode(key, (n) => ({ ...n, deferred_at: now() })), dropRows(key, ['all', 'waiting', 'recent']), patchRows(key, (r) => ({ ...r, deferred: true }))),
+      () => api.defer(rootOf(node), node.id, off),
+      off ? s('undeferred') : s('deferred'),
+    )
   }
   // An agent answered something the owner wrote: say so, whichever node is on screen.
   useEffect(() => {
@@ -284,7 +351,14 @@ export function Bench(props: {
   const toggleImportant = () => {
     if (!node || node.terminal) return
     const on = node.urgency !== 'high'
-    act(() => api.flag(rootOf(node), node.id, on ? 'important' : 'normal'), on ? s('flaggedImportant') : s('unflaggedImportant'))
+    optimistic(
+      both(
+        patchNode(node.key, (n) => ({ ...n, urgency: on ? 'high' : 'normal', important: on })),
+        patchRows(node.key, (r) => ({ ...r, flag: r.flag === 'milestone' ? r.flag : on ? 'important' : null })),
+      ),
+      () => api.flag(rootOf(node), node.id, on ? 'important' : 'normal'),
+      on ? s('flaggedImportant') : s('unflaggedImportant'),
+    )
   }
   const [milestoneFor, setMilestoneFor] = useState<Node | null>(null)
   const clearMilestone = () => {
@@ -295,8 +369,14 @@ export function Bench(props: {
       if (node.urgency === 'high') await api.flag(rootOf(node), node.id, 'important')
     }, s('milestoneRemoved'))
   }
-  const markStart = () => node && act(() => api.start(rootOf(node), node.id), s('started'))
-  const markDone = () => node && act(() => api.done(rootOf(node), node.id), s('markedDone'))
+  const markStart = () =>
+    node &&
+    optimistic(
+      both(patchNode(node.key, (n) => ({ ...n, status: 'in_progress' })), patchRows(node.key, (r) => ({ ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '◐', color: 'cyan', dim: false } }))),
+      () => api.start(rootOf(node), node.id),
+      s('started'),
+    )
+  const markDone = () => node && optimistic(finished(node.key, 'completed'), () => api.done(rootOf(node), node.id), s('markedDone'))
   const goParent = () => {
     if (node?.parent != null) jump(`${node.project}#${node.parent}`)
   }
@@ -889,7 +969,14 @@ export function Bench(props: {
           onSave={(date) => {
             const n = milestoneFor
             setMilestoneFor(null)
-            void act(() => api.flag(rootOf(n), n.id, 'milestone', date), s('milestoneSet'))
+            optimistic(
+              both(
+                patchNode(n.key, (x) => ({ ...x, milestone: true, due: `${date}T23:59:59` })),
+                patchRows(n.key, (r) => ({ ...r, flag: 'milestone', due: `${date}T23:59:59` })),
+              ),
+              () => api.flag(rootOf(n), n.id, 'milestone', date),
+              s('milestoneSet'),
+            )
           }}
         />
       )}

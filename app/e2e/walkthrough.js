@@ -166,6 +166,34 @@
     box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await until('X1 selected', () => $('.row.sel')?.textContent.includes('X1'))
 
+    log('STEP optimistic')
+    // Defer with a slow CLI: the row leaves at once, long before the CLI returns.
+    $$('.nav-item').find((b) => b.textContent.includes('Available')).click()
+    await sleep(300)
+    await pick('Pick a database')
+    await invoke('e2e_cli_fault', { fault: { command: 'defer', delayMs: 2500, fail: false } })
+    const asked = performance.now()
+    key('d')
+    await until('row gone at once', () => !$$('.row.node').some((r) => r.textContent.includes('Pick a database')), 1000)
+    log(`optimistic: row gone ${Math.round(performance.now() - asked)} ms after d`)
+    await sleep(3200)
+    if ($$('.row.node').some((r) => r.textContent.includes('Pick a database'))) throw new Error('the deferred row came back after the CLI finished')
+    // A failing CLI puts the row back and says why.
+    await invoke('e2e_cli_fault', { fault: { command: 'defer', delayMs: 300, fail: true } })
+    await pick('Write the schema')
+    key('d')
+    await until('row gone before the failure', () => !$$('.row.node').some((r) => r.textContent.includes('Write the schema')), 1000)
+    await toast('Not saved')
+    await until('row back after the failure', () => $$('.row.node').some((r) => r.textContent.includes('Write the schema')))
+    await invoke('e2e_cli_fault', { fault: null })
+    // Undo the first one so the rest of the run sees X1 as before.
+    $$('.nav-item').find((b) => b.textContent.includes('All')).click()
+    await sleep(300)
+    await pick('Pick a database')
+    key('d')
+    await toast('Back on the lists')
+    await sleep(800)
+
     log('STEP hotkey-window')
     // System-style notifications: the hotkey brings the main window up on the most urgent decision.
     await invoke('settings_set', { settings: { notify: 'off', hotkey: '', keepInTray: true } })

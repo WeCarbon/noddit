@@ -19,6 +19,26 @@ pub(crate) struct AppState {
     script_ran: std::sync::atomic::AtomicBool,
     env: Mutex<Option<ShellEnv>>,
     pub(crate) monitor: Mutex<Option<u32>>,
+    /// Scripted runs only: make one CLI command slow or fail, to watch the window cope.
+    faults: Mutex<Option<CliFault>>,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CliFault {
+    command: String,
+    delay_ms: u64,
+    fail: bool,
+}
+
+/// Debug builds: the next `decs <command>` calls wait `delayMs`, and fail if `fail`. `null` clears it.
+#[tauri::command]
+fn e2e_cli_fault(state: State<'_, AppState>, fault: Option<CliFault>) -> Result<(), String> {
+    if !is_debug() {
+        return Err("debug builds only".into());
+    }
+    *state.faults.lock().unwrap() = fault;
+    Ok(())
 }
 
 /// What a login shell would find. A GUI app starts with launchd's bare PATH,
@@ -202,6 +222,13 @@ async fn decs(app: AppHandle, state: State<'_, AppState>, args: Vec<String>, cwd
     // In background (test) mode nothing opens a terminal: the CLI only reports what it would run.
     if background() && args.len() >= 2 && args[0] == "session" && args[1] == "start" && !args.iter().any(|a| a == "--dry-run") {
         args.push("--dry-run".into());
+    }
+    let fault = state.faults.lock().unwrap().clone().filter(|f| args.first() == Some(&f.command));
+    if let Some(f) = fault {
+        tokio::time::sleep(std::time::Duration::from_millis(f.delay_ms)).await;
+        if f.fail {
+            return Ok(RunOutput { code: 1, stdout: String::new(), stderr: format!("{}: injected failure", f.command) });
+        }
     }
     let mut cmd = decs_command(&env, &args, cwd.as_deref())?;
     let out = match stdin {
@@ -396,6 +423,7 @@ pub fn run() {
             script_ran: Default::default(),
             env: Mutex::new(None),
             monitor: Mutex::new(None),
+            faults: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             shell_env,
@@ -410,6 +438,7 @@ pub fn run() {
             log,
             is_debug,
             is_background,
+            e2e_cli_fault,
             resize::resize_begin,
             resize::resize_to,
             pick_folder,
