@@ -171,6 +171,8 @@
     "unclaimed": "{{ref}} answered {{duration}} ago, not collected: {{title}} (proposed by {{author}})",
     "watching": "nod monitor: watching {{count}} projects{{author}}, {{from}}",
     "onlyAuthor": ", only {{author}}",
+    "onlyAuthorAuto": ", only {{author}} (auto-detected as that teammate — pass --mine to say so on purpose, or --all to watch everything)",
+    "autoFilteredWarn": "warning: this session detected itself as teammate \"{{author}}\" without being told to (no --mine/--author/--all) — if that's wrong, this monitor is missing everything that isn't {{author}}'s. Re-arm with --all to watch everything meanwhile.",
     "resuming": "resuming, from {{cursor}}",
     "startingAt": "from {{cursor}}",
     "notCollected": "{{what}}, not collected yet",

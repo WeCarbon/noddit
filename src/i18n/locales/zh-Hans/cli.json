@@ -167,6 +167,8 @@
     "unclaimed": "{{ref}} 已答 {{duration}}没人取走：{{title}}（提出者 {{author}}）",
     "watching": "nod monitor: 盯着 {{count}} 个项目{{author}}，{{from}}",
     "onlyAuthor": "，只看 {{author}}",
+    "onlyAuthorAuto": "，只看 {{author}}（自动认成这个队友——真要这样就加 --mine 明确说，要看全部就加 --all）",
+    "autoFilteredWarn": "提醒：这次没加 --mine/--author/--all，自己却被自动认成队友「{{author}}」——如果认错了，这次监听会漏掉所有不是 {{author}} 的节点。先用 --all 重挂看全部。",
     "resuming": "接着上次，从 {{cursor}} 起",
     "startingAt": "从 {{cursor}} 起",
     "notCollected": "{{what}}，还没取走",

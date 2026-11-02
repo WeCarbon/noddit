@@ -204,7 +204,9 @@
     "stale_few": "{{count}} مهام راكدة — لم تبدأ، ولا تنتظر قرارًا: nod start / nod defer / nod close، أو أعد تخطيطها",
     "stale_many": "{{count}} مهمة راكدة — لم تبدأ، ولا تنتظر قرارًا: nod start / nod defer / nod close، أو أعد تخطيطها",
     "stale_other": "{{count}} مهمة راكدة — لم تبدأ، ولا تنتظر قرارًا: nod start / nod defer / nod close، أو أعد تخطيطها",
-    "backFromDeferral": "عاد {{ref}} من التأجيل: {{title}}"
+    "backFromDeferral": "عاد {{ref}} من التأجيل: {{title}}",
+    "onlyAuthorAuto": "، فقط {{author}} (اكتُشف تلقائيًا كهذا الزميل — مرّر --mine لتقصد ذلك، أو --all لمراقبة الكل)",
+    "autoFilteredWarn": "تحذير: اكتشفت هذه الجلسة نفسها كزميل الفريق \"{{author}}\" دون أن يُطلب منها ذلك (بلا --mine/--author/--all) — إن كان هذا خطأً، تفوت هذه المراقبة كل ما ليس لـ {{author}}. أعد التشغيل بـ --all لمراقبة الكل في هذه الأثناء."
   },
   "defer": {
     "undeferred": "أُلغي التأجيل",

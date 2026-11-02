@@ -104,6 +104,9 @@ interface TeamMember {
   agentType?: string
   cwd?: string
   isActive?: boolean
+  /** `in-process` (Agent-tool teammates, sharing the lead's own process and
+   *  cwd) vs `tmux`/`iterm2`/other (a separate OS process in its own pane). */
+  backendType?: string
 }
 interface TeamConfig {
   members?: TeamMember[]
@@ -113,8 +116,16 @@ interface TeamConfig {
  * Fallback for when the `--agent-name` argv walk fails (a different Claude
  * Code build, or no `ps`/PowerShell reachable): `~/.claude/teams/<team>/
  * config.json` lists every member with the directory it runs in. The
- * member whose `cwd` is this process's cwd (or an ancestor of it) — the
- * closest match wins — is this session, unless it's the team-lead.
+ * member whose `cwd` is this process's cwd (or an ancestor of it) is this
+ * session — but only when that's unambiguous:
+ *   - never the team-lead itself (agentType team-lead is never a teammate);
+ *   - never an `in-process` member (N141): an Agent-tool teammate shares
+ *     the lead's own process and cwd, so cwd can't tell the two apart —
+ *     inferring one from "a team exists" misidentified the *lead's own*
+ *     monitor as whichever in-process teammate it last spawned;
+ *   - never when the lead's own cwd in the same config matches too (cwd
+ *     alone can't tell lead and teammate apart there either — skip that
+ *     team rather than guess), and never when two different members tie.
  */
 export function teammateFromTeamConfig(cwd: string = process.cwd(), home: string = homedir()): string | undefined {
   const root = join(home, '.claude', 'teams')
@@ -124,7 +135,14 @@ export function teammateFromTeamConfig(cwd: string = process.cwd(), home: string
   } catch {
     return undefined
   }
+  // One-directional on purpose: this process's cwd must be at or *inside* the
+  // recorded directory. The reverse — a member's recorded cwd sitting inside
+  // this (broader) cwd — says nothing about who's asking; a lead running from
+  // a repo root isn't "covered by" a teammate's deeper worktree just because
+  // that worktree happens to live under the same root.
+  const within = (recorded: string) => cwd === recorded || cwd.startsWith(`${recorded}${sep}`)
   let best: { name: string; len: number } | undefined
+  let ambiguous = false
   for (const team of teams) {
     let cfg: TeamConfig
     try {
@@ -132,14 +150,22 @@ export function teammateFromTeamConfig(cwd: string = process.cwd(), home: string
     } catch {
       continue
     }
-    for (const m of cfg.members ?? []) {
-      if (!m.name || !m.cwd || m.agentType === 'team-lead' || m.isActive === false) continue
-      const matches = cwd === m.cwd || cwd.startsWith(`${m.cwd}${sep}`) || m.cwd.startsWith(`${cwd}${sep}`)
-      if (!matches) continue
+    const members = cfg.members ?? []
+    const lead = members.find((m) => m.agentType === 'team-lead')
+    // The lead's own recorded cwd matches too — cwd can't distinguish the lead's
+    // session from a teammate's at that length or anything less specific, so
+    // only a teammate match strictly more specific than the lead's own counts
+    // (e.g. a nested worktree). Equal (the common case: they share a cwd
+    // outright, as in-process teammates always do) is the lead, not a guess.
+    const leadLen = lead?.cwd && within(lead.cwd) ? lead.cwd.length : -1
+    for (const m of members) {
+      if (!m.name || !m.cwd || m.agentType === 'team-lead' || m.isActive === false || m.backendType === 'in-process') continue
+      if (!within(m.cwd) || m.cwd.length <= leadLen) continue
+      if (best && m.cwd.length === best.len && m.name !== best.name) ambiguous = true
       if (!best || m.cwd.length > best.len) best = { name: m.name, len: m.cwd.length }
     }
   }
-  return best?.name
+  return ambiguous ? undefined : best?.name
 }
 
 function sessionCommand(): string {
@@ -233,11 +259,15 @@ export async function run(args: Args): Promise<number> {
     return 0
   }
   const store = resolveStore(args, { allowRegistry: allProjects, preferRegistry: allProjects })
+  const explicitlyScoped = Boolean(one(args, 'author')) || bool(args, 'mine') || bool(args, 'all')
   // A teammate watches only its own nodes even when the plugin starts it without --mine; a lead watches everything.
-  const teammate = one(args, 'author') || bool(args, 'mine') || bool(args, 'all')
-    ? undefined
-    : teammateName(sessionCommand()) ?? teammateFromTeamConfig()
+  const teammate = explicitlyScoped ? undefined : teammateName(sessionCommand()) ?? teammateFromTeamConfig()
   const author = one(args, 'author') ?? (bool(args, 'mine') ? resolveAuthor(args) : teammate)
+  // N141: this session wasn't told to filter (no --mine/--author/--all) but
+  // detected itself as a teammate anyway — surprising enough, and wrong
+  // often enough, that a lead should see it called out rather than silently
+  // missing everything that isn't that one name's.
+  const autoFiltered = !explicitlyScoped && Boolean(teammate)
   // This process's own identity (core/identity.ts) — a write it made itself
   // never needs to be reported back to it, however it's signed (N41: the
   // lead relaying the owner's own words with `--human --by owner(...)`
@@ -484,8 +514,19 @@ export async function run(args: Args): Promise<number> {
   }
 
   process.stderr.write(
-    `${t('cli.monitor.watching', { count: store.layouts.length, author: author ? t('cli.monitor.onlyAuthor', { author }) : '', from: resumed ? t('cli.monitor.resuming', { cursor }) : t('cli.monitor.startingAt', { cursor }) })}\n`,
+    `${t('cli.monitor.watching', {
+      count: store.layouts.length,
+      author: author ? t(autoFiltered ? 'cli.monitor.onlyAuthorAuto' : 'cli.monitor.onlyAuthor', { author }) : '',
+      from: resumed ? t('cli.monitor.resuming', { cursor }) : t('cli.monitor.startingAt', { cursor }),
+    })}\n`,
   )
+  // N141: never silent about this — a lead that got misidentified as a
+  // teammate otherwise just quietly misses everything that isn't that name's.
+  if (autoFiltered) {
+    const warn = t('cli.monitor.autoFilteredWarn', { author })
+    process.stderr.write(`${warn}\n`)
+    process.stdout.write(asJson ? `${JSON.stringify({ event: 'warn', kind: 'auto_filtered_as_teammate', author })}\n` : `DECS-WARN ${warn}\n`)
+  }
   // Already-answered, uncollected nodes go out first, so an answer that
   // landed before this monitor started isn't missed.
   try {

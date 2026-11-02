@@ -189,7 +189,9 @@
     "stale_one": "{{count}} tâche en sommeil — pas commencée, ne demande pas de décision : nod start / nod defer / nod close, ou replanifiez-la",
     "stale_many": "{{count}} tâches en sommeil — pas commencées, ne demandent pas de décision : nod start / nod defer / nod close, ou replanifiez-les",
     "stale_other": "{{count}} tâches en sommeil — pas commencées, ne demandent pas de décision : nod start / nod defer / nod close, ou replanifiez-les",
-    "backFromDeferral": "{{ref}} revient de report : {{title}}"
+    "backFromDeferral": "{{ref}} revient de report : {{title}}",
+    "onlyAuthorAuto": ", seulement {{author}} (détecté automatiquement comme ce coéquipier ; passez --mine pour le dire exprès, ou --all pour tout surveiller)",
+    "autoFilteredWarn": "attention : cette session s'est détectée elle-même comme le coéquipier « {{author}} » sans qu'on le lui demande (pas de --mine/--author/--all) — si c'est une erreur, cette surveillance manque tout ce qui n'est pas de {{author}}. Réarmez avec --all pour tout surveiller en attendant."
   },
   "defer": {
     "undeferred": "report levé",

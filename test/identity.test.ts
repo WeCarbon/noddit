@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 
 import { agentNameOf, currentIdentity, currentSession } from '../src/core/identity.ts'
 import { parseNotes } from '../src/core/parse.ts'
@@ -127,19 +128,62 @@ function writeTeamConfig(home: string, team: string, members: Record<string, unk
 test('teammateFromTeamConfig: finds the member whose cwd matches (or is an ancestor of) ours, skips the lead and inactive ones', (t) => {
   const home = fakeHome(t)
   writeTeamConfig(home, 'proj', [
-    { agentId: 'team-lead@proj', name: 'team-lead', agentType: 'team-lead', cwd: '/home/alice/code/proj' },
-    { agentId: 'lane-a@proj', name: 'lane-a', agentType: 'general-purpose', cwd: '/home/alice/code/proj' },
-    { agentId: 'lane-b@proj', name: 'lane-b', agentType: 'general-purpose', cwd: '/home/alice/code/proj-other', isActive: false },
+    { agentId: 'team-lead@proj', name: 'team-lead', agentType: 'team-lead', cwd: '/home/alice/code/proj', backendType: 'tmux' },
+    { agentId: 'lane-a@proj', name: 'lane-a', agentType: 'general-purpose', cwd: '/home/alice/code/proj/.worktrees/lane-a', backendType: 'tmux' },
+    { agentId: 'lane-b@proj', name: 'lane-b', agentType: 'general-purpose', cwd: '/home/alice/code/proj-other', backendType: 'tmux', isActive: false },
   ])
-  assert.equal(teammateFromTeamConfig('/home/alice/code/proj', home), 'lane-a')
-  assert.equal(teammateFromTeamConfig('/home/alice/code/proj/sub/dir', home), 'lane-a', 'a subdirectory of the member\'s cwd still matches')
+  assert.equal(teammateFromTeamConfig('/home/alice/code/proj/.worktrees/lane-a', home), 'lane-a')
+  assert.equal(teammateFromTeamConfig('/home/alice/code/proj/.worktrees/lane-a/sub/dir', home), 'lane-a', 'a subdirectory of the member\'s cwd still matches')
   assert.equal(teammateFromTeamConfig('/home/alice/code/proj-other', home), undefined, 'inactive — does not count')
   assert.equal(teammateFromTeamConfig('/home/alice/code/unrelated', home), undefined)
+  // The lead's own cwd — never the lead itself, whatever else is in the config.
+  assert.equal(teammateFromTeamConfig('/home/alice/code/proj', home), undefined)
 })
 
 test('teammateFromTeamConfig: no ~/.claude/teams at all is just undefined, not a throw', (t) => {
   const home = fakeHome(t)
   assert.equal(teammateFromTeamConfig('/anywhere', home), undefined)
+})
+
+// ---------------------------------------------------------------------------
+// N141: the lead's own re-armed `nod monitor` got misidentified as whichever
+// in-process teammate (Agent tool: lane-weekly, lane-secrets) it had most
+// recently spawned — because in-process teammates share the lead's own
+// process and cwd, cwd alone can never tell them apart. Fixed by never
+// matching an in-process member, and never matching at all when the lead's
+// own cwd in that config also covers the query.
+// ---------------------------------------------------------------------------
+
+test('teammateFromTeamConfig: never matches an in-process teammate (Agent-tool) sharing the lead\'s cwd — the exact N141 bug', (t) => {
+  const home = fakeHome(t)
+  writeTeamConfig(home, 'oa', [
+    { agentId: 'team-lead@web', name: 'team-lead', agentType: 'team-lead', cwd: '/home/alice/code/web', backendType: 'in-process' },
+    { agentId: 'lane-weekly@web', name: 'lane-weekly', agentType: 'general-purpose', cwd: '/home/alice/code/web', backendType: 'in-process' },
+    { agentId: 'lane-secrets@web', name: 'lane-secrets', agentType: 'general-purpose', cwd: '/home/alice/code/web', backendType: 'in-process' },
+  ])
+  // Queried from the lead's own shell — same cwd as both teammates. Before the fix this
+  // picked one of them (whichever tied first/last); it must now always be undefined.
+  assert.equal(teammateFromTeamConfig('/home/alice/code/web', home), undefined)
+})
+
+test('teammateFromTeamConfig: a lead + two members (one real, in-process) is never a teammate when queried as the lead', (t) => {
+  const home = fakeHome(t)
+  writeTeamConfig(home, 'oa', [
+    { agentId: 'team-lead@web', name: 'team-lead', agentType: 'team-lead', cwd: '/home/alice/code/web' },
+    { agentId: 'lane-weekly@web', name: 'lane-weekly', agentType: 'general-purpose', cwd: '/home/alice/code/web', backendType: 'in-process' },
+    { agentId: 'lane-secrets@web', name: 'lane-secrets', agentType: 'general-purpose', cwd: '/home/alice/code/web', backendType: 'in-process' },
+  ])
+  assert.equal(teammateFromTeamConfig('/home/alice/code/web', home), undefined, 'the lead, run from the lead\'s own cwd, is never a teammate')
+})
+
+test('teammateFromTeamConfig: two non-in-process members tied at the same (ancestor) cwd length is ambiguous, not "the latest one"', (t) => {
+  const home = fakeHome(t)
+  writeTeamConfig(home, 'proj', [
+    { agentId: 'team-lead@proj', name: 'team-lead', agentType: 'team-lead', cwd: '/home/alice/code/elsewhere' },
+    { agentId: 'lane-a@proj', name: 'lane-a', agentType: 'general-purpose', cwd: '/home/alice/code/proj', backendType: 'tmux' },
+    { agentId: 'lane-b@proj', name: 'lane-b', agentType: 'general-purpose', cwd: '/home/alice/code/proj', backendType: 'tmux' },
+  ])
+  assert.equal(teammateFromTeamConfig('/home/alice/code/proj/sub', home), undefined, 'two different names tie — never just pick one')
 })
 
 test('teammateName: the --agent-name a teammate\'s own process was started with; undefined for a lead', () => {
@@ -224,4 +268,49 @@ test('nod whoami: nothing set says so; NODDIT_IDENTITY wins outright; --json car
 
   const json = JSON.parse(decs(root, ['whoami', '--json'], { NODDIT_IDENTITY: 'pinned-id', DECS_AUTHOR: undefined, CLAUDECODE: undefined }))
   assert.deepEqual(json, { identity: 'pinned-id', explicit: true, author: null, session: null, harness: null })
+})
+
+// ---------------------------------------------------------------------------
+// N141: a monitor that auto-detects itself as a teammate (no --mine/--author/
+// --all given) says so loudly — in the watching line and as a DECS-WARN —
+// instead of silently missing everything that isn't that name's.
+// ---------------------------------------------------------------------------
+
+test('nod monitor --json: auto-detecting as a teammate (DECS_TEAMMATE, no --mine/--author/--all) emits a warn event; --mine does not', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+
+  const r = spawnSync(process.execPath, [BIN, 'monitor', '--json', '--interval', '100', '--idle-exit', '1s'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 5000,
+    env: { ...process.env, NO_COLOR: '1', CLAUDECODE: '1', DECS_TEAMMATE: 'lane-weekly', DECS_HOME: scratch() },
+  })
+  // nod monitor's own DECS-IDLE line is plain text even under --json (a pre-existing,
+  // unrelated quirk) — skip whatever doesn't parse rather than choke on it.
+  const parseJsonLines = (out: string) =>
+    out.trim().split('\n').filter(Boolean).flatMap((l) => {
+      try {
+        return [JSON.parse(l)]
+      } catch {
+        return []
+      }
+    })
+  const lines = parseJsonLines(r.stdout)
+  const warn = lines.find((l) => l.event === 'warn')
+  assert.equal(warn?.kind, 'auto_filtered_as_teammate')
+  assert.equal(warn?.author, 'lane-weekly')
+  assert.match(r.stderr, /lane-weekly/)
+  assert.match(r.stderr, /--all/)
+
+  // The same detection, but asked for on purpose with --mine: no warning.
+  const explicit = spawnSync(process.execPath, [BIN, 'monitor', '--json', '--mine', '--interval', '100', '--idle-exit', '1s'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 5000,
+    env: { ...process.env, NO_COLOR: '1', CLAUDECODE: '1', DECS_AUTHOR: 'lane-weekly', DECS_HOME: scratch() },
+  })
+  const explicitLines = parseJsonLines(explicit.stdout)
+  assert.equal(explicitLines.some((l) => l.event === 'warn'), false)
 })
