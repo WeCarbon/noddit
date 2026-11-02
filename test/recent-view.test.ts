@@ -77,6 +77,7 @@ test('finished, archived and deferred nodes stay in Recent', (t) => {
   assert.ok(listed.includes(parked.id))
   assert.ok(!listed.includes(byAgent.id), 'only the owner’s own actions count')
   assert.equal(lastTouch(items.find((d) => d.id === parked.id)!)?.kind, 'deferred')
+  assert.equal(lastTouch(items.find((d) => d.id === parked.id)!)?.text, '', 'the canned defer text is not the owner’s words')
 })
 
 test('touches older than 30 days fold into an "Older N" row', (t) => {

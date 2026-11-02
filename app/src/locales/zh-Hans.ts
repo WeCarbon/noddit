@@ -97,6 +97,7 @@ export const zhHans: Strings = {
   keyGoto: '跳到节点',
   keyReply: '回复',
   keyNext: '下一个等你决定的',
+  keyRecent: '最近：你答过、回复过的',
   keyScroll: '滚动详情',
   keyAdd: '添加项目',
   keyClose: '关闭',

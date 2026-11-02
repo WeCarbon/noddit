@@ -72,6 +72,7 @@ decs(web, auth, ['attach', '2', '--label', 'Before', OLD_SHOT, '--label', 'After
 decs(web, auth, ['add', 'Rate-limit the login endpoint', '--task', '--parent', '1', '--after', 'W2'])
 decs(web, auth, ['add', 'Write the user-table migration', '--task', '--parent', '1'])
 decs(web, auth, ['start', '4'])
+decs(web, 'owner', ['note', '4', 'Run the backfill on a copy of production first, please.', '--human'])
 decs(web, auth, ['done', '4', '--note', 'migration merged, backfill ran in 40s'])
 
 decs(web, build, ['add', 'Upgrade the bundler', '--task'])

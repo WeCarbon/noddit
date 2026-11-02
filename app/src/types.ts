@@ -7,7 +7,7 @@ export interface Seg {
   dim?: boolean
 }
 
-export type ViewName = 'available' | 'active' | 'decide' | 'all' | 'waiting'
+export type ViewName = 'available' | 'active' | 'decide' | 'all' | 'waiting' | 'recent'
 
 export interface Row {
   key: string
@@ -29,6 +29,8 @@ export interface Row {
   progress?: number | null
   badge?: Seg[]
   badge_short?: Seg[]
+  /** Recent: what the owner last did here. */
+  touch?: { kind: string; at: string; text: string; choice?: string; label: string }
 }
 
 export interface View {

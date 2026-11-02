@@ -98,6 +98,7 @@ export const fr: Strings = {
   keyGoto: 'Aller à un nœud',
   keyReply: 'Commenter',
   keyNext: 'Décision suivante qui vous attend',
+  keyRecent: 'Récent : ce que vous avez tranché ou commenté',
   keyScroll: 'Faire défiler le détail',
   keyAdd: 'Ajouter un projet',
   keyClose: 'Fermer',

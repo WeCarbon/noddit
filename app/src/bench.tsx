@@ -41,6 +41,7 @@ const VIEW_ICON: Record<ViewName, string> = {
   decide: 'M8 1.8 14.2 8 8 14.2 1.8 8Z',
   all: 'M2.5 3.5h11v2h-11zm0 3.5h11v2h-11zm0 3.5h11v2h-11z',
   waiting: 'M5 3h2v10H5zm4 0h2v10H9z',
+  recent: 'M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 1.6a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8ZM7.2 4.5v4.1l3.1 1.9.8-1.3-2.3-1.4V4.5Z',
 }
 
 function useToast(): [string | null, (msg: string) => void] {
@@ -496,7 +497,7 @@ export function Bench(props: {
       }
       if (help) return setHelp(false)
       const meta = e.metaKey || e.ctrlKey
-      if (meta && /^[1-5]$/.test(e.key)) {
+      if (meta && /^[1-9]$/.test(e.key) && bench.views[Number(e.key) - 1]) {
         e.preventDefault()
         return switchView(bench.views[Number(e.key) - 1].view)
       }
@@ -579,6 +580,8 @@ export function Bench(props: {
           return setPalette(true)
         case 'w':
           return nextStuck()
+        case 'h':
+          return switchView(view.view === 'recent' ? 'available' : 'recent')
         case 'N':
         case 'n':
         case 'r':
@@ -847,7 +850,16 @@ function ListRow(p: { row: Row; selected: boolean; open: boolean; hidden: number
       </span>
       <Glyph g={r.glyph} />
       <span class="ref">{r.ref}</span>
-      <span class="title">{r.title}</span>
+      {r.touch?.text && r.touch.text.trim() !== r.title ? (
+        <span class="title-stack">
+          <span class="title">{r.title}</span>
+          <span class="excerpt" dir="auto" title={r.touch.text}>
+            {r.touch.text.replace(/\s+/g, ' ')}
+          </span>
+        </span>
+      ) : (
+        <span class="title">{r.title}</span>
+      )}
       {p.hidden > 0 && <span class="hidden-count">+{p.hidden}</span>}
       <span class="badge full">
         <Segs segs={badge} trim />
@@ -1152,7 +1164,7 @@ function Help({ onClose }: { onClose: () => void }) {
   const keys: [string, string][] = [
     ['↑ ↓', s('keyMove')],
     ['← →', s('keyFold')],
-    ['⇥ / ⌘1–5', s('keyViews')],
+    ['⇥ / ⌘1–6', s('keyViews')],
     ['1 – 9', s('keyAnswer')],
     ['⏎', s('keyDefault')],
     ['N', s('keyReply')],
@@ -1162,6 +1174,7 @@ function Help({ onClose }: { onClose: () => void }) {
     ['X', s('keyCloseNode')],
     ['G', s('keyGoto')],
     ['W', s('keyNext')],
+    ['H', s('keyRecent')],
     ['J K', s('keyScroll')],
     ['⌘O', s('keyAdd')],
     ['⌘K', s('keyQuick')],

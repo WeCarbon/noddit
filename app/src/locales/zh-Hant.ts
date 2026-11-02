@@ -97,6 +97,7 @@ export const zhHant: Strings = {
   keyGoto: '跳到節點',
   keyReply: '回覆',
   keyNext: '下一個等你決定的',
+  keyRecent: '最近：你回答過、回覆過的',
   keyScroll: '捲動詳情',
   keyAdd: '新增專案',
   keyClose: '關閉',

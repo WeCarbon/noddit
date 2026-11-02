@@ -95,6 +95,7 @@ export const en = {
   keyGoto: 'Go to a node',
   keyReply: 'Reply',
   keyNext: 'Next decision waiting on you',
+  keyRecent: 'Recent: what you answered or replied to',
   keyScroll: 'Scroll the detail',
   keyAdd: 'Add a project',
   keyClose: 'Close',

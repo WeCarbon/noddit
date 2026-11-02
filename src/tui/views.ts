@@ -367,7 +367,9 @@ export function ownerTouches(d: Item): Touch[] {
       const kind = TOUCH_KIND[n.kind] ?? 'noted'
       // The stored answer is the latest one; earlier answers were superseded by it.
       const choice = kind === 'answered' && n === answers.at(-1) ? d.answer?.choice : undefined
-      return { kind, at: n.at, text: n.text, ...(choice ? { choice } : {}) }
+      // A defer or a 看过 carries canned text, not the owner's words.
+      const text = kind === 'deferred' || kind === 'undeferred' || kind === 'seen' ? '' : n.text
+      return { kind, at: n.at, text, ...(choice ? { choice } : {}) }
     })
     .sort((a, b) => touchTime(a.at) - touchTime(b.at))
 }
@@ -577,7 +579,6 @@ export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segmen
     const what = touchLabel(row.touch)
     forms.push([{ text: `${what} · ${when}`, color: 'blue' }, { text: ` · ${statusLabel(d.state)}`, dim: true }])
     forms.push([{ text: `${what} · ${when}`, color: 'blue' }])
-    forms.push([{ text: when, dim: true }])
     return forms
   }
   if (isDeferred(d)) {

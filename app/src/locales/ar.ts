@@ -97,6 +97,7 @@ export const ar: Strings = {
   keyGoto: 'الانتقال إلى عقدة',
   keyReply: 'رد',
   keyNext: 'القرار التالي الذي ينتظرك',
+  keyRecent: 'مؤخرًا: ما أجبت عنه أو رددت عليه',
   keyScroll: 'تمرير التفاصيل',
   keyAdd: 'إضافة مشروع',
   keyClose: 'إغلاق',
