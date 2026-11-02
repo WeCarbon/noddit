@@ -1,5 +1,5 @@
 {
-  "help": "nod bench [<dir>...] [--view available|active|decide|all|waiting|recent|deferred]\n\n  nod bench          opens every folder registered with nod projects, from anywhere\n  nod bench .        opens only the project the current directory is in\n  nod bench ~/Code/a ~/Code/b   opens only these (--dir also works)\n  nod bench --json   everything bench shows — each view's rows, every node's detail — as one JSON object, for a window that draws it\n  nod bench --json --node <id>   one node's detail, archived ones included\n\n\nTabs across the top: Available N / Active N / Needs you N / All / Waiting N / Recent (⇥ to switch, opens on Available).\n  Available  what is moving now: running, waiting outside, startable, needing a decision, answered and awaiting an AI (tree, ancestors shown dim)\n  Active     running and needing a decision (tree)\n  Needs you  what waits on you: decisions to make and your own to-dos, AI-blocking first, then ★/⚑\n  All        every node; finished ones fold into \"✓ Completed N\" / \"✓ Finished N\", +/- expands\n  Waiting    held up outside\n             the last row, \"Deferred N\", is what you put off with d (or nod defer), + expands; the state doesn't change,\n             it and its subtree are out of Available/Active/Needs you. --view deferred opens Waiting with it expanded.\n  Recent     what you answered, replied to, filed or deferred, latest first, finished ones too (h)\nOld --view tree|owner|running|timeline|done still works (maps to the nearest view).\nWhen there are external sources, a line under the tabs says whether they're clear. Left is nodes, right is the current one.\n↑↓ picks a node, ←→ / +- fold/unfold, digits answer, Enter takes the default, w jumps to the next decision, g jumps by number, d defers/undefers, ? shows every key, , opens Settings.\nMouse works too: click a tab name, a node, an option, an attachment; the wheel scrolls whichever pane it's over.\nPress o to view a screenshot right in the terminal (iTerm2 / kitty family; tmux swallows it,\nset NODDIT_IMAGES=iterm with passthrough enabled).\nRegister folders with: nod projects add <dir> (nod init does this automatically); stored in ~/.decs/config.json.\nWith nothing registered, it falls back to walking up from the current directory for a decisions/ folder.",
+  "help": "nod bench [<dir>...] [--view available|active|decide|all|waiting|recent|deferred]\n\n  nod bench          opens every folder registered with nod projects, from anywhere\n  nod bench .        opens only the project the current directory is in\n  nod bench ~/Code/a ~/Code/b   opens only these (--dir also works)\n  nod bench --json   everything bench shows — each view's rows, every node's detail — as one JSON object, for a window that draws it\n  nod bench --json --node <id>   one node's detail, archived ones included\n  nod bench --json --view <id> | --def '<json>'   one tab only, or a view not saved yet (nod view --help)\n\n\nTabs across the top: Available N / Active N / Needs you N / All / Waiting N / Recent (⇥ to switch, opens on Available).\n  Available  what is moving now: running, waiting outside, startable, needing a decision, answered and awaiting an AI (tree, ancestors shown dim)\n  Active     running and needing a decision (tree)\n  Needs you  what waits on you: decisions to make and your own to-dos, AI-blocking first, then ★/⚑\n  All        every node; finished ones fold into \"✓ Completed N\" / \"✓ Finished N\", +/- expands\n  Waiting    held up outside\n             the last row, \"Deferred N\", is what you put off with d (or nod defer), + expands; the state doesn't change,\n             it and its subtree are out of Available/Active/Needs you. --view deferred opens Waiting with it expanded.\n  Recent     what you answered, replied to, filed or deferred, latest first, finished ones too (h)\nOld --view tree|owner|running|timeline|done still works (maps to the nearest view).\nWhen there are external sources, a line under the tabs says whether they're clear. Left is nodes, right is the current one.\n↑↓ picks a node, ←→ / +- fold/unfold, digits answer, Enter takes the default, w jumps to the next decision, g jumps by number, d defers/undefers, ? shows every key, , opens Settings.\nMouse works too: click a tab name, a node, an option, an attachment; the wheel scrolls whichever pane it's over.\nPress o to view a screenshot right in the terminal (iTerm2 / kitty family; tmux swallows it,\nset NODDIT_IMAGES=iterm with passthrough enabled).\nRegister folders with: nod projects add <dir> (nod init does this automatically); stored in ~/.decs/config.json.\nWith nothing registered, it falls back to walking up from the current directory for a decisions/ folder.",
   "cli": {
     "needsTty": "nod bench needs a terminal. For scripts, see nod show / nod queue.",
     "noActiveDir": "{{root}} has no decisions/active, skipping"
@@ -20,15 +20,17 @@
     "waiting": "Nothing waiting outside.",
     "hint": "It shows up here as soon as an AI creates it — no need to refresh.",
     "recent": "Nothing you've answered or replied to yet.",
-    "project": "Nothing live in this project."
+    "project": "Nothing live in this project.",
+    "custom": "Nothing in this view."
   },
   "legacyViewError": "--view can only be {{views}} (the old tree|owner|running|timeline|done and --scope open|queued|all|archived also work)",
   "header": {
     "viewCount": "{{letter}} · {{project}}  {{count}} {{label}}",
-    "decide": "{{letter}} · {{project}}  Needs you {{count}}",
     "inProgress": "{{letter}} · {{project}}  {{count}} in progress",
     "inProgressDone": "{{letter}} · {{project}}  {{count}} in progress, {{done}} finished",
-    "flagged": " · ★ {{count}}"
+    "flagged": " · ★ {{count}}",
+    "group": "{{letter}} · {{project}}  {{label}} {{count}}",
+    "groupPlain": "{{label}} {{count}}"
   },
   "fold": {
     "completed": "✓ Completed {{count}}",
@@ -270,5 +272,8 @@
     "deferred": "Deferred",
     "undeferred": "Undeferred",
     "noted": "Noted"
+  },
+  "group": {
+    "ai": "AI"
   }
 }

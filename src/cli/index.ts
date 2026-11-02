@@ -49,6 +49,8 @@ const COMMANDS: Record<string, () => Promise<CommandModule>> = {
   undefer: () => import('./commands/defer.ts'),
   assign: () => import('./commands/assign.ts'),
   date: () => import('./commands/date.ts'),
+  views: () => import('./commands/views.ts'),
+  view: () => import('./commands/views.ts'),
   monitor: () => import('./commands/monitor.ts'),
   tree: () => import('./commands/tree.ts'),
   supersede: () => import('./commands/supersede.ts'),

@@ -1,5 +1,5 @@
 {
-  "help": "nod bench [<目录>...] [--view available|active|decide|all|waiting|recent|deferred]\n\n  nod bench          在任何地方打开 nod projects 里登记过的全部文件夹\n  nod bench .        只开当前目录所在的项目\n  nod bench ~/Code/a ~/Code/b   只开这几个（--dir 也认）\n  nod bench --json   看板上的全部内容——各视图的行、每个节点的详情——输出成一个 JSON，给自己画界面的窗口用\n  nod bench --json --node <编号>   单个节点的详情，归档的也行\n\n\n顶上是标签：可用 N / 活动 N / 需要人类 N / 全部 / 等待 N / 最近（⇥ 切换，打开时在可用）。\n  可用  执行中、等待外部、可以开始、待决、已答待取的（树，上级暗色列出）\n  活动  执行中和待决的（树）\n  需要人类  等人来做的：要你拍板的和你自己的事，挡着 AI 的在前，然后是 ★/⚑\n  全部  所有节点；已结束的收成「✓ 已完成 N」「✓ 已结束 N」，+/- 展开\n  等待  在等外部的\n        最后一行「延迟 N」是你按 d（或 nod defer）延迟到以后的，+ 展开；状态不变，\n        它和它的子树不进可用/活动/需要人类。--view deferred 打开等待并展开这一行。\n  最近  你答过、回复过、派过、延迟过的，按你最后一次动它的时间倒序，已结束的也在（h）\n老的 --view tree|owner|running|timeline|done 照样认（对到最接近的视图）。\n有外部来源时，标签下面多一行说清了没。左边是节点，右边看当前这个。\n↑↓ 选节点，←→ / +- 收起展开，数字键答，回车走默认，w 跳到下一个待决的，g 按编号跳，d 延迟/解除，? 看全部按键，, 开设置。\n鼠标也认：点视图名、点节点、点选项、点附件，滚轮在哪一栏就滚哪一栏。\n截图按 o 直接在终端里看（iTerm2 / kitty 系；tmux 里会被吞掉，\n需要 NODDIT_IMAGES=iterm 加 passthrough）。\n登记：nod projects add <目录>（nod init 会自动登记），存在 ~/.decs/config.json。\n一个都没登记时，退回到当前目录往上找 decisions/。",
+  "help": "nod bench [<目录>...] [--view available|active|decide|all|waiting|recent|deferred]\n\n  nod bench          在任何地方打开 nod projects 里登记过的全部文件夹\n  nod bench .        只开当前目录所在的项目\n  nod bench ~/Code/a ~/Code/b   只开这几个（--dir 也认）\n  nod bench --json   看板上的全部内容——各视图的行、每个节点的详情——输出成一个 JSON，给自己画界面的窗口用\n  nod bench --json --node <编号>   单个节点的详情，归档的也行\n  nod bench --json --view <id> | --def '<json>'   只要一个标签，或者还没保存的视图（nod view --help）\n\n\n顶上是标签：可用 N / 活动 N / 需要人类 N / 全部 / 等待 N / 最近（⇥ 切换，打开时在可用）。\n  可用  执行中、等待外部、可以开始、待决、已答待取的（树，上级暗色列出）\n  活动  执行中和待决的（树）\n  需要人类  等人来做的：要你拍板的和你自己的事，挡着 AI 的在前，然后是 ★/⚑\n  全部  所有节点；已结束的收成「✓ 已完成 N」「✓ 已结束 N」，+/- 展开\n  等待  在等外部的\n        最后一行「延迟 N」是你按 d（或 nod defer）延迟到以后的，+ 展开；状态不变，\n        它和它的子树不进可用/活动/需要人类。--view deferred 打开等待并展开这一行。\n  最近  你答过、回复过、派过、延迟过的，按你最后一次动它的时间倒序，已结束的也在（h）\n老的 --view tree|owner|running|timeline|done 照样认（对到最接近的视图）。\n有外部来源时，标签下面多一行说清了没。左边是节点，右边看当前这个。\n↑↓ 选节点，←→ / +- 收起展开，数字键答，回车走默认，w 跳到下一个待决的，g 按编号跳，d 延迟/解除，? 看全部按键，, 开设置。\n鼠标也认：点视图名、点节点、点选项、点附件，滚轮在哪一栏就滚哪一栏。\n截图按 o 直接在终端里看（iTerm2 / kitty 系；tmux 里会被吞掉，\n需要 NODDIT_IMAGES=iterm 加 passthrough）。\n登记：nod projects add <目录>（nod init 会自动登记），存在 ~/.decs/config.json。\n一个都没登记时，退回到当前目录往上找 decisions/。",
   "cli": {
     "needsTty": "nod bench 需要一个终端。要在脚本里用请看 nod show / nod queue。",
     "noActiveDir": "{{root}} 没有 decisions/active，跳过"
@@ -20,15 +20,17 @@
     "waiting": "没有在等外部的节点。",
     "hint": "AI 一建节点就会出现在这里，不用刷新。",
     "recent": "你还没有答过或回复过任何节点。",
-    "project": "这个项目里没有进行中的节点。"
+    "project": "这个项目里没有进行中的节点。",
+    "custom": "这个视图里没有节点。"
   },
   "legacyViewError": "--view 只能是 {{views}}（老的 tree|owner|running|timeline|done 和 --scope open|queued|all|archived 也认）",
   "header": {
     "viewCount": "{{letter}} · {{project}}  {{count}} 个{{label}}",
-    "decide": "{{letter}} · {{project}}  需要人类 {{count}}",
     "inProgress": "{{letter}} · {{project}}  {{count}} 个进行中",
     "inProgressDone": "{{letter}} · {{project}}  {{count}} 个进行中，{{done}} 个已结束",
-    "flagged": " · ★ {{count}}"
+    "flagged": " · ★ {{count}}",
+    "group": "{{letter}} · {{project}}  {{label}} {{count}}",
+    "groupPlain": "{{label}} {{count}}"
   },
   "fold": {
     "completed": "✓ 已完成 {{count}}",
@@ -267,5 +269,8 @@
     "deferred": "延迟了",
     "undeferred": "解除了延迟",
     "noted": "写了一条"
+  },
+  "group": {
+    "ai": "AI 来做"
   }
 }

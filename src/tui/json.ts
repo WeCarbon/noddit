@@ -6,6 +6,7 @@ import { toJSON } from '../core/render.ts'
 import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isHumanTask } from '../core/assignee.ts'
+import { builtinView, filterText, isPristine, loadViews, type ViewDef } from '../core/view-defs.ts'
 import { dependenciesOf, isDeferred, isTerminal } from '../core/status.ts'
 import { projectSessions } from '../core/listeners.ts'
 import type { Store } from '../core/store.ts'
@@ -16,7 +17,7 @@ import { metaLines, statusSegments, whoOf } from './detail.ts'
 import { bodyRows, canPin, canUseDefault, type BodyRow, type Segment } from './model.ts'
 import { imageName, nodeImages } from './images.ts'
 import {
-  DEFERRED_GROUP, RECENT_OLDER_GROUP, blocksAnAi, projectTreeRows, touchLabel, VIEWS, VIEW_EMPTY, VIEW_LABEL, doneGroupKey, glyphOf, isCollapsed, isDeferHidden, isTreeView,
+  DEFERRED_GROUP, RECENT_OLDER_GROUP, blocksAnAi, defOf, olderGroupKey, projectTreeRows, touchLabel, viewEmpty, viewLabel, doneGroupKey, glyphOf, isCollapsed, isDeferHidden, isTreeView,
   keyOf, progressOf, rowsFor, subtreeWaiting, suffixOf, viewCount, type Row, type View,
 } from './views.ts'
 
@@ -45,7 +46,7 @@ function backlinkIndex(store: Store, items: Item[]): Map<string, Item[]> {
 }
 
 function everyFoldKey(items: Item[]): Set<string> {
-  const keys = new Set<string>([DEFERRED_GROUP, RECENT_OLDER_GROUP])
+  const keys = new Set<string>([DEFERRED_GROUP, RECENT_OLDER_GROUP, ...loadViews().map(olderGroupKey)])
   for (const i of items) {
     keys.add(doneGroupKey(i))
     keys.add(doneGroupKey({ project: i.project }))
@@ -58,7 +59,8 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
   if (row.kind === 'header') return { ...base, text: row.text }
   if (row.kind === 'fold') return { ...base, text: withoutKeyHint(row.text ?? ''), count: row.finished?.length ?? 0 }
   const d = row.node!
-  const collapsed = view === 'all' ? Boolean(row.hasKids) && isCollapsed(d, {}) : false
+  const folding = defOf(view).layout === 'tree' && defOf(view).finished === 'fold'
+  const collapsed = folding ? Boolean(row.hasKids) && isCollapsed(d, {}) : false
   const forms = suffixOf(d, items, now, { ...row, collapsed: false })
   const mark = isTreeView(view) ? subtreeWaiting(d, items) : null
   return {
@@ -219,20 +221,27 @@ export function nodeDetailJson(store: Store, d: Item, now = Date.now()): Record<
  * rows, and the detail pane of every node still in active/ (archived ones,
  * often most of a long-lived project, come one at a time via `nodeDetailJson`).
  */
-export function benchJson(store: Store, opts: { project?: string; now?: number; back?: Item[] } = {}): Record<string, unknown> {
+export function benchJson(store: Store, opts: { project?: string; now?: number; back?: Item[]; views?: ViewDef[] } = {}): Record<string, unknown> {
   const now = opts.now ?? Date.now()
   const all = store.all()
   const key = store.projectKey(opts.project)
   const items = key ? all.filter((d) => d.project === key) : all
   const openAll = { expanded: new Set(items.map(keyOf)), openGroups: everyFoldKey(items) }
-  const views = VIEWS.map((view) => {
-    const rows = rowsFor(view, items, openAll)
+  const views = (opts.views ?? loadViews()).map((def) => {
+    const view = def.id
+    const rows = rowsFor(def, items, openAll)
     const folds = withFolds(rows)
     return {
       view,
-      label: VIEW_LABEL[view],
-      empty: VIEW_EMPTY[view],
-      count: viewCount(view, items) ?? null,
+      label: viewLabel(def),
+      empty: viewEmpty(def),
+      icon: def.icon ?? null,
+      // The definition as stored (see core/view-defs.ts), its filter in text form, and whether it is a built-in as shipped.
+      def,
+      filter_text: filterText(def.filter),
+      builtin: Boolean(builtinView(def.id)),
+      pristine: isPristine(def),
+      count: viewCount(def, items) ?? null,
       rows: rows.map((r, i) => rowJson(view, r, items, now, folds[i])),
     }
   })

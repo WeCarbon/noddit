@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
-import { viewFromArg } from '../../tui/views.ts'
+import { defOf, viewFromArg } from '../../tui/views.ts'
+import { validateView } from '../../core/view-defs.ts'
 import { MOUSE_OFF, MOUSE_ON } from '../../tui/mouse.ts'
 import { settingValue } from '../../core/settings.ts'
 import { t } from '../../i18n/index.ts'
@@ -29,7 +30,10 @@ export async function run(args: Args): Promise<number> {
     } catch {
       /* the next read tries again */
     }
-    console.log(JSON.stringify(benchJson(store, { project: one(args, 'project', 'p'), back })))
+    // --view <id>: that tab alone; --def '<json>': a definition not saved yet (a view editor's live preview).
+    const def = one(args, 'def')
+    const only = def ? [validateView(JSON.parse(def))] : one(args, 'view') ? [defOf(viewFromArg(one(args, 'view')))] : undefined
+    console.log(JSON.stringify(benchJson(store, { project: one(args, 'project', 'p'), back, views: only })))
     return 0
   }
   if (!process.stdout.isTTY) {

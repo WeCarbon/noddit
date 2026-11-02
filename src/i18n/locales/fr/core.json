@@ -169,5 +169,15 @@
     "noExtractableAnswer": "l’entrée archivée n’a pas de texte de réponse/résolution extractible ; marquée répondue avec une note vide",
     "otherNestedHeadings": "ce bloc contient aussi {{count}} autre(s) en-tête(s) imbriqué(s) ({{ids}}) qui n’ont pas été séparés — conservés comme texte sous D{{outerId}}",
     "legacyIdReused": "l’ancien id D{{from}} était déjà utilisé par une autre entrée de ce corpus ; renuméroté en D{{to}}"
+  },
+  "views": {
+    "badFilter": "Impossible de lire le critère « {{term}} » — écrivez champ:valeur, par ex. state:waiting",
+    "badField": "« {{field}} » n’est pas un champ de filtre ; au choix : {{fields}}",
+    "badIs": "is:{{value}} n’est pas un état possible d’un nœud ; au choix : {{values}}",
+    "notAnObject": "Une définition de vue est un objet JSON",
+    "badId": "« {{id}} » ne peut pas servir d’identifiant de vue : minuscules, chiffres, - et _, 32 au plus",
+    "badValue": "{{key}} : « {{value}} » — au choix {{values}}",
+    "lastOne": "Le tableau a besoin d’au moins une vue",
+    "notBuiltin": "{{id}} n’est pas une vue d’origine ({{ids}}) ; nod view rm supprime les vôtres"
   }
 }

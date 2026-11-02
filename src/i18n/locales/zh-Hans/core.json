@@ -161,5 +161,15 @@
     "noExtractableAnswer": "归档条目提取不出答复/结论文字；标成已答，附一个空的说明",
     "otherNestedHeadings": "这个块里还有 {{count}} 个别的嵌套标题（{{ids}}），没有单独拆出来——原样留在 D{{outerId}} 的正文里",
     "legacyIdReused": "老编号 D{{from}} 在这批文件里已经被另一个条目用过；重新编号成 D{{to}}"
+  },
+  "views": {
+    "badFilter": "看不懂筛选条件「{{term}}」——写成 字段:值，比如 state:waiting",
+    "badField": "「{{field}}」不是能筛选的字段；可以用：{{fields}}",
+    "badIs": "is:{{value}} 不是节点能有的状态；可以用：{{values}}",
+    "notAnObject": "视图定义要是一个 JSON 对象",
+    "badId": "「{{id}}」不能当视图编号：小写字母、数字、- 和 _，最多 32 个",
+    "badValue": "{{key}}：「{{value}}」——可以是 {{values}}",
+    "lastOne": "看板至少要留一个视图",
+    "notBuiltin": "{{id}} 不是内置视图（{{ids}}）；自己的视图用 nod view rm 删"
   }
 }

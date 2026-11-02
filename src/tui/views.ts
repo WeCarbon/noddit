@@ -1,16 +1,18 @@
 import { isHumanTask } from '../core/assignee.ts'
 import { untilDay } from '../core/fuzzy-date.ts'
 import { isUnclaimedBrief } from '../core/intake.ts'
-import { benchOrder, isFlagged, untilDue } from '../core/order.ts'
+import { benchOrder, isFlagged, untilDue, urgencyRank } from '../core/order.ts'
+import { parseDuration } from '../core/duration.ts'
+import { BUILTIN_IDS, builtinView, loadViews, type CondField, type Filter, type SortField, type SortKey, type ViewDef } from '../core/view-defs.ts'
 import { NOTE_KIND } from '../core/format.ts'
 import { parseNotes } from '../core/parse.ts'
 import { refOf } from '../core/ref.ts'
 import { dependentsOf } from '../core/sequence.ts'
-import { minutesSince } from '../core/staleness.ts'
-import { deferHidden, dependenciesOf, isDeferred, isStartable, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
+import { isStale, minutesSince } from '../core/staleness.ts'
+import { ITEM_STATUSES, deferHidden, dependenciesOf, isDeferred, isStartable, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps, stepProgress } from '../core/steps.ts'
 import type { Decision as Item } from '../core/types.ts'
-import { isRtl, t } from '../i18n/index.ts'
+import { isRtl, lang, t } from '../i18n/index.ts'
 import { dayFromToday, dayText, elapsed, fromNow } from '../i18n/time.ts'
 import type { Segment } from './model.ts'
 import { fit, padToWidth, stringWidth } from './width.ts'
@@ -32,28 +34,38 @@ import { fit, padToWidth, stringWidth } from './width.ts'
  * 延迟 keeps its state (not archived); it and its subtree are out of
  * 可用/活动/待决/等待 proper, and dim in 全部.
  */
-export type View = 'available' | 'active' | 'decide' | 'all' | 'waiting' | 'recent'
-/** The tabs in the header, in Tab order. */
-export const VIEWS: View[] = ['available', 'active', 'decide', 'all', 'waiting', 'recent']
-export const VIEW_LABEL: Record<View, string> = {
-  get available() { return t('bench.tabs.available') },
-  get active() { return t('bench.tabs.active') },
-  get decide() { return t('bench.tabs.decide') },
-  get all() { return t('bench.tabs.all') },
-  get waiting() { return t('bench.tabs.waiting') },
-  get recent() { return t('bench.tabs.recent') },
-}
-export const VIEW_EMPTY: Record<View, string> = {
-  get available() { return t('bench.viewEmpty.available') },
-  get active() { return t('bench.viewEmpty.active') },
-  get decide() { return t('bench.viewEmpty.decide') },
-  get all() { return t('bench.viewEmpty.all') },
-  get waiting() { return t('bench.viewEmpty.waiting') },
-  get recent() { return t('bench.viewEmpty.recent') },
+export type View = string
+/** The built-in tabs, in their shipped order. The user's own list: `viewIds()`. */
+export const VIEWS: View[] = [...BUILTIN_IDS]
+
+/** The user's tabs, in order (`$NODDIT_HOME/views.json`, else the built-ins). */
+export const viewIds = (): View[] => loadViews().map((v) => v.id)
+
+/** The definition behind a tab: the user's, else the built-in of that id, else the first tab. */
+export function defOf(view: View | ViewDef): ViewDef {
+  if (typeof view !== 'string') return view
+  return loadViews().find((v) => v.id === view) ?? builtinView(view) ?? loadViews()[0]
 }
 
+/** A tab's name: the user's own (in this language if given per language), else the built-in's translated one, else its id. */
+export function viewLabel(view: View | ViewDef): string {
+  const def = defOf(view)
+  if (typeof def.name === 'string') return def.name
+  if (def.name) return def.name[lang()] ?? def.name.en ?? Object.values(def.name)[0] ?? def.id
+  return builtinView(def.id) ? t(`bench.tabs.${def.id}`) : def.id
+}
+
+/** What an empty tab says: the built-in's own line, or a plain one for the user's views. */
+export function viewEmpty(view: View | ViewDef): string {
+  const def = defOf(view)
+  return builtinView(def.id) ? t(`bench.viewEmpty.${def.id}`) : t("bench.viewEmpty.custom")
+}
+
+export const VIEW_LABEL: Record<View, string> = new Proxy({}, { get: (_, k) => viewLabel(String(k)) })
+export const VIEW_EMPTY: Record<View, string> = new Proxy({}, { get: (_, k) => viewEmpty(String(k)) })
+
 /** The views that draw the tree (and so fold with ←/→ and +/-). */
-export const isTreeView = (v: View) => v === 'available' || v === 'active' || v === 'all'
+export const isTreeView = (v: View) => defOf(v).layout === 'tree'
 
 /** `--view`/`--scope` names from before 可用/活动 map onto the nearest
  *  view, so old scripts keep working. */
@@ -72,10 +84,11 @@ const LEGACY_VIEW: Record<string, View> = {
 }
 
 export function viewFromArg(raw: string | undefined): View {
-  if (!raw) return 'available'
-  if (VIEWS.includes(raw as View)) return raw as View
+  const ids = viewIds()
+  if (!raw) return ids.includes('available') ? 'available' : ids[0]
+  if (ids.includes(raw) || VIEWS.includes(raw)) return raw
   const v = LEGACY_VIEW[raw]
-  if (!v) throw new Error(t('bench.legacyViewError', { views: VIEWS.join(' | ') }))
+  if (!v) throw new Error(t('bench.legacyViewError', { views: ids.join(' | ') }))
   return v
 }
 
@@ -89,27 +102,84 @@ export function isDeferHidden(d: Item, items: Item[]): boolean {
 }
 
 /** Whether `d` is one of the nodes `view` lists (not counting ancestors drawn for context). */
-export function inView(view: View, d: Item, items: Item[]): boolean {
-  if (view === 'recent') return lastTouch(d) !== undefined
-  if (view !== 'all' && isDeferHidden(d, items)) return false
-  switch (view) {
-    case 'available':
-      return (
-        d.state === 'in_progress' ||
-        // Held up outside is still live work the owner wants in sight.
-        d.state === 'waiting' ||
-        d.state === 'needs_decision' ||
-        d.state === 'decided' ||
-        (d.state === 'not_started' && isStartable(d, items))
-      )
-    case 'active':
-      return d.state === 'in_progress' || d.state === 'needs_decision'
-    case 'decide':
-      return d.state === 'needs_decision' || isOpenHumanTask(d, items)
-    case 'waiting':
-      return d.state === 'waiting'
-    case 'all':
-      return true
+export function inView(view: View | ViewDef, d: Item, items: Item[], now = Date.now()): boolean {
+  const def = defOf(view)
+  if (isDeferHidden(d, items) && (def.deferred ?? 'hide') !== 'show') return false
+  if ((def.finished ?? 'hide') === 'hide' && isTerminal(d.state)) return false
+  return !def.filter || matches(def.filter, d, items, now)
+}
+
+/** One filter against one node. */
+export function matches(f: Filter, d: Item, items: Item[], now = Date.now()): boolean {
+  if ('any' in f) return f.any.some((x) => matches(x, d, items, now))
+  if ('all' in f) return f.all.every((x) => matches(x, d, items, now))
+  if ('not' in f) return !matches(f.not, d, items, now)
+  return f.value.some((v) => condHolds(f.field, v, d, items, now))
+}
+
+function condHolds(field: CondField, v: string, d: Item, items: Item[], now: number): boolean {
+  const low = v.toLowerCase()
+  switch (field) {
+    case 'state':
+      return d.state === v
+    case 'assignee':
+      return low === 'human' || low === 'me' ? isHumanTask(d) : low === 'ai' ? !isHumanTask(d) : d.assignee === v
+    case 'flag':
+      if (low === 'important') return d.urgency === 'high'
+      if (low === 'milestone') return Boolean(d.milestone && d.due)
+      if (low === 'flagged') return isFlagged(d)
+      return low === 'none' && !isFlagged(d)
+    case 'kind':
+      return d.kind === v
+    case 'project':
+      return d.project === v || d.projectName === v || d.letter === v.toUpperCase()
+    case 'author':
+      return `${d.author}\n${d.ownerAgent ?? ''}`.toLowerCase().includes(low)
+    case 'tag':
+      return d.tags.includes(v)
+    case 'title':
+      return d.title.toLowerCase().includes(low)
+    case 'due':
+      return Boolean(d.due) && Date.parse(d.due!) - now <= spanMs(v)
+    case 'updated':
+      return now - Date.parse(d.activeAt || d.updatedAt || d.created || '') <= spanMs(v)
+    case 'is':
+      return isHolds(low, d, items, now)
+  }
+}
+
+function isHolds(what: string, d: Item, items: Item[], now: number): boolean {
+  switch (what) {
+    case 'startable':
+      return isStartable(d, items)
+    case 'deferred':
+      return isDeferHidden(d, items)
+    case 'blocks_ai':
+      return blocksAnAi(d, items)
+    case 'brief':
+      return isUnclaimedBrief(d)
+    case 'touched':
+      return lastTouch(d) !== undefined
+    case 'finished':
+      return isTerminal(d.state)
+    case 'archived':
+      return d.archived
+    case 'stale':
+      return isStale(d, now)
+    case 'root':
+      return d.parent === undefined
+    case 'parent':
+      return Boolean(d.children?.length)
+    default:
+      return false
+  }
+}
+
+const spanMs = (v: string) => {
+  try {
+    return parseDuration(v)
+  } catch {
+    return -Infinity
   }
 }
 
@@ -120,9 +190,10 @@ export function isOpenHumanTask(d: Item, items: Item[]): boolean {
 }
 
 /** The number on a tab; 全部 and 最近 have none. */
-export function viewCount(view: View, items: Item[]): number | undefined {
-  if (view === 'all' || view === 'recent') return undefined
-  return items.filter((d) => inView(view, d, items)).length
+export function viewCount(view: View | ViewDef, items: Item[]): number | undefined {
+  const def = defOf(view)
+  if (def.count === false) return undefined
+  return items.filter((d) => inView(def, d, items)).length
 }
 
 export const keyOf = (d: Pick<Item, 'project' | 'id'>) => `${d.project}#${d.id}`
@@ -208,8 +279,8 @@ const isRoot = (i: Item, byKey: Map<string, Item>) => i.parent === undefined || 
 
 /** 可用/活动: the tree cut to the view's nodes, keeping dim ancestor
  *  context so a match is never shown without where it belongs. */
-export function filteredTreeRows(view: View, items: Item[], opts: TreeOptions = {}): Row[] {
-  return cutTreeRows((i) => inView(view, i, items), VIEW_LABEL[view], items, opts)
+export function filteredTreeRows(view: View | ViewDef, items: Item[], opts: TreeOptions = {}): Row[] {
+  return cutTreeRows((i) => inView(view, i, items), viewLabel(view), items, opts)
 }
 
 /**
@@ -345,7 +416,7 @@ export function ownerRows(items: Item[]): Row[] {
   for (const p of projectsOf(items)) {
     const list = ownerQueue(items).filter((i) => i.project === p.project)
     if (!list.length) continue
-    out.push({ key: `project:${p.project}`, kind: 'header', depth: 0, text: t('bench.header.decide', { letter: p.letter ?? 'X', project: p.name, count: list.length }) + flaggedNote(list) })
+    out.push({ key: `project:${p.project}`, kind: 'header', depth: 0, text: t('bench.header.group', { letter: p.letter ?? 'X', project: p.name, label: viewLabel('decide'), count: list.length }) + flaggedNote(list) })
     for (const d of list) out.push({ key: keyOf(d), kind: 'node', node: d, depth: 0 })
   }
   return out
@@ -374,11 +445,16 @@ export function waitingRows(items: Item[], opts: TreeOptions = {}): Row[] {
     .filter((i) => inView('waiting', i, items))
     .sort((a, b) => Number(isFlagged(b)) - Number(isFlagged(a)) || (waitingSince(a) === waitingSince(b) ? a.id - b.id : waitingSince(a) < waitingSince(b) ? -1 : 1))
     .map((d) => ({ key: keyOf(d), kind: 'node', node: d, depth: 0 }))
+  return [...out, ...deferredFold(items, opts)]
+}
+
+/** The 「延迟 N」 row (every deferred node), and those nodes once it is opened. */
+function deferredFold(items: Item[], opts: TreeOptions): Row[] {
   const deferred = deferredNodes(items)
-  if (!deferred.length) return out
+  if (!deferred.length) return []
   const open = Boolean(opts.openGroups?.has(DEFERRED_GROUP))
   const suffix = open ? t('bench.fold.collapseSuffix') : t('bench.fold.expandSuffix')
-  out.push({ key: DEFERRED_GROUP, kind: 'fold', depth: 0, text: `${t('bench.fold.deferredRow', { count: deferred.length })}${suffix}`, finished: deferred, open })
+  const out: Row[] = [{ key: DEFERRED_GROUP, kind: 'fold', depth: 0, text: `${t('bench.fold.deferredRow', { count: deferred.length })}${suffix}`, finished: deferred, open }]
   if (open) for (const d of deferred) out.push({ key: keyOf(d), kind: 'node', node: d, depth: 1 })
   return out
 }
@@ -457,21 +533,135 @@ export function touchLabel(touch: Touch): string {
   return t(`bench.recent.${touch.kind}`)
 }
 
-export function rowsFor(view: View, items: Item[], opts: TreeOptions = {}): Row[] {
-  if (view === 'recent') return recentRows(items, opts)
-  if (view === 'decide') return ownerRows(items)
-  if (view === 'waiting') return waitingRows(items, opts)
-  if (view === 'all') return treeRows(items, opts)
-  return filteredTreeRows(view, items, opts)
+/**
+ * A view's rows, from its definition. A tree is each project's tree cut to the
+ * matches (or, with finished folded, every node with finished ones folded); a
+ * list is the matches sorted, grouped, windowed, with a 「Deferred N」 row last.
+ */
+export function rowsFor(view: View | ViewDef, items: Item[], opts: TreeOptions = {}, now = Date.now()): Row[] {
+  const def = defOf(view)
+  if (def.layout === 'tree') {
+    if (def.finished !== 'fold') return filteredTreeRows(def, items, opts)
+    if (!def.filter) return treeRows(def.deferred === 'show' ? items : items.filter((i) => inView(def, i, items)), opts)
+    const hit = items.filter((i) => inView(def, i, items))
+    const keep = new Set([...hit, ...hit.flatMap((i) => ancestorsOf(i, items))])
+    return treeRows(items.filter((i) => keep.has(i)), opts)
+  }
+  const sorted = items.filter((i) => inView(def, i, items, now)).sort(compareBy(def.sort ?? ['bench'], items))
+  const touch = (def.sort ?? []).some((k) => k.replace(/^-/, '') === 'touched')
+  const row = (d: Item, depth: number): Row => {
+    const r: Row = { key: keyOf(d), kind: 'node', node: d, depth }
+    const tt = touch ? lastTouch(d) : undefined
+    return tt ? { ...r, touch: tt } : r
+  }
+  const { shown, older } = windowed(def, sorted, now)
+  const out = groupedRows(def, shown, items, row)
+  if (older.length) {
+    const key = olderGroupKey(def)
+    const open = Boolean(opts.openGroups?.has(key))
+    const suffix = open ? t('bench.fold.collapseSuffix') : t('bench.fold.expandSuffix')
+    out.push({ key, kind: 'fold', depth: 0, text: `${t('bench.fold.olderRow', { count: older.length })}${suffix}`, finished: older, open })
+    if (open) for (const d of older) out.push(row(d, 1))
+  }
+  if (def.deferred === 'fold') out.push(...deferredFold(items, opts))
+  return out
+}
+
+/** Where a list's 「Older N」 row is remembered — 最近 keeps its old key. */
+export const olderGroupKey = (def: ViewDef) => (def.id === 'recent' ? RECENT_OLDER_GROUP : `fold:older:${def.id}`)
+
+/** The time a windowed list measures from: its first sort key's. */
+function sortTime(def: ViewDef, d: Item): number {
+  const key = (def.sort ?? [])[0]?.replace(/^-/, '')
+  if (key === 'touched') return touchTime(lastTouch(d)?.at ?? '')
+  if (key === 'updated') return Date.parse(d.updatedAt || d.created || '') || 0
+  if (key === 'created') return Date.parse(d.created || '') || 0
+  return NaN
+}
+
+function windowed(def: ViewDef, sorted: Item[], now: number): { shown: Item[]; older: Item[] } {
+  if (!def.window) return { shown: sorted, older: [] }
+  const since = def.window.days ? now - def.window.days * 86_400_000 : -Infinity
+  const max = def.window.max ?? Infinity
+  const cut = sorted.findIndex((d, i) => i >= max || sortTime(def, d) < since)
+  return cut === -1 ? { shown: sorted, older: [] } : { shown: sorted.slice(0, cut), older: sorted.slice(cut) }
+}
+
+function groupedRows(def: ViewDef, list: Item[], items: Item[], row: (d: Item, depth: number) => Row): Row[] {
+  const group = def.group ?? 'none'
+  if (group === 'none') return list.map((d) => row(d, 0))
+  const out: Row[] = []
+  const push = (key: string, text: string, members: Item[]) => {
+    if (!members.length) return
+    out.push({ key, kind: 'header', depth: 0, text })
+    for (const d of members) out.push(row(d, 0))
+  }
+  if (group === 'project') {
+    for (const p of projectsOf(items)) {
+      const members = list.filter((d) => d.project === p.project)
+      push(`project:${p.project}`, t('bench.header.group', { letter: p.letter ?? 'X', project: p.name, label: viewLabel(def), count: members.length }) + flaggedNote(members), members)
+    }
+  } else if (group === 'state') {
+    for (const st of ITEM_STATUSES) {
+      const members = list.filter((d) => d.state === st)
+      push(`state:${st}`, t('bench.header.groupPlain', { label: statusLabel(st), count: members.length }), members)
+    }
+  } else {
+    const mine = list.filter((d) => isHumanTask(d))
+    push('assignee:human', t('bench.header.groupPlain', { label: t('bench.badge.forYou'), count: mine.length }), mine)
+    const ai = list.filter((d) => !isHumanTask(d))
+    push('assignee:ai', t('bench.header.groupPlain', { label: t('bench.group.ai'), count: ai.length }), ai)
+  }
+  return out
+}
+
+/** The list comparator for a view's sort keys; every key has a natural direction, `-` flips it; ties end on the id. */
+export function compareBy(keys: readonly SortKey[], items: Item[]): (a: Item, b: Item) => number {
+  const cmps = keys.map((k) => {
+    const flip = k.startsWith('-') ? -1 : 1
+    const c = SORTERS[k.replace(/^-/, '') as SortField]
+    return (a: Item, b: Item) => flip * c(a, b, items)
+  })
+  return (a, b) => {
+    for (const c of cmps) {
+      const r = c(a, b)
+      if (r) return r
+    }
+    return a.id - b.id
+  }
+}
+
+const asc = (x: number, y: number) => (x === y ? 0 : x < y ? -1 : 1)
+const timeOf = (s: string | undefined) => Date.parse(s ?? '') || 0
+const dueOf = (d: Item) => (d.due ? Date.parse(d.due) || Infinity : Infinity)
+const pinRank = (d: Item) => (d.pin === 'top' ? 0 : d.pin === 'bottom' ? 2 : 1)
+
+const SORTERS: Record<SortField, (a: Item, b: Item, items: Item[]) => number> = {
+  bench: (a, b) => benchOrder(a, b),
+  blocks_ai: (a, b, items) => Number(blocksAnAi(b, items)) - Number(blocksAnAi(a, items)),
+  flag: (a, b) => Number(isFlagged(b)) - Number(isFlagged(a)),
+  pin: (a, b) => pinRank(a) - pinRank(b),
+  urgency: (a, b) => urgencyRank(a) - urgencyRank(b),
+  due: (a, b) => asc(dueOf(a), dueOf(b)),
+  created: (a, b) => asc(timeOf(a.created), timeOf(b.created)),
+  updated: (a, b) => asc(timeOf(b.updatedAt || b.created), timeOf(a.updatedAt || a.created)),
+  waiting_since: (a, b) => (waitingSince(a) === waitingSince(b) ? 0 : waitingSince(a) < waitingSince(b) ? -1 : 1),
+  touched: (a, b) => touchTime(lastTouch(b)?.at ?? '') - touchTime(lastTouch(a)?.at ?? ''),
+  id: (a, b) => a.id - b.id,
+  title: (a, b) => a.title.localeCompare(b.title),
+  state: (a, b) => ITEM_STATUSES.indexOf(a.state) - ITEM_STATUSES.indexOf(b.state),
 }
 
 /** Where a jump to `d` lands if the current view doesn't list it: 可用,
  *  else 等待 (deferred) or 全部. */
 export function homeView(d: Item, items: Item[], from: View): View {
   if (inView(from, d, items)) return from
-  if (from === 'waiting' && isDeferred(d)) return from
-  if (inView('available', d, items)) return 'available'
-  return isDeferred(d) ? 'waiting' : 'all'
+  if (defOf(from).deferred === 'fold' && isDeferred(d)) return from
+  const views = loadViews()
+  if (views.some((v) => v.id === 'available') && inView('available', d, items)) return 'available'
+  const fold = isDeferred(d) ? views.find((v) => v.deferred === 'fold') : undefined
+  if (fold) return fold.id
+  return (views.find((v) => v.layout === 'tree' && inView(v, d, items)) ?? views.find((v) => inView(v, d, items)))?.id ?? from
 }
 
 /** Every ancestor's key, nearest first. */

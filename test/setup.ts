@@ -15,3 +15,5 @@ process.env.CONTINUOUS_INTEGRATION = 'false'
 process.env.TZ = 'Asia/Shanghai'
 // No test may open a terminal window: `nod session start` records its plan here instead.
 process.env.NODDIT_LAUNCH_RECORD ||= join(tmpdir(), `nod-launch-${process.pid}.jsonl`)
+// Never the user's own tabs: a test that edits views points this at a file of its own.
+process.env.NODDIT_VIEWS ||= join(tmpdir(), `nod-views-${process.pid}-absent.json`)

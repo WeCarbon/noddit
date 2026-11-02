@@ -161,5 +161,15 @@
     "noExtractableAnswer": "歸檔條目提取不出答覆/結論文字；標成已答，附一個空的說明",
     "otherNestedHeadings": "這個塊裡還有 {{count}} 個別的嵌套標題（{{ids}}），沒有單獨拆出來——原樣留在 D{{outerId}} 的正文裡",
     "legacyIdReused": "老編號 D{{from}} 在這批檔案裡已經被另一個條目用過；重新編號成 D{{to}}"
+  },
+  "views": {
+    "badFilter": "看不懂篩選條件「{{term}}」——寫成 欄位:值，例如 state:waiting",
+    "badField": "「{{field}}」不是能篩選的欄位；可以用：{{fields}}",
+    "badIs": "is:{{value}} 不是節點能有的狀態；可以用：{{values}}",
+    "notAnObject": "視圖定義要是一個 JSON 物件",
+    "badId": "「{{id}}」不能當視圖編號：小寫字母、數字、- 和 _，最多 32 個",
+    "badValue": "{{key}}：「{{value}}」——可以是 {{values}}",
+    "lastOne": "看板至少要留一個視圖",
+    "notBuiltin": "{{id}} 不是內建視圖（{{ids}}）；自己的視圖用 nod view rm 刪"
   }
 }

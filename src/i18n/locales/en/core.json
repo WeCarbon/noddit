@@ -165,5 +165,15 @@
     "noExtractableAnswer": "archived entry has no extractable answer/resolution text; marked answered with an empty note",
     "otherNestedHeadings": "block also contains {{count}} other nested heading(s) ({{ids}}) that were not split out — kept as body text under D{{outerId}}",
     "legacyIdReused": "legacy id D{{from}} was already used by another entry in this corpus; renumbered to D{{to}}"
+  },
+  "views": {
+    "badFilter": "Can't read the filter term \"{{term}}\" — write field:value, e.g. state:waiting",
+    "badField": "\"{{field}}\" is not a filter field; one of: {{fields}}",
+    "badIs": "is:{{value}} is not something a node can be; one of: {{values}}",
+    "notAnObject": "A view definition is a JSON object",
+    "badId": "\"{{id}}\" can't be a view id: lowercase letters, digits, - and _, up to 32",
+    "badValue": "{{key}}: \"{{value}}\" — one of {{values}}",
+    "lastOne": "The bench needs at least one view",
+    "notBuiltin": "{{id}} is not a built-in view ({{ids}}); nod view rm removes your own"
   }
 }

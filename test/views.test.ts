@@ -129,7 +129,7 @@ test('tab counts: Available / Active / Decide / Waiting count what each lists; A
   for (const v of VIEWS) {
     if (v === 'all' || v === 'recent') continue
     const listed = rowsFor(v, items).filter((r) => r.kind === 'node' && !r.context).length
-    assert.equal(listed, counts[v], `${v}: the number is what the view lists (context rows aside)`)
+    assert.equal(listed, (counts as Record<string, number | undefined>)[v], `${v}: the number is what the view lists (context rows aside)`)
   }
 })
 

@@ -1,5 +1,5 @@
 {
-  "help": "nod bench [<dossier>...] [--view available|active|decide|all|waiting|recent|deferred]\n\n  nod bench          ouvre tous les dossiers enregistrés avec nod projects, depuis n’importe où\n  nod bench .        ouvre uniquement le projet du dossier courant\n  nod bench ~/Code/a ~/Code/b   ouvre uniquement ceux-ci (--dir fonctionne aussi)\n  nod bench --json   tout ce que montre le tableau — les lignes de chaque vue, le détail de chaque nœud — en un objet JSON, pour une fenêtre qui le dessine\n  nod bench --json --node <id>   le détail d’un seul nœud, archivé ou non\n\n\nEn haut, les onglets : Disponible N / Actif N / Pour vous N / Tout / En attente N / Récent (⇥ pour changer, ouverture sur Disponible).\n  Disponible  ce qui bouge maintenant : en cours, en attente externe, prêt à démarrer, à décider, répondu en attente d’une IA (arbre, ancêtres en gris)\n  Actif       en cours et à décider (arbre)\n  Pour vous   ce qui attend une personne : décisions à prendre et vos propres tâches, ce qui bloque une IA d’abord, puis ★/⚑\n  Tout        tous les nœuds ; les terminés se replient en « ✓ Terminé N » / « ✓ Clos N », +/- déplie\n  En attente  en attente de l’extérieur\n              la dernière ligne, « Reporté N », regroupe ce que vous avez reporté avec d (ou nod defer), + déplie ; l’état ne change pas,\n              lui et ses sous-nœuds sortent de Disponible/Actif/Pour vous. --view deferred ouvre En attente avec cette ligne dépliée.\n  Récent      ce que vous avez tranché, commenté, confié ou reporté, le plus récent en haut, terminés compris (h)\nLes anciens --view tree|owner|running|timeline|done fonctionnent toujours (vers la vue la plus proche).\nS’il y a des sources externes, une ligne sous les onglets dit si elles sont à jour. À gauche les nœuds, à droite celui en cours.\n↑↓ choisit un nœud, ←→ / +- replie/déplie, les chiffres répondent, Entrée prend le choix par défaut, w va à la prochaine décision,\ng va directement à un numéro, d reporte/annule le report, ? affiche toutes les touches, , ouvre les Réglages.\nLa souris fonctionne aussi : cliquez un onglet, un nœud, une option, une pièce jointe ; la molette défile le panneau survolé.\nAppuyez sur o pour voir une capture directement dans le terminal (familles iTerm2 / kitty ; tmux l’avale,\nréglez NODDIT_IMAGES=iterm avec le passthrough activé).\nEnregistrer un dossier : nod projects add <dossier> (nod init le fait automatiquement) ; stocké dans ~/.decs/config.json.\nSans rien d’enregistré, nod remonte depuis le dossier courant à la recherche d’un dossier decisions/.",
+  "help": "nod bench [<dossier>...] [--view available|active|decide|all|waiting|recent|deferred]\n\n  nod bench          ouvre tous les dossiers enregistrés avec nod projects, depuis n’importe où\n  nod bench .        ouvre uniquement le projet du dossier courant\n  nod bench ~/Code/a ~/Code/b   ouvre uniquement ceux-ci (--dir fonctionne aussi)\n  nod bench --json   tout ce que montre le tableau — les lignes de chaque vue, le détail de chaque nœud — en un objet JSON, pour une fenêtre qui le dessine\n  nod bench --json --node <id>   le détail d’un seul nœud, archivé ou non\n  nod bench --json --view <id> | --def '<json>'   un seul onglet, ou une vue pas encore enregistrée (nod view --help)\n\n\nEn haut, les onglets : Disponible N / Actif N / Pour vous N / Tout / En attente N / Récent (⇥ pour changer, ouverture sur Disponible).\n  Disponible  ce qui bouge maintenant : en cours, en attente externe, prêt à démarrer, à décider, répondu en attente d’une IA (arbre, ancêtres en gris)\n  Actif       en cours et à décider (arbre)\n  Pour vous   ce qui attend une personne : décisions à prendre et vos propres tâches, ce qui bloque une IA d’abord, puis ★/⚑\n  Tout        tous les nœuds ; les terminés se replient en « ✓ Terminé N » / « ✓ Clos N », +/- déplie\n  En attente  en attente de l’extérieur\n              la dernière ligne, « Reporté N », regroupe ce que vous avez reporté avec d (ou nod defer), + déplie ; l’état ne change pas,\n              lui et ses sous-nœuds sortent de Disponible/Actif/Pour vous. --view deferred ouvre En attente avec cette ligne dépliée.\n  Récent      ce que vous avez tranché, commenté, confié ou reporté, le plus récent en haut, terminés compris (h)\nLes anciens --view tree|owner|running|timeline|done fonctionnent toujours (vers la vue la plus proche).\nS’il y a des sources externes, une ligne sous les onglets dit si elles sont à jour. À gauche les nœuds, à droite celui en cours.\n↑↓ choisit un nœud, ←→ / +- replie/déplie, les chiffres répondent, Entrée prend le choix par défaut, w va à la prochaine décision,\ng va directement à un numéro, d reporte/annule le report, ? affiche toutes les touches, , ouvre les Réglages.\nLa souris fonctionne aussi : cliquez un onglet, un nœud, une option, une pièce jointe ; la molette défile le panneau survolé.\nAppuyez sur o pour voir une capture directement dans le terminal (familles iTerm2 / kitty ; tmux l’avale,\nréglez NODDIT_IMAGES=iterm avec le passthrough activé).\nEnregistrer un dossier : nod projects add <dossier> (nod init le fait automatiquement) ; stocké dans ~/.decs/config.json.\nSans rien d’enregistré, nod remonte depuis le dossier courant à la recherche d’un dossier decisions/.",
   "cli": {
     "needsTty": "nod bench a besoin d’un terminal. Pour les scripts, voir nod show / nod queue.",
     "noActiveDir": "{{root}} n’a pas de decisions/active, ignoré"
@@ -20,15 +20,17 @@
     "waiting": "Rien en attente de l’extérieur.",
     "hint": "Elle apparaît ici dès qu’une IA la crée, pas besoin de rafraîchir.",
     "recent": "Vous n’avez encore répondu à aucun nœud.",
-    "project": "Rien en cours dans ce projet."
+    "project": "Rien en cours dans ce projet.",
+    "custom": "Rien dans cette vue."
   },
   "legacyViewError": "--view ne peut être que {{views}} (les anciens tree|owner|running|timeline|done et --scope open|queued|all|archived fonctionnent aussi)",
   "header": {
     "viewCount": "{{letter}} · {{project}}  {{count}} {{label}}",
-    "decide": "{{letter}} · {{project}}  Pour vous {{count}}",
     "inProgress": "{{letter}} · {{project}}  {{count}} en cours",
     "inProgressDone": "{{letter}} · {{project}}  {{count}} en cours, {{done}} terminés",
-    "flagged": " · ★ {{count}}"
+    "flagged": " · ★ {{count}}",
+    "group": "{{letter}} · {{project}}  {{label}} {{count}}",
+    "groupPlain": "{{label}} {{count}}"
   },
   "fold": {
     "completed": "✓ Terminé {{count}}",
@@ -273,5 +275,8 @@
     "deferred": "Reporté",
     "undeferred": "Repris",
     "noted": "Note"
+  },
+  "group": {
+    "ai": "Pour une IA"
   }
 }

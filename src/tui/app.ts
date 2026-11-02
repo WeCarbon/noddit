@@ -29,7 +29,8 @@ import { bodyRows, canPin, canUseDefault, clamp, firstHtmlAttachmentIndex, style
 import { ensureVisible, imageName, nodeImages, selectableImages, stepSelectable } from './images.ts'
 import {
   DEFERRED_GROUP,
-  VIEWS,
+  defOf,
+  viewIds,
   VIEW_EMPTY,
   VIEW_LABEL,
   ancestorsOf,
@@ -49,6 +50,7 @@ import {
   type View,
 } from './views.ts'
 import { summaryLines } from './summary.ts'
+import { loadViews } from '../core/view-defs.ts'
 import { DEFERRED_FOLD_KEY, foldFor, foldKey, foldSets, groupFoldKey, loadFolds, saveFold, type FoldMap } from './folds.ts'
 import { cycleOption, initialPicks, metaLines, optionForKey, picksSummary, questionLines, statusSegments } from './detail.ts'
 
@@ -143,6 +145,8 @@ interface Snapshot {
   sources: SourceSummary[]
   sessions: ProjectSessions[]
   now: number
+  /** The tab definitions as read this tick, so an edit to views.json redraws. */
+  views: string
 }
 
 function snapshot(store: Store, project?: string): Snapshot {
@@ -153,6 +157,7 @@ function snapshot(store: Store, project?: string): Snapshot {
     sources: listSources(store, now).filter((s) => !project || s.project === store.projectKey(project)),
     sessions: projectSessions(store, now).filter((p) => !project || p.project === store.projectKey(project)),
     now,
+    views: JSON.stringify(loadViews()),
   }
 }
 
@@ -227,7 +232,9 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const overview = useMemo(() => buildOverview(items, now, sources, sessions), [items, now, sources, sessions])
   const rootOf = useCallback((d: Decision) => store.layoutOf(d).projectRoot, [store])
   const { collapsed, expanded, openGroups } = useMemo(() => foldSets(items, folds, rootOf), [items, folds, rootOf])
-  const list = useMemo(() => rowsFor(view, items, { collapsed, expanded, openGroups }), [view, items, collapsed, expanded, openGroups])
+  // The view's definition is re-read with the items, so an edited views.json shows on the next tick.
+  const def = useMemo(() => JSON.stringify(defOf(view)), [view, snap.views])
+  const list = useMemo(() => rowsFor(view, items, { collapsed, expanded, openGroups }), [view, def, items, collapsed, expanded, openGroups])
 
   /** Folds (`true`) or unfolds `d`, and remembers it for the next session. */
   const setFold = (d: Decision, folded: boolean) => {
@@ -276,7 +283,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     setSnap((prev) => {
       const next = snapshot(store, project)
       // Same array back means nothing changed; only advance the clock for 「N 分钟前」 labels.
-      if (next.items === prev.items && JSON.stringify(next.sources) === JSON.stringify(prev.sources) && sessionsKey(next) === sessionsKey(prev)) {
+      if (next.items === prev.items && next.views === prev.views && JSON.stringify(next.sources) === JSON.stringify(prev.sources) && sessionsKey(next) === sessionsKey(prev)) {
         return next.now - prev.now >= 60_000 ? { ...prev, now: next.now } : prev
       }
       const msg = changeBanner(prev.items, next.items)
@@ -328,7 +335,15 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     setCursorKey(null)
     lastIndex.current = 0
   }
-  const cycleView = (delta: number) => switchView(VIEWS[(VIEWS.indexOf(view) + delta + VIEWS.length) % VIEWS.length])
+  // The tab on screen was removed (nod view rm): fall back to the first one.
+  useEffect(() => {
+    const ids = viewIds()
+    if (!ids.includes(view)) switchView(ids[0])
+  }, [snap.views])
+  const cycleView = (delta: number) => {
+    const ids = viewIds()
+    switchView(ids[(ids.indexOf(view) + delta + ids.length) % ids.length])
+  }
 
   /** Puts the cursor on `d`, unfolding whatever hides it and switching view if this one cannot show it. */
   const reveal = (d: Decision) => {
@@ -645,7 +660,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const foldKeyPress = (folded: boolean) => {
     if (groupKey(!folded)) return
     // In 等待, - on a node listed under an open 「延迟 N」 shuts it (below).
-    if (!isTreeView(view) && !(view === 'waiting' && current && isDeferred(current))) return say(t('bench.toast.foldOnlyHere'))
+    if (!isTreeView(view) && !(defOf(view).deferred === 'fold' && current && isDeferred(current))) return say(t('bench.toast.foldOnlyHere'))
     if (index < 0 || !current) return
     const row = list[index]
     // `-` on a finished node listed under an open 「✓ 已完成 N」 shuts that row again.
@@ -1272,7 +1287,7 @@ function spansByKey(segs: Segment[], keys: string[], offsetX: number): Span[] {
 
 function tabSegments(s: FrameInput): Segment[] {
   const needs = viewCount('decide', s.items) ?? 0
-  return VIEWS.map((v): Segment => {
+  return viewIds().map((v): Segment => {
     const n = viewCount(v, s.items)
     const text = ` ${VIEW_LABEL[v]}${n ? ` ${n}` : ''} `
     return v === s.view ? { text, bold: true, inverse: true } : { text, dim: v !== 'decide' || !needs, color: v === 'decide' && needs ? 'yellow' : undefined }
@@ -1328,9 +1343,10 @@ function rightAlign(line: Line, rw: number, rtl: boolean): Line {
  *  so a click and the drawing never disagree about which tab is where. */
 function orderedTabs(s: FrameInput, rtl: boolean, mode: BidiMode): { view: View; segment: Segment }[] {
   const segs = tabSegments(s)
-  const order = rtl ? [...VIEWS].reverse() : VIEWS
+  const ids = viewIds()
+  const order = rtl ? [...ids].reverse() : ids
   return order.map((v) => {
-    const seg = segs[VIEWS.indexOf(v)]
+    const seg = segs[ids.indexOf(v)]
     return { view: v, segment: rtl ? mirrorSegment(seg, mode) : seg }
   })
 }
