@@ -1,4 +1,4 @@
-import { Bot, CalendarClock, CornerLeftUp, Flag, GitFork, Link2, PenLine, Pin, PinOff, Radio, Star, Timer, User } from 'lucide-preact'
+import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, Flag, GitFork, Link2, PenLine, Pin, PinOff, Radio, Star, Timer, User } from 'lucide-preact'
 import type { ComponentChildren } from 'preact'
 import { Bar, Glyph, segClass } from './segs.tsx'
 import { s } from './strings.ts'
@@ -95,6 +95,11 @@ export function NodeHeader({ n, onJump, listening }: { n: Node; onJump: (key: st
         {n.urgency === 'high' && !n.terminal && (
           <Chip icon={<Star {...ICON} />} tone="c-yellow">
             {s('important')}
+          </Chip>
+        )}
+        {n.checkin && n.checkin.asked > 0 && !n.terminal && (
+          <Chip icon={<MessageCircleQuestion {...ICON} />} tone={n.checkin.unanswered ? 'c-red' : ''} title={fullTime(n.checkin.last_asked_at)}>
+            {n.checkin.unanswered ? s('checkinUnanswered', { count: n.checkin.asked }) : s('checkinAsked', { count: n.checkin.asked })}
           </Chip>
         )}
         {n.milestone && n.due && !n.terminal && (

@@ -270,6 +270,17 @@ export function Bench(props: {
     const off = Boolean(node.deferred_at)
     act(() => api.defer(rootOf(node), node.id, off), off ? s('undeferred') : s('deferred'))
   }
+  // An agent answered something the owner wrote: say so, whichever node is on screen.
+  useEffect(() => {
+    void api.on<string>('decs-event', (line) => {
+      try {
+        const refs = (JSON.parse(line) as { owner_facing?: string[] }).owner_facing ?? []
+        if (refs.length) showToast(s('agentReplied', { refs: refs.join(' ') }))
+      } catch {
+        /* not JSON: an older CLI */
+      }
+    })
+  }, [])
   const toggleImportant = () => {
     if (!node || node.terminal) return
     const on = node.urgency !== 'high'
@@ -699,6 +710,11 @@ export function Bench(props: {
                 class={`live-dot ${live[p.project] ? (live[p.project].listening ? 'on' : 'off') : 'unknown'}`}
                 title={live[p.project] ? (live[p.project].listening ? s('listening', { who: listenerOf(p)?.author ?? listenerOf(p)?.harness ?? 'AI' }) : s('notListening')) : ''}
               />
+              {(p.stale_count ?? 0) > 0 && renaming !== p.root && (
+                <span class="stale-count" title={s('staleCountHint', { count: p.stale_count! })}>
+                  {p.stale_count}
+                </span>
+              )}
               <span class="letter" onDblClick={() => (setDialogError(null), setLetterFor(p))}>
                 {p.letter}
               </span>

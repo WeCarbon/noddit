@@ -1970,3 +1970,14 @@ figcaption {
   background: var(--panel);
   color: var(--text);
 }
+
+/* Tasks in the project nobody has started: a quiet count before the letter. */
+.stale-count {
+  flex: none;
+  min-width: 16px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  text-align: end;
+  order: 3;
+  margin-inline-start: auto;
+}

@@ -133,7 +133,9 @@ export interface Node {
   if_no_answer: string | null
   reversible: boolean | null
   notes: Note[]
-  staleness: 'fresh' | 'stale' | 'very_stale'
+  staleness: 'fresh' | 'stale'
+  /** How often `nod monitor` asked this running node for an update, and whether three went unanswered. */
+  checkin?: { asked: number; last_asked_at: string; unanswered: boolean } | null
   parent_node: NodePill | null
   after_nodes: NodePill[]
   blocking_nodes: NodePill[]
@@ -166,6 +168,8 @@ export interface Project {
   letter: string
   former_letters?: string[]
   root: string
+  /** Tasks nobody has started or is deciding (not deferred). */
+  stale_count?: number
 }
 
 export interface Bench {

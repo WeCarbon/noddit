@@ -108,6 +108,7 @@ pub struct Phrases {
     milestone_day: String,
     milestone_hour: String,
     milestone: String,
+    agent_replied: String,
     open: String,
     settings: String,
     quit: String,
@@ -363,6 +364,16 @@ fn announce(app: &AppHandle, w: &Waiting, how_many: usize) {
     }
 }
 
+/// An agent's first reply after something the owner wrote (`owner_facing` on an update line).
+fn announce_replies(app: &AppHandle, line: &Value) {
+    let refs: Vec<&str> = line["owner_facing"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    if refs.is_empty() || settings(app).notify == "off" || background() {
+        return;
+    }
+    let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
+    let _ = app.notification().builder().title(refs.join(" ")).body(phrase(&phrases.agent_replied, "an AI replied")).show();
+}
+
 /// `decs monitor` says an answer has sat uncollected: the owner may want to nudge an agent.
 fn announce_unclaimed(app: &AppHandle, line: &Value) {
     if settings(app).notify == "off" {
@@ -419,6 +430,7 @@ pub fn start_monitor(app: &AppHandle) {
                         if parsed["event"] == "unclaimed" {
                             announce_unclaimed(&app, &parsed);
                         }
+                        announce_replies(&app, &parsed);
                         refresh(&app);
                         let _ = app.emit("decs-event", line);
                     }
