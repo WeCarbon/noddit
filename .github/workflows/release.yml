@@ -240,15 +240,13 @@ jobs:
         run: |
           {
             echo 'body<<EOF'
-            if [ '${{ needs.check-version.outputs.macos-notarize-method }}' != none ]; then
-              echo '- macOS: signed and notarized.'
-            elif [ '${{ needs.check-version.outputs.macos-signed }}' = true ]; then
-              echo '- macOS: signed, not notarized — Gatekeeper still warns on first open.'
-            else
-              echo '- macOS: unsigned. Gatekeeper blocks it; right-click (or Control-click) the app, choose Open, confirm once.'
-            fi
-            echo '- Windows: unsigned. SmartScreen warns; choose "More info" then "Run anyway".'
-            echo '- Linux: unsigned (AppImage/.deb are not code-signed on Linux).'
+            echo '## Downloads'
+            echo ''
+            echo '- **macOS** (Apple silicon and Intel): `Noddit_${{ needs.check-version.outputs.version }}_universal.dmg`'
+            echo '- **Windows**: `Noddit_${{ needs.check-version.outputs.version }}_x64-setup.exe` or `Noddit_${{ needs.check-version.outputs.version }}_x64_en-US.msi`'
+            echo '- **Linux**: `Noddit_${{ needs.check-version.outputs.version }}_amd64.AppImage` or `Noddit_${{ needs.check-version.outputs.version }}_amd64.deb`'
+            echo ''
+            echo 'The command line: `npm i -g @wecarbon/noddit`. The Python SDK: `pip install noddit`.'
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
       - uses: softprops/action-gh-release@v3.0.3
