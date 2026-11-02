@@ -31,6 +31,34 @@ struct CliFault {
     fail: bool,
 }
 
+/// The first `max` bytes of an attachment, as text, for the in-app preview. Only files inside
+/// a `decisions/` folder (where nod keeps attachments) are read.
+#[derive(Serialize)]
+struct Preview {
+    text: String,
+    truncated: bool,
+    size: u64,
+}
+
+#[tauri::command]
+async fn read_preview(path: String, max: Option<u64>) -> Result<Preview, String> {
+    use std::io::Read;
+    let real = std::fs::canonicalize(&path).map_err(|e| e.to_string())?;
+    if !real.components().any(|c| c.as_os_str() == "decisions") {
+        return Err("not an attachment".into());
+    }
+    let max = max.unwrap_or(1_048_576);
+    tauri::async_runtime::spawn_blocking(move || {
+        let file = std::fs::File::open(&real).map_err(|e| e.to_string())?;
+        let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+        let mut bytes = Vec::new();
+        file.take(max).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+        Ok(Preview { text: String::from_utf8_lossy(&bytes).into_owned(), truncated: size > max, size })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Debug builds: the next `decs <command>` calls wait `delayMs`, and fail if `fail`. `null` clears it.
 #[tauri::command]
 fn e2e_cli_fault(state: State<'_, AppState>, fault: Option<CliFault>) -> Result<(), String> {
@@ -439,6 +467,7 @@ pub fn run() {
             is_debug,
             is_background,
             e2e_cli_fault,
+            read_preview,
             resize::resize_begin,
             resize::resize_to,
             pick_folder,

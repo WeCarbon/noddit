@@ -466,3 +466,13 @@ export const deferUntil = (root: string, id: number, date: string | null) =>
   ok(['defer', String(id), ...(date ? ['--until', date] : []), ...human, '--dir', root])
 
 export const assign = (root: string, id: number, who: 'me' | 'ai') => ok(['assign', String(id), who, '--dir', root])
+
+/** The first megabyte of an attachment as text, for the in-app viewer. */
+export async function readPreview(path: string): Promise<{ text: string; truncated: boolean; size: number }> {
+  if (!inDesktop) {
+    const r = await fetch(imageSrc(path))
+    const text = await r.text()
+    return { text: text.slice(0, 1_048_576), truncated: text.length > 1_048_576, size: text.length }
+  }
+  return invoke('read_preview', { path, max: 1_048_576 })
+}

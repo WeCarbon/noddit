@@ -4,6 +4,7 @@ import { Body } from './body.tsx'
 import { NodeHeader } from './header.tsx'
 import { QuickEntry, StartSession } from './quick.tsx'
 import { DeferDialog, NewNode } from './newnode.tsx'
+import { Viewer, itemsAround, type ViewItem } from './viewer.tsx'
 import {
   ArrowDownToLine, ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Pin, PinOff, Play, Plus, RotateCcw,
@@ -136,7 +137,15 @@ export function Bench(props: {
     void api.on<string>('summon', (key) => summonRef.current(key))
     void api.on<null>('open-settings', () => setSettingsOpen(true))
   }, [])
-  const [lightbox, setLightbox] = useState<number | null>(null)
+  const [viewer, setViewer] = useState<{ items: ViewItem[]; at: number } | null>(null)
+  const lightbox = viewer ? viewer.at : null
+  /** Opens the viewer on a node's image (by index) or attachment (by path). */
+  const openView = (n: Node | undefined, what: number | string) => {
+    if (!n) return
+    const path = typeof what === 'number' ? n.images[what]?.path : what
+    if (path) setViewer(itemsAround(n, path))
+  }
+  const setLightbox = (i: number | null) => (i === null ? setViewer(null) : openView(node, i))
   const [error, setError] = useState<string | null>(null)
   const [toast, showToast] = useToast()
   const [menu, setMenu] = useState<MenuState | null>(null)
@@ -525,9 +534,9 @@ export function Bench(props: {
     { label: s('ctxCopyPath'), icon: I(Copy), run: () => copy(p.root, p.root) },
   ]
 
-  const fileMenu = (path: string, view?: () => void): MenuItem[] => [
-    ...(view ? [{ label: s('ctxOpen'), icon: I(Maximize2), run: view } as MenuItem] : []),
-    { label: view ? s('ctxOpenEditor') : s('ctxOpen'), icon: I(ExternalLink), run: () => void api.openPath(path) },
+  const fileMenu = (path: string, view: () => void = () => openView(node, path)): MenuItem[] => [
+    { label: s('ctxOpen'), icon: I(Maximize2), run: view },
+    { label: s('ctxOpenEditor'), icon: I(ExternalLink), shortcut: 'O', run: () => void api.openPath(path) },
     { label: revealLabel, icon: I(FolderSearch), run: () => void api.reveal(path) },
     { label: s('ctxCopyPath'), icon: I(Copy), run: () => copy(path, path) },
   ]
@@ -670,12 +679,8 @@ export function Bench(props: {
         e.preventDefault()
         return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
       }
-      if (lightbox !== null) {
-        if (!node) return
-        if (e.key === 'ArrowRight') setLightbox((i) => Math.min(node.images.length - 1, (i ?? 0) + 1))
-        if (e.key === 'ArrowLeft') setLightbox((i) => Math.max(0, (i ?? 0) - 1))
-        return
-      }
+      // The viewer takes its own keys (←→, O, Esc).
+      if (viewer) return
       if (help) return setHelp(false)
       const meta = e.metaKey || e.ctrlKey
       if (meta && e.altKey && /^Digit[0-9]$/.test(e.code)) {
@@ -954,6 +959,7 @@ export function Bench(props: {
               return l ? { on: l.listening, who: l.sessions.find((x) => x.role === 'lead')?.author ?? null } : null
             })()}
             onImage={setLightbox}
+            onFile={(path) => openView(node, path)}
             onQuestions={(picks) => act(() => api.answerQuestions(rootOf(node), node.id, picks), s('sent'))}
           />
         ) : current?.kind === 'fold' ? (
@@ -1067,15 +1073,7 @@ export function Bench(props: {
           }
         />
       )}
-      {lightbox !== null && node?.images[lightbox] && (
-        <div class="lightbox" onClick={() => setLightbox(null)}>
-          <img src={api.imageSrc(node.images[lightbox].path)} alt={node.images[lightbox].name} />
-          <div class="lb-caption">
-            {node.images[lightbox].caption ?? node.images[lightbox].name}
-            {node.images.length > 1 && <span class="d"> · {lightbox + 1} / {node.images.length}</span>}
-          </div>
-        </div>
-      )}
+      {viewer && <Viewer items={viewer.items} at={viewer.at} onAt={(at) => setViewer({ ...viewer, at })} onClose={() => setViewer(null)} />}
       <div class={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </div>
   )
@@ -1185,6 +1183,8 @@ function Detail(p: {
   onJump: (key: string) => void
   listening: { on: boolean; who: string | null } | null
   onImage: (i: number) => void
+  /** Opens an attachment in the big viewer. */
+  onFile: (path: string) => void
   onQuestions: (picks: Record<string, string>) => void
 }) {
   const n = p.node
@@ -1267,7 +1267,7 @@ function Detail(p: {
         {files.length > 0 && (
           <section class="files">
             {files.map((a, i) => (
-              <button key={i} class="file" data-ctx="file" data-path={a.path} onClick={() => api.openPath(a.path)} title={s('attachments')}>
+              <button key={i} class="file" data-ctx="file" data-path={a.path} onClick={() => p.onFile(a.path)} title={s('attachments')}>
                 <Paperclip size={14} strokeWidth={1.75} />
                 <span>{a.label}</span>
                 {a.caption && <span class="d"> — {a.caption}</span>}

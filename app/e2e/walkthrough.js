@@ -118,6 +118,17 @@
     await sleep(800)
     await shot('replied')
 
+    log('STEP preview')
+    // An attachment opens in the window: markdown read in place, ←→ to the next one, Esc closes.
+    $$('.row.node').find((r) => r.textContent.includes('Write the schema')).click()
+    ;(await until('the md attachment', () => $$('.file').find((f) => f.textContent.includes('schema.md')))).click()
+    await until('markdown shown in place', () => $('.viewer-stage.markdown')?.textContent.includes('Schema notes'))
+    await shot('preview')
+    key('ArrowRight')
+    await until('the log next', () => $('.viewer-stage.text')?.textContent.includes('migration 2 ok'))
+    key('Escape')
+    await until('viewer closed', () => !$('.viewer'))
+
     log('STEP defer')
     // d asks until when; Enter on an empty date defers indefinitely.
     const deferNow = async () => {

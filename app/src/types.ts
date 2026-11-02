@@ -119,6 +119,8 @@ export interface Node {
   body_rows: BodyRow[]
   images: Image[]
   attachments: Attachment[]
+  /** The body's own attachments (each note carries its own). */
+  body_attachments?: Attachment[]
   terminal: boolean
   backlinks: string[]
   progress: number | null
@@ -165,6 +167,8 @@ export interface Note {
   author: string
   at: string
   text: string
+  /** This note's own attachments. */
+  attachments?: Attachment[]
 }
 
 export interface Project {
