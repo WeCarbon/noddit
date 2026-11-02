@@ -1652,7 +1652,7 @@ function MilestoneDialog(p: { node: Node; busy: boolean; onClose: () => void; on
             }}
           />
         </label>
-        <div class="confirm-actions">
+        <div class="sheet-footer">
           <button class="ghost" onClick={p.onClose}>
             {s('cancel')}
           </button>
@@ -1677,7 +1677,7 @@ function EditConflict(p: { onReload: () => void; onOverwrite: () => void; onKeep
     <div class="overlay" onClick={p.onKeep}>
       <div class="confirm" role="alertdialog" onClick={(e) => e.stopPropagation()}>
         <h3>{s('editConflict')}</h3>
-        <div class="confirm-actions">
+        <div class="sheet-footer">
           <button class="ghost" onClick={p.onReload}>
             {s('editReload')}
           </button>

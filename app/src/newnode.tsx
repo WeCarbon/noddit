@@ -65,11 +65,12 @@ export function NewNode(p: {
 
   return (
     <div class="overlay" onClick={p.onClose}>
-      <div class="quick new-node" role="dialog" aria-label={s('newTitle')} onClick={(e) => e.stopPropagation()}>
-        <div class="quick-box">
+      <div class="sheet new-node" role="dialog" aria-label={s('newTitle')} onClick={(e) => e.stopPropagation()}>
+        <h3 class="sheet-title">{s('newTitle')}</h3>
+        <div class="sheet-section">
           <input
             ref={field}
-            class="new-title"
+            class="field field-lg new-title"
             value={title}
             placeholder={s('newPlaceholder')}
             onInput={(e) => setTitle((e.target as HTMLInputElement).value)}
@@ -81,7 +82,9 @@ export function NewNode(p: {
           />
         </div>
 
-        <div class="new-row">
+        <div class="sheet-section">
+          <div class="sheet-label">{s('newProject')}</div>
+          <div class="new-row">
           <label class={`qchip ${project ? '' : 'warn'}`} title={s('quickProject')}>
             <FolderGit2 {...ICON} />
             <select value={project?.root ?? ''} onChange={(e) => setProject(p.projects.find((x) => x.root === (e.currentTarget as HTMLSelectElement).value) ?? null)}>
@@ -98,8 +101,11 @@ export function NewNode(p: {
               {s('quickUnder', { ref: under.ref })}
             </button>
           )}
+          </div>
         </div>
 
+        <div class="sheet-section">
+        <div class="sheet-label">{s('whoLabel')}</div>
         <div class="new-row seg-row" role="radiogroup" aria-label={s('whoLabel')}>
           {whoChoices.map((c) => (
             <button key={c.id} role="radio" aria-checked={who === c.id} class={`who ${who === c.id ? 'on' : ''}`} onClick={() => setWho(c.id)} title={c.hint}>
@@ -109,7 +115,10 @@ export function NewNode(p: {
           ))}
         </div>
         <p class="new-hint">{whoChoices.find((c) => c.id === who)!.hint}</p>
+        </div>
 
+        <div class="sheet-section">
+        <div class="sheet-label">{s('newMarks')}</div>
         <div class="new-row">
           <button class={`qchip ${important ? 'on' : ''}`} onClick={() => setImportant(!important)} aria-pressed={important}>
             <Star {...ICON} />
@@ -129,9 +138,10 @@ export function NewNode(p: {
         {milestoneOn && (
           <DateField value={milestoneText} onText={setMilestoneText} onChange={setMilestone} onEnter={() => void save()} onEscape={p.onClose} placeholder={s('milestonePlaceholder')} />
         )}
+        </div>
 
         {error && <p class="s-error quick-error">{error}</p>}
-        <div class="confirm-actions">
+        <div class="sheet-footer">
           <button class="ghost" onClick={p.onClose}>
             {s('cancel')}
           </button>
@@ -155,7 +165,7 @@ export function DeferDialog(p: { title: string; busy: boolean; onClose: () => vo
         <h3>{s('deferTitle')}</h3>
         <p class="d">{p.title}</p>
         <DateField value={text} onText={setText} onChange={setDate} onEnter={go} onEscape={p.onClose} autoFocus placeholder={s('deferPlaceholder')} />
-        <div class="confirm-actions">
+        <div class="sheet-footer">
           <button class="ghost" onClick={() => p.onDefer(null)} disabled={p.busy}>
             {s('deferIndefinitely')}
           </button>
@@ -201,7 +211,7 @@ export function HoldDialog(p: { node: import('./types.ts').Node; busy: boolean; 
           }}
         />
         <DateField value={text} onText={setText} onChange={setDate} onEnter={go} onEscape={p.onClose} placeholder={s('holdUntilPlaceholder')} />
-        <div class="confirm-actions">
+        <div class="sheet-footer">
           <span class="grow" />
           <button class="ghost" onClick={p.onClose}>
             {s('cancel')}

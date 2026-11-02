@@ -206,7 +206,7 @@ export function ViewEditor(p: { start?: string; onClose: () => void; onChanged: 
           </div>
 
           {error && <p class="s-error">{error}</p>}
-          <div class="confirm-actions">
+          <div class="sheet-footer">
             {v?.builtin && !v.pristine && (
               <button class="ghost" onClick={() => void act(() => api.resetViews(draft.id), draft.id)} disabled={busy}>
                 {s('viewResetOne')}

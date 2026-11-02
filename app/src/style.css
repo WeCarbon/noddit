@@ -2039,16 +2039,6 @@ figcaption {
 }
 
 /* ⌘N */
-.new-node .new-title {
-  width: 100%;
-  font: inherit;
-  font-size: 15px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text);
-  padding: 4px 2px;
-}
 
 .new-row {
   display: flex;
@@ -2588,4 +2578,108 @@ figcaption {
 .note-files .file:hover {
   color: var(--text);
   background: var(--hover);
+}
+
+/* ---------- sheets: one layout for every dialog ---------- */
+
+.sheet {
+  width: min(560px, 92vw);
+  box-sizing: border-box;
+  padding: 22px 24px 20px;
+  background: var(--raised);
+  border-radius: 14px;
+  box-shadow: var(--shadow-pop);
+  animation: pop 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sheet-title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sheet-section + .sheet-section {
+  margin-top: 16px;
+}
+
+.sheet-label {
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+}
+
+.field {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--sel);
+}
+
+.field-lg {
+  font-size: 15px;
+  padding: 9px 12px;
+}
+
+.sheet .new-row {
+  margin-top: 0;
+}
+
+.sheet .new-hint {
+  margin: 6px 0 0;
+}
+
+/* The buttons of every dialog: at the end (right, or left in a right-to-left language), 8px apart, primary last. */
+.sheet-footer,
+.confirm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.sheet-footer .grow {
+  flex: 1;
+}
+
+.confirm .datefield input,
+.confirm .hold-on,
+.sheet .datefield input {
+  height: 34px;
+}
+
+.view-editor .sheet-footer {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.viewer-stage.html {
+  width: min(1100px, 94vw);
+  height: calc(100vh - 140px);
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.viewer-page {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
 }
