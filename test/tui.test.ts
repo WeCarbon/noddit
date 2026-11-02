@@ -563,3 +563,13 @@ test('a note heading too long for the pane still reads as "Agent | name | when" 
   assert.match(text, /waiting on Carol: final icon/)
   assert.doesNotMatch(text, /等/)
 })
+
+test('writer marks and other HTML comments in a body never show in the bench — regression: "<!-- nod:by=lane-x -->" showed under notes', (t) => {
+  const { store, root } = fixture()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const d = store.create({ title: 'marker', author: 'lane-x · test', task: true, body: 'first line\n<!-- nod:by=lane-x -->\nsecond line\n<!-- /分组 -->' })
+  const text = bodyLines(d, 60, false).join('\n')
+  assert.doesNotMatch(text, /<!--/)
+  assert.match(text, /first line/)
+  assert.match(text, /second line/)
+})

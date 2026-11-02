@@ -151,6 +151,8 @@ export function bodyRows(d: Decision, width: number, condensed: boolean, images:
   // An infinite width is a window that wraps for itself.
   const wrap = (text: string) => (Number.isFinite(width) ? wrapToWidth(text, width) : [text])
   const pushText = (raw: string) => {
+    // HTML comments are bookkeeping for tools (writer marks, group ends), never for reading.
+    if (/^\s*<!--.*-->\s*$/.test(raw)) return
     if (/^#{1,6}[ \t]/.test(raw)) {
       noteKind = parseNoteHeading(raw)?.kind
       const { text, ...style } = styleLine(markDefault(raw, d))
