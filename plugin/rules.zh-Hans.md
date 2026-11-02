@@ -15,8 +15,12 @@
 - **计划就是子节点**：拆步骤时把还没做的写成子节点（`--parent`），有先后的写 `--after`，能估的写 `--est 30m`。
   中途发现新事项，加子节点，不要只在对话里说。
 - **进度要能自己走**：长跑的命令接到 `nod progress`（`pytest … | nod progress --parse pytest`），
-  多步流程用 `nod steps` / `nod step`。超过 check-in 的时限（默认 30 分钟，`nod config checkin-after`
-  可改）没更新会收到一条 `NODDIT-CHECKIN`——见下。还在做但没新内容可报？`nod beat <id>` 本身就算回报。
+  多步流程用 `nod steps` / `nod step`。`nod progress --from-file x.jsonl` 会自动识别 noddit 的
+  JSONL 事件格式（Python 包的 `progress_events` / pytest 插件写的）。或者整件事交给
+  `nod run <id> -- <cmd…>`：开始、跟进度（自动设好 `NODDIT_EVENTS`），退出码 0 就 `nod done`，
+  失败就 `nod hold --on "failing: …"` 并附上输出的尾部。超过 check-in 的时限（默认 30 分钟，
+  `nod config checkin-after` 可改）没更新会收到一条 `NODDIT-CHECKIN`——见下。还在做但没新内容可报？
+  `nod beat <id>` 本身就算回报。
 - **等外部**：卡在同事、客户、供应商或某个服务上，`nod hold <id> --on "<谁/什么>"`（状态「等待」，不算卡住）；等到了 `nod start <id>`。
 - **要负责人拍板**：在当前节点上 `nod ask <id> -o …`，或新建带选项的子节点；答复会从 nod monitor 来（见下）。
 - **做完自己标完成，不要等别人**：活合进去、检查（测试、关卡）通过，当场 `nod done <id> --note "<结果、提交>"`。

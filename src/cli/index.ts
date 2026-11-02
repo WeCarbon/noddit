@@ -60,6 +60,7 @@ const COMMANDS: Record<string, () => Promise<CommandModule>> = {
   folders: () => import('./commands/projects.ts'),
   folder: () => import('./commands/projects.ts'),
   progress: () => import('./commands/progress.ts'),
+  run: () => import('./commands/run.ts'),
   steps: () => import('./commands/steps.ts'),
   claim: () => import('./commands/claim.ts'),
   expand: () => import('./commands/expand.ts'),

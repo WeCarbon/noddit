@@ -23,7 +23,12 @@
   في الطريق يصبح عقدة فرعية، لا مجرّد ذكر في المحادثة.
 - **التقدّم يجب أن يتحرّك بنفسه**: وصّل الأوامر الطويلة بـ `nod progress`
   (`pytest … | nod progress --parse pytest`)؛ العمل متعدّد الخطوات
-  يستخدم `nod steps` / `nod step`. عدم التحديث بعد مدة check-in
+  يستخدم `nod steps` / `nod step`. `nod progress --from-file x.jsonl`
+  يكتشف وحده صيغة أحداث JSONL الخاصة بـ noddit (`progress_events` من
+  حزمة Python / إضافة pytest). أو اترك `nod run <id> -- <cmd…>` يتولّى
+  كل شيء: يبدأ، يتابع التقدّم (يضبط `NODDIT_EVENTS` لك)، ثم `nod done`
+  إن كان رمز الخروج 0، وإلا `nod hold --on "failing: …"` مع آخر
+  المخرجات. عدم التحديث بعد مدة check-in
   (30 دقيقة افتراضيًا، `nod config checkin-after`) يصل كسطر
   `NODDIT-CHECKIN` — انظر أدناه. ما زلت تعمل عليه ولا جديد تقوله؟
   `nod beat <id>` بمفردها تُحسب ردًا.

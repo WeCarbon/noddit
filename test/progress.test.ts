@@ -173,6 +173,76 @@ test('decs progress --count-lines: reads the file once, does not follow it', (t)
   assert.equal(JSON.parse(decs(root, ['get', '1', '--json'])).progress, 22)
 })
 
+test('decs progress --from-file: auto-detects a noddit JSONL events file with no --parse flag', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 't', '--task'])
+  const log = join(root, 'events.jsonl')
+  writeFileSync(log, ['{"type":"start","total":10,"label":"pytest"}', '{"type":"progress","done":3,"failed":1}'].join('\n') + '\n')
+
+  decs(root, ['progress', '--from-file', log, '--idle', '100'], { DECS_NODE: '1' })
+
+  const d = JSON.parse(decs(root, ['get', '1', '--json']))
+  assert.equal(d.progress, 30)
+  assert.equal(d.progress_msg, '3/10 · 1 failed')
+})
+
+test('decs progress --from-file --parse jsonl: explicit flag reads the same events', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 't', '--task'])
+  const log = join(root, 'events.jsonl')
+  writeFileSync(log, ['{"type":"start","total":4}', '{"type":"progress","done":2}', '{"type":"finish","ok":true,"summary":"all good"}'].join('\n') + '\n')
+
+  decs(root, ['progress', '--from-file', log, '--parse', 'jsonl', '--idle', '100'], { DECS_NODE: '1' })
+
+  const d = JSON.parse(decs(root, ['get', '1', '--json']))
+  assert.equal(d.progress, 100, 'finish always lands at 100%')
+  assert.equal(d.progress_msg, 'all good')
+})
+
+test('decs progress --from-file: a plain log with no JSON still uses the legacy parsers (auto-detect does not break them)', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 't', '--task'])
+  const log = join(root, 'run.log')
+  writeFileSync(log, 'collecting...\ntests/test_x.py::y PASSED [ 37%]\n')
+
+  decs(root, ['progress', '--from-file', log, '--idle', '100'], { DECS_NODE: '1' })
+
+  assert.equal(JSON.parse(decs(root, ['get', '1', '--json'])).progress, 37)
+})
+
+test('decs progress --from-file: an explicit --msg overrides the message an event line would have set', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 't', '--task'])
+  const log = join(root, 'events.jsonl')
+  writeFileSync(log, ['{"type":"start","total":4}', '{"type":"progress","done":2}'].join('\n') + '\n')
+
+  decs(root, ['progress', '--from-file', log, '--idle', '100', '--msg', 'custom override'], { DECS_NODE: '1' })
+
+  const d = JSON.parse(decs(root, ['get', '1', '--json']))
+  assert.equal(d.progress, 50)
+  assert.equal(d.progress_msg, 'custom override')
+})
+
+test('decs progress --from-file: an unrecognized --parse name is a clear error, and still lists jsonl', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 't', '--task'])
+  const log = join(root, 'run.log')
+  writeFileSync(log, 'anything\n')
+  const r = decsResult(root, ['progress', '--from-file', log, '--parse', 'nope'], { DECS_NODE: '1' })
+  assert.equal(r.code, 1)
+  assert.match(r.stderr, /jsonl/)
+})
+
 test('decs progress: stdin is parsed AND teed through to stdout unchanged', (t) => {
   const root = scratch()
   t.after(() => rmSync(root, { recursive: true, force: true }))

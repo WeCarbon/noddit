@@ -7,17 +7,28 @@ import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
 import {
   PROGRESS_PARSERS,
+  JSONL_PARSER_NAME,
   parseAnyProgressLine,
   percentFromCount,
   percentFromRegex,
   createThrottle,
+  createJsonlParser,
+  createAutoParser,
   type ProgressParser,
 } from '../../core/progress.ts'
 import type { Decision as Item } from '../../core/types.ts'
 import type { Store } from '../../core/store.ts'
 import { t } from '../../i18n/index.ts'
 
-const help = () => t('cli.help.progress', { parsers: Object.keys(PROGRESS_PARSERS).join(' | ') })
+/** `pytest`/`percent`/`fraction` plus `jsonl`, which needs per-call state so it isn't a plain `PROGRESS_PARSERS` entry. */
+const parserNames = () => [...Object.keys(PROGRESS_PARSERS), JSONL_PARSER_NAME].join(' | ')
+
+const help = () => t('cli.help.progress', { parsers: parserNames() })
+
+/** A bare percentage, normalized to the same shape a `{pct, msg}` parser result has. */
+function asPct(v: number | { pct: number; msg?: string }): { pct: number; msg?: string } {
+  return typeof v === 'number' ? { pct: v } : v
+}
 
 function resolveNodeRef(args: Args): string {
   const flag = one(args, 'node', 'task', 'id')
@@ -44,9 +55,10 @@ function makeParser(args: Args): ProgressParser {
     return (line) => percentFromRegex(re, line)
   }
   const name = one(args, 'parse')
+  if (name === JSONL_PARSER_NAME) return createJsonlParser()
   if (name) {
     const p = PROGRESS_PARSERS[name]
-    if (!p) throw new Error(t('cli.progress.unknownParser', { name, parsers: Object.keys(PROGRESS_PARSERS).join(' | ') }))
+    if (!p) throw new Error(t('cli.progress.unknownParser', { name, parsers: parserNames() }))
     return p
   }
   return parseAnyProgressLine
@@ -87,18 +99,21 @@ function isAlive(pid: number): boolean {
  */
 async function runFromFile(args: Args): Promise<number> {
   const file = one(args, 'from-file')!
-  const parse = makeParser(args)
+  // With neither --parse nor --regex given, auto-detect a noddit JSONL
+  // events file rather than always falling back to the legacy line parsers.
+  const parse = one(args, 'parse') || one(args, 'regex') ? makeParser(args) : createAutoParser()
   const untilExitRaw = one(args, 'until-exit')
   const untilExitPid = untilExitRaw ? Number(untilExitRaw) : undefined
   const idleMs = Number(one(args, 'idle') ?? 5000)
   const { store, item } = storeAndItem(args)
-  const throttle = createThrottle<number>(5000, (pct) => {
-    store.progress(item, { progress: pct, progressMsg: one(args, 'msg') })
+  const explicitMsg = one(args, 'msg')
+  const throttle = createThrottle<{ pct: number; msg?: string }>(5000, ({ pct, msg }) => {
+    store.progress(item, { progress: pct, progressMsg: explicitMsg ?? msg })
   })
 
   let lastSize = -1
   let lastChangeAt = Date.now()
-  let lastPct: number | null = null
+  let last: { pct: number; msg?: string } | null = null
 
   return new Promise<number>((resolveP) => {
     const tick = () => {
@@ -111,9 +126,9 @@ async function runFromFile(args: Args): Promise<number> {
         const text = readFileSync(file, 'utf8')
         for (const line of text.split('\n')) {
           const v = parse(line)
-          if (v !== null) lastPct = v
+          if (v !== null) last = asPct(v)
         }
-        if (lastPct !== null) throttle.push(lastPct)
+        if (last !== null) throttle.push(last)
       }
       const processGone = untilExitPid !== undefined && !isAlive(untilExitPid)
       const idleTimedOut = untilExitPid === undefined && Date.now() - lastChangeAt >= idleMs
@@ -136,8 +151,9 @@ async function runStdin(args: Args): Promise<number> {
   }
   const parse = makeParser(args)
   const { store, item } = storeAndItem(args)
-  const throttle = createThrottle<number>(5000, (pct) => {
-    store.progress(item, { progress: pct, progressMsg: one(args, 'msg') })
+  const explicitMsg = one(args, 'msg')
+  const throttle = createThrottle<{ pct: number; msg?: string }>(5000, ({ pct, msg }) => {
+    store.progress(item, { progress: pct, progressMsg: explicitMsg ?? msg })
   })
 
   return new Promise<number>((resolveP) => {
@@ -145,7 +161,7 @@ async function runStdin(args: Args): Promise<number> {
     rl.on('line', (line) => {
       process.stdout.write(`${line}\n`)
       const v = parse(line)
-      if (v !== null) throttle.push(v)
+      if (v !== null) throttle.push(asPct(v))
     })
     rl.on('close', () => {
       throttle.flush()

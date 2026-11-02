@@ -23,10 +23,14 @@ load the decs skill.
   work found mid-task gets a child node, not just a chat mention.
 - **Progress should move itself**: pipe long commands into `nod progress`
   (`pytest … | nod progress --parse pytest`); multi-step work uses
-  `nod steps` / `nod step`. No update past the check-in span (default
-  30m, `nod config checkin-after`) gets a `NODDIT-CHECKIN` line — see
-  below. Still working but nothing to report yet? `nod beat <id>` alone
-  counts as a reply.
+  `nod steps` / `nod step`. `nod progress --from-file x.jsonl` auto-detects
+  the noddit JSONL event format (the Python package's `progress_events` /
+  pytest plugin). Or let `nod run <id> -- <cmd…>` do the whole thing: start,
+  follow progress (sets `NODDIT_EVENTS` for you), then `nod done` on exit 0
+  or `nod hold --on "failing: …"` with the tail of the output on failure. No
+  update past the check-in span (default 30m, `nod config checkin-after`)
+  gets a `NODDIT-CHECKIN` line — see below. Still working but nothing to
+  report yet? `nod beat <id>` alone counts as a reply.
 - **Waiting on someone outside**: `nod hold <id> --on "<who/what>"`
   (status "waiting", not stuck); `nod start <id>` once it clears.
 - **Need the owner to decide**: `nod ask <id> -o …` on the current node,

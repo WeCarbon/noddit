@@ -310,6 +310,23 @@ nod progress --count-lines run.log --total 23              # 逐节重算：读�
 但管道结束/文件读完时最后一次值一定落地。**没设 `NODDIT_NODE`/`DECS_NODE` 也没给 `--node`，
 这条命令直接报错退出，不会静默地什么都不做。**
 
+**`--from-file` 会自动识别 noddit 的 JSONL 事件文件**（Python 包 `noddit`
+的 `progress_events` / pytest 插件写的格式，`python/docs/progress-events.md`），
+不用加 `--parse jsonl`：有 `total` 就按 `done/total` 算百分比，`"3823/10011 ·
+2 failed"` 这样的短 msg 自动带上。
+
+**跑测试/跑命令这种一条命令代劳更省事：**
+
+```sh
+nod run <id> -- pytest -q           # 标执行中、跟进度（自动设 NODDIT_EVENTS）、退出时收尾
+nod run <id> --log run.log -- pytest -q    # 命令输出也追加写进 run.log
+```
+
+成功（退出码 0）自动 `nod done`，带计数/耗时/日志路径；失败自动留一条记录
+（最后 20 行输出、失败的测试名）并 `nod hold --on "failing: …"`——「等待」是
+现有状态里最贴切的失败标记，不是新开一种状态。退出码就是那条命令自己的。
+跑在 Docker 里、事件文件挂在宿主机路径时，给 `--events <宿主机路径>`。
+
 **多步骤的活（lead 的工作大多是这种），用 steps 而不是自己心算百分比：**
 
 ```sh

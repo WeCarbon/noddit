@@ -4,14 +4,24 @@
  * written to disk. `src/cli/commands/progress.ts` does the I/O.
  */
 
+import { createEventTracker, isEventLine } from './events.ts'
+
 function clampPercent(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)))
 }
 
-export type ProgressParser = (line: string) => number | null
+/**
+ * A plain percentage, or `{pct, msg}` when the source (currently just the
+ * `jsonl`/noddit-event parser) also knows a short label to show alongside
+ * it — "3823/10011 · 2 failed" rather than a bare number.
+ */
+export type ProgressParser = (line: string) => number | { pct: number; msg?: string } | null
+
+/** The built-in regex-based parsers only ever return a bare percentage. */
+type NumericParser = (line: string) => number | null
 
 /** Built-in line parsers, picked with `--parse <name>`. */
-export const PROGRESS_PARSERS: Record<string, ProgressParser> = {
+export const PROGRESS_PARSERS: Record<string, NumericParser> = {
   /** pytest's `-v`/default progress column: `tests/test_x.py::y PASSED [ 37%]`. */
   pytest: (line) => {
     const m = /\[\s*(\d{1,3})\s*%\]/.exec(line)
@@ -38,6 +48,32 @@ export function parseAnyProgressLine(line: string): number | null {
     if (v !== null) return v
   }
   return null
+}
+
+/** Not a key of `PROGRESS_PARSERS`: it needs state (a running `total`) a plain `(line) => value` can't hold. */
+export const JSONL_PARSER_NAME = 'jsonl'
+
+/** `--parse jsonl` — reads the noddit progress-event format (see `core/events.ts`). Fresh state per call. */
+export function createJsonlParser(): ProgressParser {
+  const tracker = createEventTracker()
+  return (line) => tracker.push(line)
+}
+
+/**
+ * What `nod progress --from-file` uses when neither `--parse` nor `--regex`
+ * is given: tries the noddit event format and the legacy line-parsers on
+ * every line, so a JSONL events file is recognized with no flag needed, and
+ * an ordinary log still works exactly as it did before this existed. Once a
+ * line is recognized as a noddit event, later blank/partial lines return
+ * `null` from the tracker rather than being (mis-)read as plain text again.
+ */
+export function createAutoParser(): ProgressParser {
+  const tracker = createEventTracker()
+  return (line) => {
+    if (isEventLine(line)) return tracker.push(line)
+    if (tracker.last.start || tracker.last.progress || tracker.last.finish) return null
+    return parseAnyProgressLine(line)
+  }
 }
 
 /** Applies a user-supplied `--regex`: two groups are `N/M`, one is a literal percentage. */
