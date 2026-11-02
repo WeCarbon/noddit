@@ -95,7 +95,9 @@
     "briefIsTask": "派活是任务：不能带选项，也不能是 --fyi",
     "claimFinished": "{{ref}} 已经{{state}}，没什么可接的了",
     "alreadyClaimed": "{{ref}} 已被 {{by}} 在 {{at}} 接走，交给它做（--force 强行接手）",
-    "milestoneNeedsDue": "{{ref}}：里程碑要有日期——加 --due 2026-11-15（或 3d）"
+    "milestoneNeedsDue": "{{ref}}：里程碑要有日期——加 --due 2026-11-15（或 3d）",
+    "attachToOutOfRange": "--to {{n}} 超出范围（这个节点一共 {{count}} 条段落）",
+    "attachToNotFound": "没有段落匹配 --to {{to}}"
   },
   "duration": {
     "notADuration": "「{{value}}」不是一个时长——例如 90s、30m、1h、2d"
@@ -132,7 +134,8 @@
     "none": "（无）",
     "numberedOptions": "编号列表选项 → ### 标题",
     "dropStaleDefault": "删掉过时的默认「{{default}}」（已结束，没有选项可指）",
-    "optionsNotRecognised": "认不出选项——用 nod ask 手动修（默认「{{default}}」）"
+    "optionsNotRecognised": "认不出选项——用 nod ask 手动修（默认「{{default}}」）",
+    "attachmentsMoved": "附件挪位置：{{count}}/{{total}}"
   },
   "sources": {
     "badName": "source 名字 \"{{name}}\" 不合法 — 只能是字母/数字/._- ，且不能以符号开头",

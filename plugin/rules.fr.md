@@ -50,6 +50,10 @@ suite — tout est dans `nod bench`. Hors nod, invisible. Détails :
   --approve-on <option>` avant d'envoyer ; `nod approved <id> --check
   brouillon` doit réussir d'abord. Jamais `--human` pour approuver à sa
   place.
+- **Une pièce jointe suit le message qui l'a jointe, pas tout à la fin** :
+  `nod attach` sans `--to` tombe sur votre propre dernière note, sinon le
+  corps ; `nod note <id> "…" --attach a.png` écrit une réponse et sa preuve
+  ensemble. `--to body|last|<n>` choisit la section explicitement.
 - **Sources externes** : la session principale enregistre un suivi de
   tickets, une boîte mail ou un formulaire avec `nod source register` ;
   le script ne synchronise qu'identifiants et titres. Nouveautés via

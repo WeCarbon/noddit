@@ -110,7 +110,9 @@
     "briefIsTask": "المهمة المُسنَدة مهمة: بلا خيارات وبلا --fyi",
     "claimFinished": "{{ref}} حالته {{state}}، لم يبقَ شيء لاستلامه",
     "alreadyClaimed": "استلم {{by}} العقدة {{ref}} في {{at}}، اتركها له (--force للاستيلاء عليها)",
-    "milestoneNeedsDue": "{{ref}}: المرحلة الأساسية تحتاج تاريخًا — أضف ‎--due 2026-11-15 (أو 3d)"
+    "milestoneNeedsDue": "{{ref}}: المرحلة الأساسية تحتاج تاريخًا — أضف ‎--due 2026-11-15 (أو 3d)",
+    "attachToOutOfRange": "--to {{n}} خارج النطاق (ملاحظات هذه العقدة: {{count}})",
+    "attachToNotFound": "لا توجد ملاحظة تطابق --to {{to}}"
   },
   "duration": {
     "notADuration": "\"{{value}}\" ليست مدة — مثل 90s أو 30m أو 1h أو 2d"
@@ -152,7 +154,8 @@
     "none": "(لا شيء)",
     "numberedOptions": "خيارات بقائمة مرقّمة → عناوين ###",
     "dropStaleDefault": "حذف الافتراضي القديم \"{{default}}\" (منتهية، ولا خيارات يشير إليها)",
-    "optionsNotRecognised": "لم تُعرف الخيارات — أصلحها يدويًا بـ nod ask (الافتراضي \"{{default}}\")"
+    "optionsNotRecognised": "لم تُعرف الخيارات — أصلحها يدويًا بـ nod ask (الافتراضي \"{{default}}\")",
+    "attachmentsMoved": "مرفقات نُقلت: {{count}} من {{total}}"
   },
   "sources": {
     "badName": "اسم المصدر \"{{name}}\" غير صالح — فقط حروف/أرقام/._- ، ولا يبدأ برمز",

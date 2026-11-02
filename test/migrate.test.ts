@@ -1,14 +1,17 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { parseLegacyActive, parseLegacyArchive, toDecision } from '../src/migrate/legacy.ts'
 import { parseDecision } from '../src/core/parse.ts'
-import { serializeDecision } from '../src/core/serialize.ts'
+import { appendSection, noteHeading, serializeDecision } from '../src/core/serialize.ts'
+import { planAttachmentMoves, upgradeAttachments } from '../src/core/upgrade.ts'
+import { initLayout } from '../src/core/paths.ts'
+import { Store } from '../src/core/store.ts'
 import { setLang } from '../src/i18n/index.ts'
 
 // This file's expectations are written in English; legacy.ts's warnings are
@@ -268,6 +271,148 @@ test('decs migrate refuses to overwrite an existing entry file without --force',
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+// --- --attachments: splitting one old global ## 附件 block back into its sections --
+
+function scratchStore(): { store: Store; root: string } {
+  const root = scratch()
+  return { store: new Store([initLayout(root)]), root }
+}
+
+/** Appends a hand-written legacy-shaped `## 附件` block directly, bypassing
+ *  `store.attach()` — this is exactly the bug `--attachments` repairs: every
+ *  entry piled into one section regardless of which message it was for.
+ *  `file` is the attachment's real absolute path, relinked to be correct
+ *  from the node file's own directory (same as a real `nod attach` would). */
+function withLegacyAttachmentsBlock(store: Store, d: import('../src/core/types.ts').Decision, file: string) {
+  const target = relative(dirname(d.file), file).replace(/\\/g, '/')
+  const label = file.split('/').pop()!
+  return store.rewriteBody(d, () => `${d.body.trimEnd()}\n\n## 附件\n\n- ![${label}](${target})\n`)
+}
+
+test('planAttachmentMoves: an inline mention in one note wins over whichever section the old block happens to sit under', (t) => {
+  const { store, root } = scratchStore()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const report = join(root, 'report.pdf')
+  writeFileSync(report, 'R')
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'please check report.pdf for the numbers', role: 'agent', author: 'x' })
+  d = store.note(d, { text: 'nothing else to add here', role: 'agent', author: 'y' })
+  d = withLegacyAttachmentsBlock(store, d, report)
+
+  // Before any repair: the parser attributes the whole block to the last
+  // note, purely by position — that's the bug, not the fix.
+  assert.deepEqual(d.notes[1].attachments.map((a) => a.label), ['report.pdf'])
+
+  const plan = planAttachmentMoves(d)
+  assert.equal(plan.moves.length, 1)
+  assert.equal(plan.moves[0].reason, 'inline-reference')
+  assert.equal(plan.moves[0].to, d.notes[0].heading)
+  assert.equal(plan.moves[0].from, d.notes[1].heading)
+  assert.equal(plan.changedCount, 1)
+})
+
+test('planAttachmentMoves: with no inline reference, the section whose timestamp is closest to the file wins', (t) => {
+  const { store, root } = scratchStore()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const shot = join(root, 'shot.png')
+  writeFileSync(shot, 'S')
+  let d = store.create({ title: 't', author: 'a' })
+  // Hand-timestamped, far apart — real `nowStamp()` values would all land
+  // within the same second or two of each other and make this timing-sensitive.
+  const note1At = '2020-01-01T00:00:00+00:00'
+  const note2At = '2025-06-01T00:00:00+00:00'
+  d = store.rewriteBody(d, (fresh) => appendSection(fresh.body, noteHeading('补充', 'agent', 'x', note1At), 'first note'))
+  d = store.rewriteBody(d, (fresh) => appendSection(fresh.body, noteHeading('补充', 'agent', 'y', note2At), 'second note'))
+  assert.equal(d.notes.length, 2)
+  const at = new Date(note2At)
+  utimesSync(shot, at, at)
+  d = withLegacyAttachmentsBlock(store, d, shot)
+
+  const plan = planAttachmentMoves(d)
+  assert.equal(plan.moves[0].reason, 'timing')
+  assert.equal(plan.moves[0].ambiguous, false)
+  assert.equal(plan.moves[0].to, d.notes[1].heading)
+})
+
+test('planAttachmentMoves: no inline reference and nothing local to time (a URL) is kept under the body', (t) => {
+  const { store, root } = scratchStore()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'a note with nothing to go on', role: 'agent', author: 'x' })
+  d = store.rewriteBody(d, () => `${d.body.trimEnd()}\n\n## 附件\n\n- [spec](https://example.com/spec.pdf)\n`)
+
+  const plan = planAttachmentMoves(d)
+  assert.equal(plan.moves[0].reason, 'no-signal-kept-body')
+  assert.equal(plan.moves[0].ambiguous, false)
+  assert.equal(plan.moves[0].to, '(body)')
+  assert.equal(plan.changedCount, 1, 'it was parsed as the note\'s (the block sat right after it) — moving it under the body is the fix')
+})
+
+test('planAttachmentMoves: the same file named in two notes is flagged ambiguous and left where it was, not guessed', (t) => {
+  const { store, root } = scratchStore()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const shot = join(root, 'shot.png')
+  writeFileSync(shot, 'S')
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'see shot.png', role: 'agent', author: 'x' })
+  d = store.note(d, { text: 'shot.png again, updated', role: 'agent', author: 'y' })
+  d = withLegacyAttachmentsBlock(store, d, shot)
+
+  const plan = planAttachmentMoves(d)
+  assert.equal(plan.moves[0].reason, 'kept-ambiguous')
+  assert.equal(plan.moves[0].ambiguous, true)
+  assert.deepEqual(plan.moves[0].candidates.sort(), [d.notes[0].heading, d.notes[1].heading].sort())
+  assert.equal(plan.moves[0].to, plan.moves[0].from)
+  assert.equal(plan.changedCount, 0, 'ambiguous is not the same as changed — nothing moves until a person decides')
+})
+
+test('upgradeAttachments: --dry-run touches nothing; for real it splits the section and leaves everything else byte-identical', (t) => {
+  const { store, root } = scratchStore()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const report = join(root, 'report.pdf')
+  writeFileSync(report, 'R')
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'please check report.pdf', role: 'agent', author: 'x' })
+  d = store.note(d, { text: 'nothing else to add', role: 'agent', author: 'y' })
+  d = withLegacyAttachmentsBlock(store, d, report)
+  const before = readFileSync(d.file, 'utf8')
+
+  const dry = upgradeAttachments(store, { dryRun: true })
+  assert.equal(readFileSync(d.file, 'utf8'), before, 'dry run writes nothing')
+  assert.equal(dry.plans.find((p) => p.id === d.id)?.changedCount, 1)
+
+  const real = upgradeAttachments(store)
+  assert.equal(real.steps.length, 1)
+  const after = store.get(d.id)!
+  assert.deepEqual(after.notes[0].attachments.map((a) => a.label), ['report.pdf'])
+  assert.deepEqual(after.notes[1].attachments, [])
+  assert.deepEqual(after.bodyAttachments, [])
+  assert.match(after.body, /please check report\.pdf/)
+  assert.match(after.body, /nothing else to add/)
+
+  assert.equal(upgradeAttachments(store).steps.length, 0, 'nothing left to move the second time')
+})
+
+test('CLI: decs migrate --attachments --dry-run reports it, and the real run writes it', (t) => {
+  const { store, root } = scratchStore()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const report = join(root, 'report.pdf')
+  writeFileSync(report, 'R')
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'please check report.pdf for the numbers', role: 'agent', author: 'x' })
+  d = store.note(d, { text: 'nothing else to add here', role: 'agent', author: 'y' })
+  withLegacyAttachmentsBlock(store, d, report)
+
+  const dry = execFileSync('node', [BIN, 'migrate', '--dir', root, '--attachments', '--dry-run'], { encoding: 'utf8', env: ENV_EN })
+  assert.match(dry, /attachments moved: 1 of 1/)
+  assert.match(dry, /nodes touched: 1, moved: 1, ambiguous: 0/)
+
+  execFileSync('node', [BIN, 'migrate', '--dir', root, '--attachments'], { encoding: 'utf8', env: ENV_EN })
+  const reread = store.get(d.id)!
+  assert.deepEqual(reread.notes[0].attachments.map((a) => a.label), ['report.pdf'])
+  assert.deepEqual(reread.notes[1].attachments, [])
 })
 
 function existsDecisionsDir(dir: string): boolean {

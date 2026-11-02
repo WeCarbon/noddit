@@ -223,6 +223,13 @@ nod source register <name> --title "..." --kind github \
 
 ## 附件：版本、对比图、批准
 
+- **附件跟着它所附的那条消息，不是堆在最后一块**：`nod attach <id> file` 不给 `--to`
+  时，默认落在你自己最新的一条追问/回复里，没有就落正文；要显式指定用
+  `nod attach <id> file --to body|last|<n>|<文字>`（正文 / 最新的那条，不分作者 /
+  第 n 条，从 1 数 / 匹配某条标题或时间的文字）。`nod note <id> "…" --attach a.png
+  --attach b.png` 把回复和证据写进同一段——写评论时顺手带图，不用先回复再 attach 两步。
+  旧节点那种一个全局 `## 附件` 块，用 `nod migrate --attachments` 拆回各自的段落
+  （见下面「迁移」）。
 - **同名文件重新 attach 用 `--replace`**：`nod attach <id> file.html --replace`
   直接覆盖最新版，旧的挪进 `.history/`，正文里的链接永远指向最新版。不给这个
   flag，同名文件会变成 `file-2.html`——两份都留着，但谁也不知道该看哪份。
@@ -263,6 +270,11 @@ nod migrate --strip-prefix --upgrade
 `--strip-prefix` 把 `D305-….md`、子节点文件夹、`attachments/D305/` 去掉 D，并改正文里
 的附件链接；同一个编号两种名字都有时拒绝。`--upgrade` 把老的 open/answered 写成新的
 节点状态。两个都可以重复跑。
+
+`--attachments [--dry-run]` 把旧的一个全局 `## 附件` 块拆回每条记录真正该在的段落：
+先看正文或某条追问里有没有直接提到这个文件，没有就看附件文件的时间离哪条追问最近，
+还是看不出来就留在正文下面——不会瞎猜。拿不准的（比如同一个文件名在两条追问里都提过）
+会在输出里单独列出来，位置不动，等人看一眼再决定。
 
 ---
 

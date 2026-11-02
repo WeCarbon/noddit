@@ -98,7 +98,9 @@
     "briefIsTask": "a brief is a task: no options, no --fyi",
     "claimFinished": "{{ref}} is {{state}} — nothing left to pick up",
     "alreadyClaimed": "{{ref}} was already picked up by {{by}} at {{at}} — leave it to them (--force takes it over)",
-    "milestoneNeedsDue": "{{ref}}: a milestone needs a date — add --due 2026-11-15 (or 3d)"
+    "milestoneNeedsDue": "{{ref}}: a milestone needs a date — add --due 2026-11-15 (or 3d)",
+    "attachToOutOfRange": "--to {{n}} is out of range for this node (notes: {{count}})",
+    "attachToNotFound": "no note matches --to {{to}}"
   },
   "duration": {
     "notADuration": "\"{{value}}\" is not a duration — e.g. 90s, 30m, 1h, 2d"
@@ -136,7 +138,8 @@
     "none": "(none)",
     "numberedOptions": "numbered-list options → ### headings",
     "dropStaleDefault": "drop stale default \"{{default}}\" (finished, no options to point at)",
-    "optionsNotRecognised": "options not recognised — fix by hand with nod ask (default \"{{default}}\")"
+    "optionsNotRecognised": "options not recognised — fix by hand with nod ask (default \"{{default}}\")",
+    "attachmentsMoved": "attachments moved: {{count}} of {{total}}"
   },
   "sources": {
     "badName": "source name \"{{name}}\" is not valid — only letters/digits/._- , and it can't start with a symbol",

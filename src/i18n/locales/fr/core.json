@@ -101,7 +101,9 @@
     "briefIsTask": "une demande est une tâche : pas d’options, pas de --fyi",
     "claimFinished": "{{ref}} est {{state}} : plus rien à prendre",
     "alreadyClaimed": "{{ref}} a déjà été pris par {{by}} à {{at}} : laissez-le-lui (--force pour le reprendre)",
-    "milestoneNeedsDue": "{{ref}} : un jalon a besoin d’une date — ajoutez --due 2026-11-15 (ou 3d)"
+    "milestoneNeedsDue": "{{ref}} : un jalon a besoin d’une date — ajoutez --due 2026-11-15 (ou 3d)",
+    "attachToOutOfRange": "--to {{n}} est hors limites (notes sur ce nœud : {{count}})",
+    "attachToNotFound": "aucune note ne correspond à --to {{to}}"
   },
   "duration": {
     "notADuration": "« {{value}} » n’est pas une durée — ex. 90s, 30m, 1h, 2d"
@@ -140,7 +142,8 @@
     "none": "(aucun)",
     "numberedOptions": "options en liste numérotée → titres ###",
     "dropStaleDefault": "retirer le défaut périmé « {{default}} » (terminé, aucune option à désigner)",
-    "optionsNotRecognised": "options non reconnues — corrigez à la main avec nod ask (défaut « {{default}} »)"
+    "optionsNotRecognised": "options non reconnues — corrigez à la main avec nod ask (défaut « {{default}} »)",
+    "attachmentsMoved": "pièces jointes déplacées : {{count}} sur {{total}}"
   },
   "sources": {
     "badName": "le nom de source « {{name}} » n’est pas valide — seulement lettres/chiffres/._- , et ça ne peut pas commencer par un symbole",

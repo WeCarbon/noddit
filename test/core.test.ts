@@ -843,6 +843,43 @@ test('CLI: decs attach --replace, then --approval-content + decs approved --chec
   assert.match(out, /content changed, needs re-approval/)
 })
 
+test('CLI: decs note --attach and decs attach --to put files in the right section, not one global block', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const env = { ...process.env, DECS_AUTHOR: 'cli-test · lane' }
+  execFileSync(process.execPath, [BIN, 'init', '--no-register'], { cwd: root, env, input: '' })
+  execFileSync(process.execPath, [BIN, 'add', 't', '--task'], { cwd: root, env, input: '' })
+
+  const before = join(root, 'before.png')
+  writeFileSync(before, 'A')
+  execFileSync(process.execPath, [BIN, 'attach', '1', before, '--to', 'body'], { cwd: root, env, input: '' })
+
+  execFileSync(process.execPath, [BIN, 'note', '1', 'first note', '--agent'], { cwd: root, env, input: '' })
+
+  const after = join(root, 'after.png')
+  writeFileSync(after, 'B')
+  execFileSync(process.execPath, [BIN, 'attach', '1', after, '--to', 'last'], { cwd: root, env, input: '' })
+
+  const withNote = join(root, 'withnote.png')
+  writeFileSync(withNote, 'C')
+  execFileSync(process.execPath, [BIN, 'note', '1', 'second note', '--agent', '--attach', withNote], { cwd: root, env, input: '' })
+
+  const json = JSON.parse(execFileSync(process.execPath, [BIN, 'get', '1', '--json'], { cwd: root, env, encoding: 'utf8', input: '' }))
+  assert.deepEqual(json.body_attachments.map((a: { label: string }) => a.label), ['before.png'])
+  assert.deepEqual(json.notes[0].attachments.map((a: { label: string }) => a.label), ['after.png'])
+  assert.deepEqual(json.notes[1].attachments.map((a: { label: string }) => a.label), ['withnote.png'])
+  assert.deepEqual(json.attachments.map((a: { label: string }) => a.label), ['before.png', 'after.png', 'withnote.png'])
+
+  // The raw file reads as plain markdown with each attachment right under the section it belongs to.
+  const raw = readFileSync(join(root, 'decisions', 'active', '1-t.md'), 'utf8')
+  const beforeAt = raw.indexOf('before.png')
+  const firstNoteAt = raw.indexOf('first note')
+  const afterAt = raw.indexOf('after.png')
+  const secondNoteAt = raw.indexOf('second note')
+  const withNoteAt = raw.indexOf('withnote.png')
+  assert.ok(beforeAt < firstNoteAt && firstNoteAt < afterAt && afterAt < secondNoteAt && secondNoteAt < withNoteAt, raw)
+})
+
 test('decs check warns about an approval record whose attachment is gone, but not a healthy one', (t) => {
   const root = scratch()
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -913,6 +950,153 @@ test('integration: attach works from a stale copy without dropping a note writte
   const after = store.attach(stale, [src])
   assert.match(after.body, /something another lane found/, 'attach re-read the node under its lock')
   assert.equal(after.attachments.length, 1)
+})
+
+// --- attach lands in the section it belongs to, not one global block --------
+
+test('store.attach with no --to lands on the attaching author\'s own latest note, not the body', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'first', role: 'agent', author: 'lane-a · x' })
+  d = store.note(d, { text: 'second', role: 'agent', author: 'lane-b · y' })
+  const src = join(root, 'shot.png')
+  writeFileSync(src, 'p')
+  const next = store.attach(d, [src], { by: 'lane-a · x' })
+  assert.deepEqual(next.notes[0].attachments.map((a) => a.label), ['shot.png'], 'lane-a\'s own note, not the newest one')
+  assert.deepEqual(next.notes[1].attachments, [])
+  assert.deepEqual(next.bodyAttachments, [])
+  assert.equal(next.attachments.length, 1)
+})
+
+test('store.attach with no --to and no matching author falls back to the body', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'a note', role: 'agent', author: 'lane-a · x' })
+  const src = join(root, 'shot.png')
+  writeFileSync(src, 'p')
+  const next = store.attach(d, [src], { by: 'someone-else · z' })
+  assert.deepEqual(next.bodyAttachments.map((a) => a.label), ['shot.png'])
+  assert.deepEqual(next.notes[0].attachments, [])
+})
+
+test('store.attach --to last always lands on the newest note, whoever wrote it', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'first', role: 'agent', author: 'lane-a · x' })
+  d = store.note(d, { text: 'second', role: 'agent', author: 'lane-b · y' })
+  const src = join(root, 'shot.png')
+  writeFileSync(src, 'p')
+  const next = store.attach(d, [src], { to: 'last', by: 'lane-a · x' })
+  assert.deepEqual(next.notes[1].attachments.map((a) => a.label), ['shot.png'])
+  assert.deepEqual(next.notes[0].attachments, [])
+})
+
+test('store.attach --to body always lands on the body, even with notes present', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'a note', role: 'agent', author: 'lane-a · x' })
+  const src = join(root, 'shot.png')
+  writeFileSync(src, 'p')
+  const next = store.attach(d, [src], { to: 'body', by: 'lane-a · x' })
+  assert.deepEqual(next.bodyAttachments.map((a) => a.label), ['shot.png'])
+  assert.deepEqual(next.notes[0].attachments, [])
+})
+
+test('store.attach --to <n> picks the nth note (1-based); out of range throws', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'first', role: 'agent', author: 'x' })
+  d = store.note(d, { text: 'second', role: 'agent', author: 'x' })
+  const src = join(root, 'shot.png')
+  writeFileSync(src, 'p')
+  const next = store.attach(d, [src], { to: '1' })
+  assert.deepEqual(next.notes[0].attachments.map((a) => a.label), ['shot.png'])
+  assert.deepEqual(next.notes[1].attachments, [])
+  inEnglish(() => assert.throws(() => store.attach(d, [src], { to: '9' }), /out of range/))
+})
+
+test('store.attach --to <text> matches a note by its heading or timestamp', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a' })
+  d = store.note(d, { text: 'first', role: 'human', author: 'owner' })
+  d = store.note(d, { text: 'second', role: 'agent', author: 'lane-x · y' })
+  const src = join(root, 'shot.png')
+  writeFileSync(src, 'p')
+  const next = store.attach(d, [src], { to: '回复' })
+  assert.deepEqual(next.notes[0].attachments.map((a) => a.label), ['shot.png'], 'the human reply, matched on its heading word')
+  inEnglish(() => assert.throws(() => store.attach(d, [src], { to: 'no such text anywhere' }), /no note matches/))
+})
+
+test('store.attach: two attachments to different sections keep their own ## 附件 block and don\'t mix', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a' })
+  const a = join(root, 'a.png')
+  writeFileSync(a, 'A')
+  d = store.attach(d, [a], { to: 'body' })
+  d = store.note(d, { text: 'a note', role: 'agent', author: 'x' })
+  const b = join(root, 'b.png')
+  writeFileSync(b, 'B')
+  d = store.attach(d, [b], { to: 'last' })
+
+  assert.deepEqual(d.bodyAttachments.map((x) => x.label), ['a.png'])
+  assert.deepEqual(d.notes[0].attachments.map((x) => x.label), ['b.png'])
+  assert.deepEqual(d.attachments.map((x) => x.label), ['a.png', 'b.png'])
+
+  // Round-trips through a fresh parse of the file, not just the in-memory result.
+  const reread = new Store([initLayout(root)]).get(d.id)!
+  assert.deepEqual(reread.bodyAttachments.map((x) => x.label), ['a.png'])
+  assert.deepEqual(reread.notes[0].attachments.map((x) => x.label), ['b.png'])
+})
+
+test('store.note with attach writes the note and its files into the same new section', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a' })
+  const a = join(root, 'shot.png')
+  writeFileSync(a, 'A')
+  d = store.note(d, { text: 'see this', role: 'human', author: 'owner', attach: { sources: [a] } })
+
+  assert.equal(d.notes.length, 1)
+  assert.equal(d.notes[0].text, 'see this')
+  assert.deepEqual(d.notes[0].attachments.map((x) => x.label), ['shot.png'])
+  assert.deepEqual(d.bodyAttachments, [])
+  assert.equal(d.queued, true, 'still a normal human reply — queues the node')
+
+  const reread = new Store([initLayout(root)]).get(d.id)!
+  assert.deepEqual(reread.notes[0].attachments.map((x) => x.label), ['shot.png'])
+})
+
+test('store.note with attach: --label/--caption and --approval-content still work exactly as decs attach', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  let d = store.create({ title: 't', author: 'a', options: [{ key: '1', label: 'send' }] })
+  const a = join(root, 'draft.html')
+  writeFileSync(a, '<p>v1</p>')
+  d = store.note(d, {
+    text: 'ready to send',
+    role: 'agent',
+    author: 'lane · x',
+    attach: { sources: [a], groups: ['Option 1'], captions: ['the draft'], approvalContent: true, approveOn: ['1'] },
+  })
+  assert.equal(d.notes[0].attachments[0].group, 'Option 1')
+  assert.equal(d.notes[0].attachments[0].caption, 'the draft')
+  assert.ok(store.findApproval(d, a))
 })
 
 test('bench opens every registered folder from anywhere; `.` narrows to the current one', () => {

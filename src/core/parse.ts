@@ -27,11 +27,11 @@ export const OPTIONS_HEADING_RE = /^##[ \t]+(?:选项|各选项|选项与代价|
 const OPTION_RE = /^###[ \t]+([A-Za-z0-9]{1,4})[ \t]*(?:[·:：．.\-—–]{1,2}[ \t]*(.*))?$/
 const H2_RE = /^##[ \t]+\S/
 export const ATTACHMENTS_HEADING_RE = /^##[ \t]+(附件|Attachments)[ \t　]*[:：]?[ \t]*$/
-const ATTACHMENT_RE = /^[-*][ \t]+(!)?\[([^\]]*)\]\(([^)]+)\)/
+export const ATTACHMENT_RE = /^[-*][ \t]+(!)?\[([^\]]*)\]\(([^)]+)\)/
 /** `**选项 1**` on its own line — a group heading over the attachments below it. */
-const ATTACHMENT_GROUP_RE = /^\*\*([^*]+)\*\*[ \t]*$/
+export const ATTACHMENT_GROUP_RE = /^\*\*([^*]+)\*\*[ \t]*$/
 /** `  *caption text*` right under an attachment line — single `*`, not `**`. */
-const ATTACHMENT_CAPTION_RE = /^\*([^*].*[^*]|[^*])\*[ \t]*$/
+export const ATTACHMENT_CAPTION_RE = /^\*([^*].*[^*]|[^*])\*[ \t]*$/
 
 /**
  * `\r\n` (Windows editors, `git config core.autocrlf true`) and a lone `\r`
@@ -247,7 +247,9 @@ const WRITER_MARKER_RE = /\n?<!--[ \t]*nod:by=([^\n]*?)[ \t]*-->[ \t]*$/
 /** Every appended section, in body order. */
 export function parseNotes(body: string): DecisionNote[] {
   const lines = body.split('\n')
+  const sections = sectionAttachments(body)
   const out: DecisionNote[] = []
+  let noteIndex = 0
   for (let i = 0; i < lines.length; i++) {
     const h = parseNoteHeading(lines[i])
     if (!h) continue
@@ -265,9 +267,48 @@ export function parseNotes(body: string): DecisionNote[] {
       text,
       heading: lines[i].replace(/^##[ \t]+/, ''),
       ...(writer ? { writer } : {}),
+      attachments: sections.notes[noteIndex] ?? [],
     })
+    noteIndex++
   }
   return out
+}
+
+/**
+ * Splits every `## 附件` block in the body by which section it belongs to —
+ * the body's own top prose, or whichever note heading most recently came
+ * before it (any other heading in between, e.g. `## 选项`, doesn't change
+ * the owner). A section's attachments block may sit right after a later
+ * `## 附件` of a different owner too; only a note heading switches owners.
+ * `notes[i]` lines up with `parseNotes(body)[i]`.
+ */
+export function sectionAttachments(body: string): { body: Attachment[]; notes: Attachment[][] } {
+  const lines = body.split('\n')
+  const noteHeadingAt = new Set<number>()
+  for (let i = 0; i < lines.length; i++) if (parseNoteHeading(lines[i])) noteHeadingAt.add(i)
+
+  const noteCount = noteHeadingAt.size
+  const buckets: string[][] = Array.from({ length: noteCount + 1 }, () => [])
+  let owner = 0
+  let noteSeen = 0
+  let inAttachments = false
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (noteHeadingAt.has(i)) {
+      noteSeen++
+      owner = noteSeen
+      inAttachments = false
+      continue
+    }
+    if (H2_RE.test(line)) {
+      inAttachments = ATTACHMENTS_HEADING_RE.test(line)
+      if (inAttachments) buckets[owner].push(line)
+      continue
+    }
+    if (inAttachments) buckets[owner].push(line)
+  }
+  const [bodyLines, ...noteLines] = buckets
+  return { body: parseAttachments(bodyLines.join('\n')), notes: noteLines.map((b) => parseAttachments(b.join('\n'))) }
 }
 
 /** `fyi` is stored; otherwise: no options → task, lone 验收通过 → acceptance, else decision. */
@@ -336,6 +377,8 @@ export function parseDecision(
 
   const state = stateOf(data.status, { archived, answered: Boolean(hasAnswer), queued: ctx.queued })
   const options = parseOptions(body)
+  const notes = parseNotes(body)
+  const bodyAttachments = sectionAttachments(body).body
   const extra = Object.fromEntries(Object.entries(data).filter(([k]) => !KNOWN_KEYS.has(k)))
   const strList = (v: unknown) => (Array.isArray(v) ? v.map(String) : v === undefined || v === null ? undefined : [String(v)])
   const progress = Number(data.progress)
@@ -394,8 +437,9 @@ export function parseDecision(
     body,
     options,
     questions: parseQuestions(body, strMap(data.question_defaults) ?? {}),
-    attachments: parseAttachments(body),
-    notes: parseNotes(body),
+    attachments: [...bodyAttachments, ...notes.flatMap((n) => n.attachments)],
+    bodyAttachments,
+    notes,
     approvals: parseApprovals(data),
     file,
     slug: fromName?.[2] ?? '',

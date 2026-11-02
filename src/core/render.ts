@@ -8,7 +8,11 @@ import { formatRef, refOf } from './ref.ts'
 import { minutesSince, stalenessOf } from './staleness.ts'
 import { isDeferred, statusLabel } from './status.ts'
 import { lastHumanAt, reopenedAfterArchive } from './store.ts'
-import { type AttachmentApproval, type Decision } from './types.ts'
+import { type Attachment, type AttachmentApproval, type Decision } from './types.ts'
+
+function attachmentJSON(a: Attachment) {
+  return { label: a.label, target: a.target, image: a.image, group: a.group ?? null, caption: a.caption ?? null }
+}
 
 const useColor = () => Boolean(process.stdout.isTTY) && !process.env.NO_COLOR
 
@@ -212,13 +216,18 @@ export function toJSON(d: Decision): Record<string, unknown> {
     })),
     answers: d.answer?.answers ?? null,
     answer_notes: d.answer?.answerNotes ?? null,
-    notes: d.notes.map((n) => ({ kind: n.kind, role: n.role, author: n.author, at: n.at, text: n.text })),
+    // `attachments` is every `## 附件` in the file, flat, file order — a lane
+    // or the bench's own numbered picker wanting "everything" reads this.
+    // To show them where they belong, read `body_attachments` for the body
+    // and each note's own `attachments` below — never this flat list.
+    notes: d.notes.map((n) => ({ kind: n.kind, role: n.role, author: n.author, at: n.at, text: n.text, attachments: n.attachments.map(attachmentJSON) })),
     queued: Boolean(d.queued),
     archived_at: d.archivedAt ?? null,
     reopened_at: d.reopenedAt ?? null,
     reopened_after_archive: reopenedAfterArchive(d),
     tags: d.tags,
-    attachments: d.attachments.map((a) => ({ label: a.label, target: a.target, image: a.image, group: a.group ?? null, caption: a.caption ?? null })),
+    attachments: d.attachments.map(attachmentJSON),
+    body_attachments: d.bodyAttachments.map(attachmentJSON),
     approvals: d.approvals.map((ap) => ({
       target: ap.target,
       hash: ap.hash,

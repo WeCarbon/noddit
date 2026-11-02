@@ -26,6 +26,8 @@
   收走負責人的回覆用 `nod read`，問題解決了或不需要再解決才 `done`。
 - **要發出去的內容**：發之前 `nod attach <id> 草稿 --approval-content --approve-on <選項>`，發送前 `nod approved <id> --check 草稿` 必須通過。
   不要用 `--human` 替負責人核准。
+- **附件跟著它所附的那條訊息，不是堆在最後一塊**：`nod attach` 不給 `--to` 預設落你自己最新那條，沒有就落正文；
+  `nod note <id> "…" --attach a.png` 把回覆和證據一起寫。`--to body|last|<n>` 明確指定段落。
 - **外部來源**：專案有 issue 追蹤、信箱、意見表單要跟的，主控工作階段用 `nod source register` 登記，寫後端同步腳本只同步 id 和標題，
   新項目會從 nod monitor 來（見下），處理完 `nod source ack`。
 - **延後**：負責人可以把節點延後（看板裡按 d / `nod defer`）：它從可用/活動/待決裡消失，狀態不變；你收到「負責人延後」就先停手，解除前別動它。

@@ -27,7 +27,7 @@ const BOOLEAN = new Set([
   'json', 'raw', 'help', 'h', 'all', 'dry-run', 'force', 'quiet', 'q',
   'no-archive', 'keep', 'answered', 'archived', 'version', 'v', 'stdin',
   'seen', 'undo', 'peek', 'mine', 'link', 'fix', 'no-register', 'no-images', 'inline',
-  'human', 'agent', 'fyi', 'defaults', 'done', 'notify', 'task', 'tree', 'root', 'upgrade', 'strip-prefix',
+  'human', 'agent', 'fyi', 'defaults', 'done', 'notify', 'task', 'tree', 'root', 'upgrade', 'strip-prefix', 'attachments',
   // Not `stale`: `decs queue --stale 1h` takes a value; a bare `--stale` still reads as set.
   'unhandled', 'no-sources', 'here',
   'replace', 'approval-content', 'off', 'brief', 'no-brief', 'no-heartbeat',

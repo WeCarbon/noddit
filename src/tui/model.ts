@@ -137,9 +137,12 @@ function generatedNoteText(line: string, kind: string | undefined): string | und
 
 /**
  * The body as displayable lines. Options stay inline (cost matters, footer
- * only has room for labels); attachment images come back at the end as
- * `🖼️ alt` placeholders under one 附件 heading. Each `![alt](path)` becomes
- * its own selectable line, never the picture itself.
+ * only has room for labels); so are attachment images — each `![alt](path)`
+ * or `## 附件` entry becomes its own selectable `🖼️ alt` placeholder right
+ * where it sits (under whichever note attached it, or the body), never the
+ * picture itself. Condensed is a cut-down summary, not the full thread: it
+ * keeps every attachment reachable but as one block at the end, since
+ * `condense()`'s paragraph filter may have dropped the note that placed it.
  */
 export function bodyRows(d: Decision, width: number, condensed: boolean, images: NodeImage[] = nodeImages(d)): BodyRow[] {
   const out: BodyRow[] = []
@@ -147,6 +150,7 @@ export function bodyRows(d: Decision, width: number, condensed: boolean, images:
   const used = new Set<number>()
   const find = (alt: string, target: string) =>
     images.findIndex((im, i) => im.source === 'body' && !used.has(i) && im.alt === alt && im.target === target)
+  const findAttachment = (n: number) => images.findIndex((im) => im.source === 'attachment' && im.attachment === n)
   let noteKind: string | undefined
   // An infinite width is a window that wraps for itself.
   const wrap = (text: string) => (Number.isFinite(width) ? wrapToWidth(text, width) : [text])
@@ -162,7 +166,17 @@ export function bodyRows(d: Decision, width: number, condensed: boolean, images:
     const line = generatedNoteText(raw.trim(), noteKind) ?? raw
     for (const text of line.trim() ? wrap(line) : ['']) out.push({ text })
   }
-  walkBody(condensed ? condense(d) : d.body, (raw, inCode) => {
+  let attIdx = 0
+  walkBody(condensed ? condense(d) : d.body, (raw, inCode, inAttachments) => {
+    if (inAttachments) {
+      const n = attIdx++
+      if (!condensed) {
+        const i = findAttachment(n)
+        if (i >= 0) out.push({ text: placeholderText(images[i]), image: i })
+      }
+      return
+    }
+    if (condensed && ATTACHMENTS_HEADING_RE.test(raw)) return
     const parts = inCode ? [] : splitImageLinks(raw)
     if (!parts.some((p) => 'target' in p)) return pushText(raw)
     for (const p of parts) {
@@ -176,11 +190,13 @@ export function bodyRows(d: Decision, width: number, condensed: boolean, images:
     }
   })
   while (out.length && !out[out.length - 1].text.trim()) out.pop()
-  const attached = images.flatMap((im, i) => (im.source === 'attachment' ? [i] : []))
-  if (attached.length) {
-    if (out.length) out.push({ text: '' })
-    out.push({ text: t('bench.detail.attachmentsHeading') })
-    for (const i of attached) out.push({ text: placeholderText(images[i]), image: i })
+  if (condensed) {
+    const attached = images.flatMap((im, i) => (im.source === 'attachment' ? [i] : []))
+    if (attached.length) {
+      if (out.length) out.push({ text: '' })
+      out.push({ text: t('bench.detail.attachmentsHeading') })
+      for (const i of attached) out.push({ text: placeholderText(images[i]), image: i })
+    }
   }
   return out
 }

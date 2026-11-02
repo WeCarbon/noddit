@@ -113,6 +113,9 @@ export interface DecisionNote {
    *  made this section left one — see `core/identity.ts`. Absent on
    *  anything written before the marker existed, or with no identity set. */
   writer?: string
+  /** This note's own `## 附件` block — attached with `nod note --attach` or
+   *  `nod attach --to` pointed here. Empty when this note has none. */
+  attachments: Attachment[]
 }
 
 /** 「做完了，等你看一眼」 — a decision whose only option is `验收通过`. */
@@ -222,8 +225,13 @@ export interface Decision {
   options: DecisionOption[]
   /** Parsed out of `## 子问题`; empty for an ordinary node. */
   questions?: DecisionQuestion[]
-  /** Parsed out of `## 附件` in the body. */
+  /** Every `## 附件` in the body, flat and in file order — the concatenation
+   *  of `bodyAttachments` and every note's own `attachments`. Kept for
+   *  whatever wants one flat numbered list (the bench's picker, `nod open`). */
   attachments: Attachment[]
+  /** Just the body's own `## 附件` — the ones attached before any note, or
+   *  explicitly with `--to body`. */
+  bodyAttachments: Attachment[]
   /** Every appended answer / follow-up / record, in body order. */
   notes: DecisionNote[]
   /** Approval bookkeeping for `## 附件` entries attached with `--approval-content`. */

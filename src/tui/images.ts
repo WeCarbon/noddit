@@ -1,12 +1,14 @@
 import { basename } from 'node:path'
-import { HEADING } from '../core/format.ts'
+import { ATTACHMENT_GROUP_END } from '../core/format.ts'
+import { ATTACHMENT_CAPTION_RE, ATTACHMENT_GROUP_RE, ATTACHMENTS_HEADING_RE } from '../core/parse.ts'
 import type { Decision } from '../core/types.ts'
 
 /**
- * Every picture a node shows, in draw order: `![alt](path)` links in the
- * body first, then attachments under `## 附件`. One list, so ↑/↓, ←/→ and
- * mouse clicks agree on "the next image". Bench shows only a `🖼️ alt`
- * placeholder; the picture itself is in the big view.
+ * Every picture a node shows, in draw order: inline `![alt](path)` links and
+ * `## 附件` attachments, interleaved exactly as the file has them — each
+ * right where its own message put it, not bucketed at the end. One list, so
+ * ↑/↓, ←/→ and mouse clicks agree on "the next image". Bench shows only a
+ * `🖼️ alt` placeholder; the picture itself is in the big view.
  */
 export interface NodeImage {
   /** Link text; may be empty (`placeholderText` falls back to the filename). */
@@ -21,10 +23,8 @@ export interface NodeImage {
 }
 
 const IMAGE_LINK = /!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g
-// The real heading is the canonical Chinese token (file format); `Attachments` stays for old English-only files.
-const ATTACHMENTS_HEADING = new RegExp(`^##[ \\t]+(${HEADING.attachments}|Attachments)[ \\t　]*[:：]?[ \\t]*$`)
-const ANY_H2 = /^##[ \t]+\S/
 const FENCE = /^\s*```/
+const ANY_H2 = /^##[ \t]+\S/
 
 /** A line split into prose and image links, in order. */
 export type LinePart = { text: string } | { alt: string; target: string }
@@ -41,19 +41,32 @@ export function splitImageLinks(line: string): LinePart[] {
   return out
 }
 
-/** Walks body lines as the detail pane shows them: skips `## 附件`, and
- *  leaves fenced code alone (a link inside is an example, not a picture). */
-export function walkBody(body: string, visit: (line: string, inCode: boolean) => void): void {
-  let skipping = false
+/**
+ * Walks body lines as the detail pane shows them, leaving fenced code alone
+ * (a link inside is an example, not a picture). Inside a `## 附件` block, only
+ * the heading and each attachment-link line reach `visit` (flagged
+ * `inAttachments`) — a blank line, a `**group**` marker, a caption or the
+ * group-end comment are bookkeeping the attachment list already carries
+ * (`d.attachments[].group`/`.caption`), not body text, so they're dropped.
+ */
+export function walkBody(body: string, visit: (line: string, inCode: boolean, inAttachments?: boolean) => void): void {
   let inCode = false
+  let inAttachments = false
   for (const raw of body.split('\n')) {
-    if (!inCode && ATTACHMENTS_HEADING.test(raw)) {
-      skipping = true
+    if (!inCode && ANY_H2.test(raw)) {
+      inAttachments = ATTACHMENTS_HEADING_RE.test(raw)
+      visit(raw, false)
       continue
     }
-    if (skipping) {
-      if (!ANY_H2.test(raw)) continue
-      skipping = false
+    if (inAttachments) {
+      const trimmed = raw.trim()
+      if (!trimmed) {
+        visit(raw, false) // a blank line still reads as a blank row, same as anywhere else in the body
+        continue
+      }
+      if (trimmed === ATTACHMENT_GROUP_END || ATTACHMENT_GROUP_RE.test(trimmed) || ATTACHMENT_CAPTION_RE.test(trimmed)) continue
+      visit(raw, false, true)
+      continue
     }
     const fence = FENCE.test(raw)
     visit(raw, inCode || fence)
@@ -63,13 +76,16 @@ export function walkBody(body: string, visit: (line: string, inCode: boolean) =>
 
 export function nodeImages(d: Pick<Decision, 'body' | 'attachments'>): NodeImage[] {
   const out: NodeImage[] = []
-  walkBody(d.body ?? '', (line, inCode) => {
+  const attachments = d.attachments ?? []
+  let attIdx = 0
+  walkBody(d.body ?? '', (line, inCode, inAttachments) => {
+    if (inAttachments) {
+      const a = attachments[attIdx++]
+      if (a?.image) out.push({ alt: a.label, target: a.target, source: 'attachment', attachment: attIdx - 1, group: a.group, caption: a.caption })
+      return
+    }
     if (inCode) return
     for (const p of splitImageLinks(line)) if ('target' in p) out.push({ alt: p.alt, target: p.target, source: 'body' })
-  })
-  ;(d.attachments ?? []).forEach((a, i) => {
-    if (!a.image) return
-    out.push({ alt: a.label, target: a.target, source: 'attachment', attachment: i, group: a.group, caption: a.caption })
   })
   return out
 }

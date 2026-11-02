@@ -32,7 +32,7 @@ import {
   renderOptionsBlock,
   serializeDecision,
   slugify,
-  upsertSection,
+  upsertSectionScoped,
 } from './serialize.ts'
 import {
   ACCEPTANCE_OPTION,
@@ -59,6 +59,164 @@ export interface ListFilter {
 /** The AI's turn to act on this node, regardless of what state the file says. */
 function onQueue(d: Decision): Decision {
   return { ...d, queued: true, state: d.state === 'needs_decision' ? 'decided' : d.state }
+}
+
+export interface AttachOpts {
+  link?: boolean
+  name?: string
+  replace?: boolean
+  groups?: string[]
+  captions?: string[]
+  approvalContent?: boolean
+  /** `--approve-on 1,3` / `Q2:1`: which answers approve this content. */
+  approveOn?: string[]
+  /**
+   * Which section this lands in: `'body'`, `'last'` (whichever section is
+   * newest, any author), a 1-based index into `d.notes`, or text matched
+   * against a note's heading or timestamp. Default (`undefined`): the same
+   * author's (`by`) own latest note, else the body — see `resolveAttachAnchor`.
+   */
+  to?: string
+  /** Who is attaching, for the default `to` resolution; not stored. */
+  by?: string
+}
+
+/**
+ * Resolves `AttachOpts.to` to a `DecisionNote.heading` string (the section
+ * `upsertSectionScoped` writes into), or `undefined` for the body.
+ */
+function resolveAttachAnchor(d: Decision, to: string | undefined, by: string | undefined): string | undefined {
+  const notes = d.notes
+  if (to === undefined) {
+    if (by) for (let i = notes.length - 1; i >= 0; i--) if (sameAgent(notes[i].author, by) || sameAgent(by, notes[i].author)) return notes[i].heading
+    return undefined
+  }
+  if (to === 'body') return undefined
+  if (to === 'last') return notes.length ? notes[notes.length - 1].heading : undefined
+  if (/^\d+$/.test(to)) {
+    const idx = Number(to) - 1
+    if (idx < 0 || idx >= notes.length) throw new Error(t('core.store.attachToOutOfRange', { n: to, count: notes.length }))
+    return notes[idx].heading
+  }
+  const hit = notes.find((n) => n.heading.includes(to) || n.at.startsWith(to))
+  if (!hit) throw new Error(t('core.store.attachToNotFound', { to }))
+  return hit.heading
+}
+
+/** The attachments already in the section `anchor` names (see `resolveAttachAnchor`). */
+function sectionAttachmentsOf(d: Decision, anchor: string | undefined): Attachment[] {
+  return anchor === undefined ? d.bodyAttachments : d.notes.find((n) => n.heading === anchor)?.attachments ?? []
+}
+
+/**
+ * Where `anchor`'s own span ends, for `upsertSectionScoped`: the next
+ * note's heading (notes are already in file order), or `undefined` for
+ * "whatever comes after is this section's own" (the last note, or the body
+ * when there are no notes at all).
+ */
+export function sectionStopBefore(d: Decision, anchor: string | undefined): string | undefined {
+  if (anchor === undefined) return d.notes[0]?.heading
+  const idx = d.notes.findIndex((n) => n.heading === anchor)
+  return idx === -1 ? undefined : d.notes[idx + 1]?.heading
+}
+
+/**
+ * Copies/links `sources` beside the entry (or just records a URL/link) and
+ * returns the updated attachments for ONE section plus the node's approvals
+ * (global, keyed by target — not scoped to a section). Writes nothing; the
+ * caller places the result into the body.
+ */
+function resolveAttachments(
+  d: Decision,
+  layout: Layout,
+  sources: string[],
+  opts: Pick<AttachOpts, 'link' | 'name' | 'replace' | 'groups' | 'captions' | 'approvalContent' | 'approveOn'>,
+  baseAttachments: Attachment[],
+): { attachments: Attachment[]; approvals: AttachmentApproval[] } {
+  const attachments = [...baseAttachments]
+  const approvals = [...d.approvals]
+  // Settled before copying anything, so a refusal leaves no partial state.
+  if (opts.approveOn) checkApproveOn(d, opts.approveOn)
+  const fallbackApproveOn = opts.approveOn ?? defaultApproveOn(d)
+  if (opts.approvalContent && !fallbackApproveOn) {
+    const known = (src: string) => approvals.find((ap) => basename(ap.target) === basename(src))?.approveOn?.length
+    if (!sources.every(known))
+      throw new Error(
+        t('core.store.approveOnAmbiguous', {
+          ref: refOf(d),
+          what: d.questions?.length ? t('core.store.subQuestionsWord') : t('core.store.optionsCountWord', { count: d.options.length }),
+          example: d.questions?.length ? `${d.questions[0].key}:${d.questions[0].options[0]?.key ?? '1'}` : d.options[0]?.key ?? '1',
+        }),
+      )
+  }
+
+  const upsert = (target: string, image: boolean, defaultLabel: string, group?: string, caption?: string) => {
+    const i = attachments.findIndex((x) => x.target === target)
+    const prev = i >= 0 ? attachments[i] : undefined
+    const entry: Attachment = {
+      label: opts.name ?? prev?.label ?? defaultLabel,
+      target,
+      image,
+      group: group ?? prev?.group,
+      caption: caption ?? prev?.caption,
+    }
+    if (i >= 0) attachments[i] = entry
+    else attachments.push(entry)
+  }
+  const recordApproval = (target: string, hash: string) => {
+    const i = approvals.findIndex((x) => x.target === target)
+    const approveOn = opts.approveOn ?? (i >= 0 ? approvals[i].approveOn : undefined) ?? fallbackApproveOn!
+    if (i >= 0) approvals[i] = { ...approvals[i], hash, approveOn }
+    else approvals.push({ target, hash, approveOn })
+  }
+
+  sources.forEach((src, i) => {
+    const group = opts.groups?.[i]
+    const caption = opts.captions?.[i]
+
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(src)) {
+      upsert(src, isImagePath(src), src, group, caption)
+      return
+    }
+
+    const abs = resolve(src)
+    if (opts.link) {
+      upsert(abs, isImagePath(abs), basename(abs), group, caption)
+      if (opts.approvalContent) recordApproval(abs, sha256File(abs))
+      return
+    }
+
+    const destDir = attachmentDir(layout, d.id)
+    mkdirSync(destDir, { recursive: true })
+    const destName = basename(abs)
+    let dest = join(destDir, destName)
+
+    if (opts.replace && existsSync(dest)) {
+      // Old bytes move to .history/ rather than disappearing.
+      const histDir = join(destDir, '.history')
+      mkdirSync(histDir, { recursive: true })
+      const n = Math.max(0, ...historyVersions(histDir, destName)) + 1
+      renameSync(dest, join(histDir, `${destName}.${n}`))
+    } else if (!opts.replace) {
+      dest = uniquePath(dest)
+    }
+    copyFileSync(abs, dest)
+
+    const target = toPosixPath(relative(dirname(d.file), dest))
+    upsert(target, isImagePath(dest), basename(dest), group, caption)
+    if (opts.approvalContent) recordApproval(target, sha256File(dest))
+  })
+
+  return { attachments, approvals }
+}
+
+/** Checked before taking the lock, so a typo fails without touching anything. */
+function checkAttachSources(sources: string[], approvalContent: boolean | undefined): void {
+  for (const src of sources) {
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(src)) {
+      if (approvalContent) throw new Error(t('core.store.approvalContentNoUrl'))
+    } else if (!existsSync(resolve(src))) throw new Error(t('core.store.noSuchFile', { path: src }))
+  }
 }
 
 /** Local time with an explicit offset; `ms` adds milliseconds, for ordering same-second answers. */
@@ -328,6 +486,7 @@ export class Store {
       options,
       questions,
       attachments: [],
+      bodyAttachments: [],
       notes: [],
       approvals: [],
       file,
@@ -418,110 +577,23 @@ export class Store {
   }
 
   /**
-   * Copies files in beside the entry (or records a link) and updates `## 附件`.
-   * `opts.groups`/`opts.captions` line up with `sources` by position.
-   * `--replace` overwrites the same-named attachment in place (old bytes
-   * move to `attachments/<id>/.history/`) instead of creating `name-2.ext`.
+   * Copies files in beside the entry (or records a link) and updates the
+   * `## 附件` block of whichever section they're attached to — the body, or
+   * one note's own appended section (`opts.to`). `opts.groups`/`opts.captions`
+   * line up with `sources` by position. `--replace` overwrites the
+   * same-named attachment in place (old bytes move to
+   * `attachments/<id>/.history/`) instead of creating `name-2.ext`.
    */
-  attach(
-    d: Decision,
-    sources: string[],
-    opts: {
-      link?: boolean
-      name?: string
-      replace?: boolean
-      groups?: string[]
-      captions?: string[]
-      approvalContent?: boolean
-      /** `--approve-on 1,3` / `Q2:1`: which answers approve this content. */
-      approveOn?: string[]
-    } = {},
-  ): Decision {
+  attach(d: Decision, sources: string[], opts: AttachOpts = {}): Decision {
     if (opts.approveOn && !opts.approvalContent) throw new Error(t('core.store.approveOnNeedsApprovalContent'))
-    // Checked before taking the lock, so a typo fails without touching anything.
-    for (const src of sources) {
-      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(src)) {
-        if (opts.approvalContent) throw new Error(t('core.store.approvalContentNoUrl'))
-      } else if (!existsSync(resolve(src))) throw new Error(t('core.store.noSuchFile', { path: src }))
-    }
+    checkAttachSources(sources, opts.approvalContent)
     const layout = this.layoutOf(d)
 
     return this.mutate(d, (d) => {
-      const attachments = [...d.attachments]
-      const approvals = [...d.approvals]
-      // Settled before copying anything, so a refusal leaves no partial state.
-      if (opts.approveOn) checkApproveOn(d, opts.approveOn)
-      const fallbackApproveOn = opts.approveOn ?? defaultApproveOn(d)
-      if (opts.approvalContent && !fallbackApproveOn) {
-        const known = (src: string) => approvals.find((ap) => basename(ap.target) === basename(src))?.approveOn?.length
-        if (!sources.every(known))
-          throw new Error(
-            t('core.store.approveOnAmbiguous', {
-              ref: refOf(d),
-              what: d.questions?.length ? t('core.store.subQuestionsWord') : t('core.store.optionsCountWord', { count: d.options.length }),
-              example: d.questions?.length ? `${d.questions[0].key}:${d.questions[0].options[0]?.key ?? '1'}` : d.options[0]?.key ?? '1',
-            }),
-          )
-      }
-
-      const upsert = (target: string, image: boolean, defaultLabel: string, group?: string, caption?: string) => {
-        const i = attachments.findIndex((x) => x.target === target)
-        const prev = i >= 0 ? attachments[i] : undefined
-        const entry: Attachment = {
-          label: opts.name ?? prev?.label ?? defaultLabel,
-          target,
-          image,
-          group: group ?? prev?.group,
-          caption: caption ?? prev?.caption,
-        }
-        if (i >= 0) attachments[i] = entry
-        else attachments.push(entry)
-      }
-      const recordApproval = (target: string, hash: string) => {
-        const i = approvals.findIndex((x) => x.target === target)
-        const approveOn = opts.approveOn ?? (i >= 0 ? approvals[i].approveOn : undefined) ?? fallbackApproveOn!
-        if (i >= 0) approvals[i] = { ...approvals[i], hash, approveOn }
-        else approvals.push({ target, hash, approveOn })
-      }
-
-      sources.forEach((src, i) => {
-        const group = opts.groups?.[i]
-        const caption = opts.captions?.[i]
-
-        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(src)) {
-          upsert(src, isImagePath(src), src, group, caption)
-          return
-        }
-
-        const abs = resolve(src)
-        if (opts.link) {
-          upsert(abs, isImagePath(abs), basename(abs), group, caption)
-          if (opts.approvalContent) recordApproval(abs, sha256File(abs))
-          return
-        }
-
-        const destDir = attachmentDir(layout, d.id)
-        mkdirSync(destDir, { recursive: true })
-        const destName = basename(abs)
-        let dest = join(destDir, destName)
-
-        if (opts.replace && existsSync(dest)) {
-          // Old bytes move to .history/ rather than disappearing.
-          const histDir = join(destDir, '.history')
-          mkdirSync(histDir, { recursive: true })
-          const n = Math.max(0, ...historyVersions(histDir, destName)) + 1
-          renameSync(dest, join(histDir, `${destName}.${n}`))
-        } else if (!opts.replace) {
-          dest = uniquePath(dest)
-        }
-        copyFileSync(abs, dest)
-
-        const target = toPosixPath(relative(dirname(d.file), dest))
-        upsert(target, isImagePath(dest), basename(dest), group, caption)
-        if (opts.approvalContent) recordApproval(target, sha256File(dest))
-      })
-
-      return { next: { ...d, approvals, body: upsertSection(d.body, HEADING.attachments, renderAttachmentsBlock(attachments)) } }
+      const anchor = resolveAttachAnchor(d, opts.to, opts.by)
+      const { attachments, approvals } = resolveAttachments(d, layout, sources, opts, sectionAttachmentsOf(d, anchor))
+      const body = upsertSectionScoped(d.body, anchor, sectionStopBefore(d, anchor), HEADING.attachments, renderAttachmentsBlock(attachments))
+      return { next: { ...d, approvals, body } }
     })
   }
 
@@ -545,11 +617,45 @@ export class Store {
     return d.approvals.find((ap) => basename(ap.target) === name)
   }
 
-  /** A follow-up/execution note with an auto-generated heading; `append` takes a pre-written one. */
-  note(d: Decision, n: { text: string; role: NoteRole; author: string; kind?: string }): Decision {
+  /**
+   * A follow-up/execution note with an auto-generated heading; `append`
+   * takes a pre-written one. `n.attach.sources` copies files in (same rules
+   * as `attach()`) and writes them into this same new section — the note
+   * and its attachments land together, so the association never needs a
+   * separate `--to`.
+   */
+  note(
+    d: Decision,
+    n: { text: string; role: NoteRole; author: string; kind?: string; attach?: AttachOpts & { sources: string[] } },
+  ): Decision {
     if (n.role === 'human' && this.recentSameHumanNote(d, n.text)) return d
     const kind = n.kind ?? (n.role === 'human' ? NOTE_KIND.reply : NOTE_KIND.addendum)
-    return this.append(d, noteHeading(kind, n.role, n.author, nowStamp()), n.text, n.author, n.role)
+    const heading = noteHeading(kind, n.role, n.author, nowStamp())
+    if (!n.attach?.sources.length) return this.append(d, heading, n.text, n.author, n.role)
+
+    const { sources, ...opts } = n.attach
+    if (opts.approveOn && !opts.approvalContent) throw new Error(t('core.store.approveOnNeedsApprovalContent'))
+    checkAttachSources(sources, opts.approvalContent)
+    const layout = this.layoutOf(d)
+    const human = n.role === 'human'
+
+    const written = this.mutate(d, (d) => {
+      const { attachments, approvals } = resolveAttachments(d, layout, sources, opts, [])
+      const block = renderAttachmentsBlock(attachments)
+      return {
+        next: {
+          ...d,
+          approvals,
+          body: appendSection(d.body, heading, block ? `${n.text.trim()}\n\n${block}` : n.text),
+          state: human ? 'decided' : d.state,
+          reopenedAt: human && d.archived ? nowStamp(new Date(), { ms: true }) : d.reopenedAt,
+        },
+        move: human && d.archived ? 'unarchive' : undefined,
+      }
+    })
+    if (!human) return written
+    enqueue(this.layoutOf(written), written.id)
+    return { ...written, queued: true }
   }
 
   /**
@@ -965,6 +1071,12 @@ export class Store {
   /** Writes the node back as it reads now — what `decs migrate --upgrade` uses to make read-time mappings permanent. */
   rewrite(d: Decision): Decision {
     return this.mutate(d, (d) => ({ next: d }))
+  }
+
+  /** For a one-off migration that rewrites a node's body text directly (and
+   *  nothing else) — `transform` sees the fresh-off-disk node. */
+  rewriteBody(d: Decision, transform: (fresh: Decision) => string): Decision {
+    return this.mutate(d, (fresh) => ({ next: { ...fresh, body: transform(fresh) } }))
   }
 
   pin(d: Decision, pin: DecisionPin | null): Decision {

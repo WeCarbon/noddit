@@ -1,11 +1,12 @@
 import { existsSync, readFileSync, readdirSync, renameSync, statSync } from 'node:fs'
-import { basename, dirname, join, relative, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { withFileLock, writeFileAtomic } from './lock.ts'
+import { HEADING } from './format.ts'
 import { listEntryFiles, type Layout } from './paths.ts'
-import { splitFrontMatter } from './parse.ts'
-import { relinkFile } from './serialize.ts'
-import type { Store } from './store.ts'
-import { ITEM_STATUSES } from './types.ts'
+import { ATTACHMENTS_HEADING_RE, splitFrontMatter } from './parse.ts'
+import { relinkFile, renderAttachmentsBlock, upsertSectionScoped } from './serialize.ts'
+import { sectionStopBefore, type Store } from './store.ts'
+import { ITEM_STATUSES, type Attachment, type Decision } from './types.ts'
 import { list, t } from '../i18n/index.ts'
 
 /**
@@ -199,4 +200,173 @@ export function upgradeOptionLists(store: Store, opts: { dryRun?: boolean } = {}
     }
   }
   return steps
+}
+
+// --- attachments: split one old global `## 附件` back to the sections it belongs to ----
+
+const BODY_KEY = '(body)'
+const ANY_H2 = /^##[ \t]+\S/
+
+/** Every `## 附件`-headed block removed, wherever it sits — the sections stay, just without their old attachment list. */
+function stripAttachmentBlocks(body: string): string {
+  const lines = body.split('\n')
+  const out: string[] = []
+  let skipping = false
+  for (const line of lines) {
+    if (ATTACHMENTS_HEADING_RE.test(line)) {
+      skipping = true
+      continue
+    }
+    if (skipping) {
+      if (!ANY_H2.test(line)) continue
+      skipping = false
+    }
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
+interface AttachmentSection {
+  /** `BODY_KEY`, or the `DecisionNote.heading` this section is. */
+  key: string
+  anchor: string | undefined
+  /** Prose only — an existing `## 附件` block within it is stripped first,
+   *  so an attachment doesn't "reference itself" by already being listed. */
+  text: string
+  at: string
+}
+
+function bodyProseText(d: Decision): string {
+  const lines = d.body.split('\n')
+  const first = d.notes[0]
+  const stopAt = first ? lines.findIndex((l) => l === `## ${first.heading}`) : -1
+  return stripAttachmentBlocks((stopAt === -1 ? lines : lines.slice(0, stopAt)).join('\n'))
+}
+
+function attachmentSections(d: Decision): AttachmentSection[] {
+  return [
+    { key: BODY_KEY, anchor: undefined, text: bodyProseText(d), at: d.created },
+    ...d.notes.map((n) => ({ key: n.heading, anchor: n.heading, text: n.text, at: n.at })),
+  ]
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** A section's own prose names this file — `](target)` (any link syntax) or the bare filename as a word. */
+function referencesTarget(text: string, target: string): boolean {
+  if (text.includes(`](${target})`)) return true
+  const name = basename(target.split(/[?#]/)[0])
+  return name ? new RegExp(`(?<![\\w.-])${escapeRe(name)}(?![\\w.-])`, 'i').test(text) : false
+}
+
+/** When this was (likely) copied in — `undefined` for a URL or a file no longer there to time. */
+function attachedAtMs(d: Decision, target: string): number | undefined {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return undefined
+  try {
+    return statSync(resolve(dirname(d.file), target)).mtimeMs
+  } catch {
+    return undefined
+  }
+}
+
+export interface AttachmentMove {
+  target: string
+  label: string
+  /** `BODY_KEY` or a note heading — where it is today. */
+  from: string
+  /** Where the evidence says it belongs — same shape as `from`. */
+  to: string
+  reason: 'inline-reference' | 'timing' | 'kept-ambiguous' | 'no-signal-kept-body'
+  /** Conflicting evidence, not just "no evidence" — worth a person's own look (see `candidates`). */
+  ambiguous: boolean
+  candidates: string[]
+}
+
+/**
+ * Where one attachment belongs, by the best evidence available: an inline
+ * reference to it in exactly one section's prose; failing that, which
+ * section's own timestamp is clearly closest to when the file was copied in
+ * (no author is recorded per attachment, so this is the whole signal —
+ * see `AttachmentMove`); failing that, the body — the same default a fresh
+ * `nod attach` with no `--to` would not have picked, but a safe, visible one.
+ */
+function classifyAttachment(d: Decision, sections: AttachmentSection[], a: Attachment, from: string): AttachmentMove {
+  const base = { target: a.target, label: a.label, from }
+  const refHits = sections.filter((s) => referencesTarget(s.text, a.target))
+  if (refHits.length === 1) return { ...base, to: refHits[0].key, reason: 'inline-reference', ambiguous: false, candidates: [] }
+  if (refHits.length > 1) return { ...base, to: from, reason: 'kept-ambiguous', ambiguous: true, candidates: refHits.map((s) => s.key) }
+
+  const mtime = attachedAtMs(d, a.target)
+  if (mtime !== undefined) {
+    const scored = sections
+      .map((s) => ({ s, gap: Math.abs(mtime - Date.parse(s.at)) }))
+      .filter((x) => Number.isFinite(x.gap))
+      .sort((x, y) => x.gap - y.gap)
+    const [best, second] = scored
+    if (best && (!second || best.gap <= second.gap / 2)) return { ...base, to: best.s.key, reason: 'timing', ambiguous: false, candidates: [] }
+    if (best) return { ...base, to: from, reason: 'kept-ambiguous', ambiguous: true, candidates: scored.slice(0, 3).map((x) => x.s.key) }
+  }
+  return { ...base, to: BODY_KEY, reason: 'no-signal-kept-body', ambiguous: false, candidates: [] }
+}
+
+export interface NodeAttachmentPlan {
+  file: string
+  id: number
+  project: string
+  moves: AttachmentMove[]
+  changedCount: number
+  ambiguousCount: number
+}
+
+/** Pure — reads nothing but `d` (and, for the timing heuristic, the attachment files' mtimes). */
+export function planAttachmentMoves(d: Decision): NodeAttachmentPlan {
+  const sections = attachmentSections(d)
+  const ownerOf = new Map<Attachment, string>()
+  for (const s of sections) {
+    const items = s.anchor === undefined ? d.bodyAttachments : (d.notes.find((n) => n.heading === s.anchor)?.attachments ?? [])
+    for (const a of items) ownerOf.set(a, s.key)
+  }
+  const moves = d.attachments.map((a) => classifyAttachment(d, sections, a, ownerOf.get(a) ?? BODY_KEY))
+  return {
+    file: d.file,
+    id: d.id,
+    project: d.project,
+    moves,
+    changedCount: moves.filter((m) => m.to !== m.from).length,
+    ambiguousCount: moves.filter((m) => m.ambiguous).length,
+  }
+}
+
+/** Rewrites the body so every attachment sits in the section `moves` (aligned 1:1 with `d.attachments`) says it belongs to. */
+function applyAttachmentMoves(d: Decision, moves: AttachmentMove[]): string {
+  const byTo = new Map<string, Attachment[]>()
+  d.attachments.forEach((a, i) => byTo.set(moves[i].to, [...(byTo.get(moves[i].to) ?? []), a]))
+
+  let body = stripAttachmentBlocks(d.body)
+  for (const [to, items] of byTo) {
+    const anchor = to === BODY_KEY ? undefined : to
+    body = upsertSectionScoped(body, anchor, sectionStopBefore(d, anchor), HEADING.attachments, renderAttachmentsBlock(items))
+  }
+  return body.replace(/\n{3,}/g, '\n\n')
+}
+
+/**
+ * Splits every node's one old `## 附件` section back into the sections its
+ * entries actually belong to (see `planAttachmentMoves`). A node where
+ * nothing moves is left untouched byte-for-byte.
+ */
+export function upgradeAttachments(store: Store, opts: { dryRun?: boolean } = {}): { steps: Step[]; plans: NodeAttachmentPlan[] } {
+  const steps: Step[] = []
+  const plans: NodeAttachmentPlan[] = []
+  for (const d of store.all()) {
+    if (!d.attachments.length) continue
+    const plan = planAttachmentMoves(d)
+    plans.push(plan)
+    if (!plan.changedCount) continue
+    steps.push({ what: t('core.upgrade.attachmentsMoved', { count: plan.changedCount, total: d.attachments.length }), from: d.file })
+    if (!opts.dryRun) store.rewriteBody(d, (fresh) => applyAttachmentMoves(fresh, planAttachmentMoves(fresh).moves))
+  }
+  return { steps, plans }
 }

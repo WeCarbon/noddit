@@ -575,6 +575,7 @@ export function toDecision(entry: LegacyEntry, project: string): Decision {
     body: entry.body,
     options,
     attachments: [],
+    bodyAttachments: [],
     notes: [],
     approvals: [],
     file: `D${entry.id}-${slug}.md`,

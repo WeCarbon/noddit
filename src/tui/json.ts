@@ -147,6 +147,11 @@ const pill = (o: Item, items: Item[], now: number) => ({ key: keyOf(o), ref: ref
 const asHeading = (heading: string) => (r: BodyRow, i: number, rows: BodyRow[]): BodyRow =>
   !r.style && r.text === heading && rows[i + 1]?.image !== undefined ? { text: heading.replace(/^#+\s*/, ''), style: { bold: true, color: 'cyan' } } : r
 
+/** `d.attachments`' plain shape plus the absolute path a window needs to read the file itself. */
+const withPath = (d: Item, a: Item['attachments'][number]) => ({
+  label: a.label, target: a.target, path: targetPath(d.file, a.target), image: a.image, group: a.group ?? null, caption: a.caption ?? null,
+})
+
 function nodeJson(d: Item, items: Item[], now: number, backlinks: Item[]): Record<string, unknown> {
   const { body: _body, ...fields } = toJSON(d)
   const live = withoutLiveChoices(d.body)
@@ -183,7 +188,12 @@ function nodeJson(d: Item, items: Item[], now: number, backlinks: Item[]): Recor
       ...(r.style ? { style: plain([{ text: '', ...r.style }])[0] } : {}),
     })),
     images,
-    attachments: d.attachments.map((a) => ({ label: a.label, target: a.target, path: targetPath(d.file, a.target), image: a.image, group: a.group ?? null, caption: a.caption ?? null })),
+    // Every attachment, flat — the bench's own numbered picker. Render per
+    // message instead: `body_attachments` for the body, each entry in
+    // `notes[].attachments` for that note — same shape, plus `path`.
+    attachments: d.attachments.map((a) => withPath(d, a)),
+    body_attachments: d.bodyAttachments.map((a) => withPath(d, a)),
+    notes: d.notes.map((n) => ({ kind: n.kind, role: n.role, author: n.author, at: n.at, text: n.text, attachments: n.attachments.map((a) => withPath(d, a)) })),
     terminal: isTerminal(d.state),
     backlinks: backlinks.map((b) => keyOf(b)),
   }

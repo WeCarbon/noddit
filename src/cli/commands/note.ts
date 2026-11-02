@@ -1,4 +1,4 @@
-import { bool, one, type Args } from '../args.ts'
+import { bool, many, one, type Args } from '../args.ts'
 import { noteKindKey } from '../../core/format.ts'
 import { refOf } from '../../core/ref.ts'
 import { readStdin, requireDecision, resolveAuthor, resolveStore, shellRole } from '../context.ts'
@@ -52,7 +52,28 @@ export async function run(args: Args): Promise<number> {
     console.log(t('cli.note.alreadyRecorded', { ref: refOf(d), by: same.author }))
     return 0
   }
-  const next = store.note(d, { text, role, author, kind: one(args, 'heading') })
+  const sources = many(args, 'attach')
+  const groups = many(args, 'label')
+  const captions = many(args, 'caption')
+  const approvalContent = bool(args, 'approval-content')
+  const approveOn = many(args, 'approve-on').flatMap((v) => v.split(/[,，\s]+/)).filter(Boolean)
+  const next = store.note(d, {
+    text,
+    role,
+    author,
+    kind: one(args, 'heading'),
+    attach: sources.length
+      ? {
+          sources,
+          link: bool(args, 'link'),
+          name: one(args, 'name'),
+          groups: groups.length ? groups : undefined,
+          captions: captions.length ? captions : undefined,
+          approvalContent,
+          approveOn: approveOn.length ? approveOn : undefined,
+        }
+      : undefined,
+  })
   // A note like 「等 Dave 推新版」 leaves the node 执行中, and the bench
   // never shows it is held up outside. Point at hold.
   if (role === 'agent' && next.state === 'in_progress' && /(^|[，。；：:])\s*(在等|等(?!待))\s?[^\s，。]{1,20}/.test(text)) {

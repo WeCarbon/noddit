@@ -1,11 +1,21 @@
 import { basename, resolve } from 'node:path'
 import { bool, many, one, type Args } from '../args.ts'
 import { refOf } from '../../core/ref.ts'
-import { requireDecision, resolveStore } from '../context.ts'
+import { requireDecision, resolveAuthor, resolveStore } from '../context.ts'
 import { dim } from '../../core/render.ts'
 import { t } from '../../i18n/index.ts'
 
 const help = () => t('cli.help.attach')
+
+/** Best-effort — an interactive owner with no configured author still gets
+ *  the simplest default (the body) rather than an error. */
+function attachingAuthor(args: Args): string | undefined {
+  try {
+    return resolveAuthor(args)
+  } catch {
+    return undefined
+  }
+}
 
 export function run(args: Args): number {
   if (bool(args, 'help', 'h')) {
@@ -30,6 +40,8 @@ export function run(args: Args): number {
     captions: captions.length ? captions : undefined,
     approvalContent,
     approveOn: approveOn.length ? approveOn : undefined,
+    to: one(args, 'to'),
+    by: attachingAuthor(args),
   })
 
   for (const src of sources) {

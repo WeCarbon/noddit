@@ -105,7 +105,7 @@ test('placeholderText: alt text, else the file name; a --label group rides along
   assert.equal(imageName({ alt: '', target: 'https://x.test/p/q.png' }), 'q.png')
 })
 
-test('bodyRows: each image link is its own placeholder line in place, prose keeps its lines, attachments come last under the attachments heading', () => {
+test('bodyRows: each image link is its own placeholder line in place, prose keeps its lines, a body-level ## 附件 renders right where it sits, styled like any other heading', () => {
   const d = {
     body: `intro\n\nbefore ![first](a.png) after\n\n![](dir/b.png)\n\n## ${HEADING.attachments}\n\n![att.png](att.png)\n`,
     attachments: [{ label: 'att.png', target: 'att.png', image: true }],
@@ -122,10 +122,56 @@ test('bodyRows: each image link is its own placeholder line in place, prose keep
       ['', undefined],
       ['🖼️ b.png', 1],
       ['', undefined],
-      ['## Attachments', undefined], // bodyRows renders this heading through t('bench.detail.attachmentsHeading'), not the raw body text
+      ['Attachments', undefined], // the same sectionLabel() styling as any other heading — not the raw "## 附件" text
+      ['', undefined],
       ['🖼️ att.png', 2],
     ],
   )
+  assert.equal(rows[8].style?.bold, true)
+})
+
+test('bodyRows: an attachment under a note renders right after that note, not bucketed with the body\'s own', () => {
+  const d = {
+    body: [
+      'intro',
+      '',
+      `## ${HEADING.attachments}`,
+      '',
+      '![before.png](before.png)',
+      '',
+      '## 回复（human · owner · 2026-10-28 10:51:30）',
+      '',
+      'see this one',
+      '',
+      `## ${HEADING.attachments}`,
+      '',
+      '![after.png](after.png)',
+      '',
+    ].join('\n'),
+    attachments: [
+      { label: 'before.png', target: 'before.png', image: true },
+      { label: 'after.png', target: 'after.png', image: true },
+    ],
+  } as unknown as Decision
+  const rows = bodyRows(d, 60, false)
+  const texts = rows.map((r) => [r.text, r.image])
+  assert.match(String(texts[6][0]), /^User \| /, 'the note heading, whatever "ago" text it carries')
+  texts[6][0] = 'User | …'
+  assert.deepEqual(texts, [
+    ['intro', undefined],
+    ['', undefined],
+    ['Attachments', undefined],
+    ['', undefined],
+    ['🖼️ before.png', 0],
+    ['', undefined],
+    ['User | …', undefined],
+    ['', undefined],
+    ['see this one', undefined],
+    ['', undefined],
+    ['Attachments', undefined],
+    ['', undefined],
+    ['🖼️ after.png', 1],
+  ])
 })
 
 test('bodyRows: the condensed body still points each placeholder at its entry in the full list', (t) => {

@@ -2,7 +2,7 @@ import { closeSync, existsSync, openSync, readFileSync, rmSync, writeFileSync } 
 import { basename, join, sep } from 'node:path'
 import { bool, one, type Args } from '../args.ts'
 import { resolveStore } from '../context.ts'
-import { stripPrefix, upgradeOptionLists, upgradeStatuses, type Step } from '../../core/upgrade.ts'
+import { stripPrefix, upgradeAttachments, upgradeOptionLists, upgradeStatuses, type Step } from '../../core/upgrade.ts'
 import { initLayout, layoutFor, listEntryFiles, type Layout } from '../../core/paths.ts'
 import { serializeDecision } from '../../core/serialize.ts'
 import { parseLegacyActive, parseLegacyArchive, toDecision, type LegacyEntry } from '../../migrate/legacy.ts'
@@ -15,7 +15,7 @@ export async function run(args: Args): Promise<number> {
     console.log(help())
     return 0
   }
-  if (bool(args, 'upgrade') || bool(args, 'strip-prefix')) return upgrade(args)
+  if (bool(args, 'upgrade') || bool(args, 'strip-prefix') || bool(args, 'attachments')) return upgrade(args)
 
   const dir = one(args, 'dir', 'd') ?? process.cwd()
   const dryRun = bool(args, 'dry-run')
@@ -153,6 +153,8 @@ function upgrade(args: Args): number {
   // Prefix first: the status pass reads the files where they end up.
   if (bool(args, 'strip-prefix')) steps.push(...stripPrefix(layout, { dryRun }))
   if (bool(args, 'upgrade')) steps.push(...upgradeStatuses(store, { dryRun }), ...upgradeOptionLists(store, { dryRun }))
+  const attachments = bool(args, 'attachments') ? upgradeAttachments(store, { dryRun }) : undefined
+  if (attachments) steps.push(...attachments.steps)
   // join()'d paths use the host separator — a hard-coded `/` never matched on Windows.
   const rel = (p: string) => p.replace(`${layout.root}${sep}`, '')
   for (const s of steps) console.log(`${dryRun ? t('cli.migrate.wouldPrefix') : ''}${s.what}  ${rel(s.from)}${s.to ? ` → ${rel(s.to)}` : ''}`)
@@ -161,5 +163,20 @@ function upgrade(args: Args): number {
       ? `\n${t('cli.migrate.upgradeSteps', { count: steps.length, dryRun: dryRun ? t('cli.migrate.dryRunNoChange') : '' })}`
       : t('cli.migrate.alreadyUpToDate'),
   )
+  if (attachments) {
+    const ambiguous = attachments.plans.flatMap((p) => p.moves.filter((m) => m.ambiguous).map((m) => ({ p, m })))
+    console.log('')
+    console.log(
+      t('cli.migrate.attachmentsSummary', {
+        nodes: attachments.plans.filter((p) => p.changedCount).length,
+        moved: attachments.plans.reduce((n, p) => n + p.changedCount, 0),
+        ambiguous: ambiguous.length,
+      }),
+    )
+    if (ambiguous.length) {
+      console.log(t('cli.migrate.attachmentsAmbiguousHeading'))
+      for (const { p, m } of ambiguous) console.log(`  ${p.project}#${p.id}  ${m.target}  ${m.from} → [${m.candidates.join(', ')}]`)
+    }
+  }
   return 0
 }

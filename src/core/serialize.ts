@@ -160,6 +160,33 @@ export function upsertSection(body: string, heading: string, block: string): str
 }
 
 /**
+ * `upsertSection`, confined to one section's own span: the body's top prose
+ * (`anchor` undefined), or right after a `## <anchor>` heading — stopping
+ * before `stopBefore` (the next *note's* heading, or `undefined` for "end of
+ * body") rather than at the next `## ` of any kind, so a heading already
+ * inside this section (`## 选项`, an existing `## 附件`) doesn't get read as
+ * someone else's boundary. `anchor`/`stopBefore` are `DecisionNote.heading`
+ * strings, found verbatim — see `core/store.ts#sectionStopBefore`.
+ */
+export function upsertSectionScoped(body: string, anchor: string | undefined, stopBefore: string | undefined, heading: string, block: string): string {
+  const lines = body.split('\n')
+  let start = 0
+  if (anchor !== undefined) {
+    const hi = lines.findIndex((l) => l === `## ${anchor}`)
+    if (hi === -1) throw new Error(`no such section: ${anchor}`)
+    start = hi + 1
+  }
+  let end = lines.length
+  if (stopBefore !== undefined) {
+    const si = lines.findIndex((l, i) => i >= start && l === `## ${stopBefore}`)
+    if (si !== -1) end = si
+  }
+
+  const span = upsertSection(lines.slice(start, end).join('\n'), heading, block)
+  return [...lines.slice(0, start), ...span.split('\n'), ...lines.slice(end)].join('\n')
+}
+
+/**
  * `已答（human · owner · 2026-10-28 10:51:30）` — the shape every appended
  * section is written in, so `parseNoteHeading` can read it back. Seconds,
  * not minutes, so a note just after a `decs changes --since` cutoff isn't
