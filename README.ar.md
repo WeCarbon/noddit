@@ -401,6 +401,31 @@ Measured again: 1.9 s p95 from Singapore.
 **لديّ `DECISIONS.md` قديم.**
 `nod migrate --dir <project> --dry-run`، ثم بدون `--dry-run`.
 
+## حزمة Python
+
+يأتي Noddit أيضًا مع حزمة Python صغيرة، [`noddit` على PyPI](https://pypi.org/project/noddit/) (المكتبة القياسية فقط، Python 3.10 فما فوق). تتيح للمهام الطويلة في Python أن ترسل تقدّمها إلى عقدة — وهذا مفيد حين تعمل الاختبارات أو السكربتات في مكان لا يوجد فيه `nod`، مثل حاوية Docker. تكتب إضافة pytest سطر JSON لكل اختبار، وتفعل `progress_events` الشيء نفسه لأي سكربت. على الجهاز المضيف، يقرأ `nod progress --from-file` أو `nod run` الملف ويحرّك العقدة.
+
+</div>
+
+```sh
+pip install noddit
+pytest --noddit-events events.jsonl          # or NODDIT_EVENTS=events.jsonl pytest
+nod run W12 --events events.jsonl -- pytest  # the node's progress bar follows the run
+```
+
+```python
+from noddit import progress_events
+
+ev = progress_events("events.jsonl")
+ev.start(total=23, label="recalculate")
+ev.step(done=5, msg="table 3")
+ev.finish(ok=True, summary="23 tables")
+```
+
+<div dir="rtl">
+
+صيغة الأحداث موضّحة في [`python/docs/progress-events.md`](python/docs/progress-events.md).
+
 ## التطوير
 
 ```sh

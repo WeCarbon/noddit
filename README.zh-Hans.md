@@ -375,6 +375,27 @@ Measured again: 1.9 s p95 from Singapore.
 **我有一份老的 `DECISIONS.md`。**
 `nod migrate --dir <project> --dry-run`，确认没问题后去掉 `--dry-run` 再跑一次。
 
+## Python SDK
+
+Noddit 另有一个小小的 Python 包：[PyPI 上的 `noddit`](https://pypi.org/project/noddit/)（只用标准库，Python 3.10 以上）。它让 Python 里的长任务把进度报到节点上——测试或脚本跑在装不了 `nod` 的地方（比如 Docker 容器）时尤其有用。pytest 插件每跑完一条测试写一行 JSON；`progress_events` 让任何脚本也这样写。宿主机上用 `nod progress --from-file` 或 `nod run` 读这个文件，节点的进度条就跟着走。
+
+```sh
+pip install noddit
+pytest --noddit-events events.jsonl          # or NODDIT_EVENTS=events.jsonl pytest
+nod run W12 --events events.jsonl -- pytest  # the node's progress bar follows the run
+```
+
+```python
+from noddit import progress_events
+
+ev = progress_events("events.jsonl")
+ev.start(total=23, label="recalculate")
+ev.step(done=5, msg="table 3")
+ev.finish(ok=True, summary="23 tables")
+```
+
+事件格式见 [`python/docs/progress-events.md`](python/docs/progress-events.md)。
+
 ## 开发
 
 ```sh

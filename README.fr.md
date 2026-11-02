@@ -444,6 +444,27 @@ pièces jointes cohérents.
 **J’ai un vieux `DECISIONS.md`.**
 `nod migrate --dir <project> --dry-run`, puis sans `--dry-run`.
 
+## SDK Python
+
+Noddit propose aussi un petit paquet Python, [`noddit` sur PyPI](https://pypi.org/project/noddit/) (bibliothèque standard seulement, Python 3.10+). Il permet aux longues tâches Python de faire remonter leur progression vers un nœud — utile quand des tests ou des scripts tournent là où `nod` n’est pas installé, par exemple dans un conteneur Docker. Un plugin pytest écrit une ligne JSON par test ; `progress_events` fait de même pour n’importe quel script. Sur l’hôte, `nod progress --from-file` ou `nod run` lit le fichier et fait avancer le nœud.
+
+```sh
+pip install noddit
+pytest --noddit-events events.jsonl          # or NODDIT_EVENTS=events.jsonl pytest
+nod run W12 --events events.jsonl -- pytest  # the node's progress bar follows the run
+```
+
+```python
+from noddit import progress_events
+
+ev = progress_events("events.jsonl")
+ev.start(total=23, label="recalculate")
+ev.step(done=5, msg="table 3")
+ev.finish(ok=True, summary="23 tables")
+```
+
+Le format des événements est décrit dans [`python/docs/progress-events.md`](python/docs/progress-events.md).
+
 ## Développement
 
 ```sh

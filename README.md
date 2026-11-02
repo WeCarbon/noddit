@@ -408,6 +408,27 @@ answer queue and attachment history consistent.
 **I have an old `DECISIONS.md`.**
 `nod migrate --dir <project> --dry-run`, then without `--dry-run`.
 
+## Python SDK
+
+Noddit also ships a small Python package, [`noddit` on PyPI](https://pypi.org/project/noddit/) (standard library only, Python 3.10+). It lets long Python jobs report progress to a node — useful when tests or scripts run somewhere `nod` isn't installed, such as a Docker container. A pytest plugin writes one JSON line per test; `progress_events` does the same for any script. On the host, `nod progress --from-file` or `nod run` reads the file and moves the node.
+
+```sh
+pip install noddit
+pytest --noddit-events events.jsonl          # or NODDIT_EVENTS=events.jsonl pytest
+nod run W12 --events events.jsonl -- pytest  # the node's progress bar follows the run
+```
+
+```python
+from noddit import progress_events
+
+ev = progress_events("events.jsonl")
+ev.start(total=23, label="recalculate")
+ev.step(done=5, msg="table 3")
+ev.finish(ok=True, summary="23 tables")
+```
+
+The event format is in [`python/docs/progress-events.md`](python/docs/progress-events.md).
+
 ## Development
 
 ```sh
