@@ -25,7 +25,7 @@ const COMMANDS: Record<string, () => Promise<CommandModule>> = {
   pop: () => import('./commands/read.ts'),
   archive: () => import('./commands/archive.ts'),
   note: () => import('./commands/note.ts'),
-  pin: () => import('./commands/pin.ts'),
+  order: () => import('./commands/order.ts'),
   flag: () => import('./commands/flag.ts'),
   edit: () => import('./commands/edit.ts'),
   attach: () => import('./commands/attach.ts'),

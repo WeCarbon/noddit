@@ -88,7 +88,8 @@ export const reply = async (root: string, id: number, text: string, files: File[
 
 export const defer = (root: string, id: number, off: boolean) => ok(['defer', String(id), ...(off ? ['--off'] : []), ...human, '--dir', root])
 
-export const pin = (root: string, id: number, where: 'top' | 'bottom' | 'off') => ok(['pin', String(id), where, '--dir', root])
+/** `nod order`: these nodes in this order, above the ones never moved. `root` when they share a project. */
+export const order = (refs: string[], root?: string) => ok(['order', ...refs, ...(root ? ['--dir', root] : [])])
 
 /** The owner's marks: important, a milestone on `due` (YYYY-MM-DD or 3d), or normal (both off). */
 export const flag = (root: string, id: number, how: 'important' | 'milestone' | 'normal', due?: string) =>
@@ -550,7 +551,7 @@ const DEMO_VIEWS: ViewsList = {
     groups: ['project', 'state', 'assignee', 'none'],
     finished: ['hide', 'show', 'fold'],
     deferred: ['hide', 'show', 'fold'],
-    sort: ['bench', 'blocks_ai', 'flag', 'pin', 'urgency', 'due', 'created', 'updated', 'waiting_since', 'touched', 'id', 'title', 'state'],
+    sort: ['bench', 'blocks_ai', 'flag', 'manual', 'urgency', 'due', 'created', 'updated', 'waiting_since', 'touched', 'id', 'title', 'state'],
     filter_fields: ['state', 'assignee', 'flag', 'kind', 'project', 'author', 'tag', 'is', 'due', 'updated', 'title'],
     is_values: ['startable', 'deferred', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'],
     builtin: ['available', 'active', 'decide', 'all', 'waiting', 'recent'],

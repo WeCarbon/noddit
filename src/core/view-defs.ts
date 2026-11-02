@@ -37,7 +37,7 @@ export interface ViewDef {
 }
 
 export type SortKey = `${'' | '-'}${SortField}`
-export const SORT_FIELDS = ['bench', 'blocks_ai', 'flag', 'pin', 'urgency', 'due', 'created', 'updated', 'check_back', 'waiting_since', 'touched', 'id', 'title', 'state'] as const
+export const SORT_FIELDS = ['bench', 'blocks_ai', 'flag', 'manual', 'urgency', 'due', 'created', 'updated', 'check_back', 'waiting_since', 'touched', 'id', 'title', 'state'] as const
 export type SortField = (typeof SORT_FIELDS)[number]
 
 /** `{ any: […] }` / `{ all: […] }` / `{ not: … }` nest; a leaf is one condition. */
@@ -184,7 +184,8 @@ export function validateView(v: unknown): ViewDef {
   pick('finished', SHOW)
   pick('deferred', SHOW)
   if (d.sort !== undefined) {
-    const keys = (Array.isArray(d.sort) ? d.sort : String(d.sort).split(/[,\s]+/)).map(String).filter(Boolean)
+    // `pin` was manual order's name while it only meant top / bottom.
+    const keys = (Array.isArray(d.sort) ? d.sort : String(d.sort).split(/[,\s]+/)).map(String).filter(Boolean).map((k) => k.replace(/^(-?)pin$/, '$1manual'))
     for (const k of keys) if (!(SORT_FIELDS as readonly string[]).includes(k.replace(/^-/, ''))) throw new Error(t('core.views.badValue', { key: 'sort', value: k, values: SORT_FIELDS.join(' ') }))
     out.sort = keys as SortKey[]
   }

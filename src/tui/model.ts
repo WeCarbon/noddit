@@ -25,11 +25,6 @@ export function canUseDefault(d: Decision): boolean {
   return d.status === 'open' && Boolean(d.default)
 }
 
-/** Pinning is triage of the open queue; a settled entry has nowhere to be. */
-export function canPin(d: Decision): boolean {
-  return d.status === 'open'
-}
-
 export interface Segment {
   text: string
   /** Splits a row into blocks that a right-to-left layout reorders on their

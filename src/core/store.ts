@@ -44,7 +44,6 @@ import {
   type Decision,
   type DecisionNote,
   type DecisionOption,
-  type DecisionPin,
   type ItemStatus,
   type NewDecision,
   type NoteRole,
@@ -585,8 +584,6 @@ export class Store {
         ...d,
         state: 'decided',
         answer: { choice, ...(answers ? { answers } : {}), ...(answerNotes ? { answerNotes } : {}), note: a.note?.trim(), by, at },
-        pin: undefined,
-        pinnedAt: undefined,
         approvals: role === 'human' ? approveAttachments(d, { choice, answers }, by, at) : d.approvals,
         body: appendSection(d.body, noteHeading(NOTE_KIND.answered, role, by, at), text),
         reopenedAt: d.archived ? at : d.reopenedAt,
@@ -1191,8 +1188,6 @@ export class Store {
         ...d,
         state: 'completed',
         answer: { note: NOTE_TEXT.seenAnswer, by, at },
-        pin: undefined,
-        pinnedAt: undefined,
         body: appendSection(d.body, noteHeading(NOTE_KIND.seen, roleOf(by), by, at), NOTE_TEXT.seen),
         archivedAt: d.archived ? d.archivedAt : at,
       }
@@ -1274,8 +1269,20 @@ export class Store {
     return this.mutate(d, (fresh) => ({ next: { ...fresh, body: transform(fresh) } }))
   }
 
-  pin(d: Decision, pin: DecisionPin | null): Decision {
-    return this.mutate(d, (d) => ({ next: { ...d, pin: pin ?? undefined, pinnedAt: pin ? nowStamp() : undefined } }))
+  /**
+   * Puts `ds` in this order, above the nodes listed with them that were never moved: the first
+   * gets -n, the last -1. Only nodes whose number changes are written.
+   */
+  arrange(ds: Decision[]): Decision[] {
+    return ds.map((d, i) => {
+      const order = i - ds.length
+      return d.order === order ? d : this.mutate(d, (d) => ({ next: { ...d, order } }))
+    })
+  }
+
+  /** Back to the view's own order. */
+  unarrange(d: Decision): Decision {
+    return d.order === undefined ? d : this.mutate(d, (d) => ({ next: { ...d, order: undefined } }))
   }
 
   /**

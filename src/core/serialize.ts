@@ -10,7 +10,7 @@ const KEY_ORDER = [
   'id', 'title', 'author', 'status', 'close_reason', 'waiting_on', 'waiting_until', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'created', 'updated_at',
   'after', 'progress', 'progress_msg', 'est', 'when', 'stale_after', 'steps', 'owner_agent', 'intake', 'claimed_by', 'claimed_at',
   'kind', 'urgency', 'due', 'milestone', 'default', 'question_defaults', 'if_no_answer', 'reversible',
-  'pin', 'pinned_at', 'tags', 'session', 'supersedes', 'superseded_by', 'answer', 'approvals',
+  'order', 'tags', 'session', 'supersedes', 'superseded_by', 'answer', 'approvals',
   'archived_at', 'reopened_at',
 ]
 
@@ -55,8 +55,7 @@ export function frontMatterOf(d: Decision): Record<string, unknown> {
   if (d.session) fm.session = d.session
   if (d.supersedes?.length) fm.supersedes = d.supersedes
   if (d.supersededBy !== undefined) fm.superseded_by = d.supersededBy
-  if (d.pin) fm.pin = d.pin
-  if (d.pinnedAt) fm.pinned_at = d.pinnedAt
+  if (d.order) fm.order = d.order
   if (d.tags.length) fm.tags = d.tags
   if (d.archivedAt) fm.archived_at = d.archivedAt
   if (d.reopenedAt) fm.reopened_at = d.reopenedAt

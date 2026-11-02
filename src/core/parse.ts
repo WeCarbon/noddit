@@ -426,7 +426,7 @@ export function legacyStatus(state: ItemStatus, answered: boolean): DecisionStat
 
 /** Every front matter key this version reads; anything else is kept verbatim in `extra`. */
 const KNOWN_KEYS = new Set([
-  'id', 'title', 'author', 'status', 'created', 'updated_at', 'default', 'pin', 'pinned_at',
+  'id', 'title', 'author', 'status', 'created', 'updated_at', 'default', 'order', 'pin', 'pinned_at',
   'urgency', 'due', 'milestone', 'if_no_answer', 'reversible', 'kind', 'session', 'superseded_by', 'supersedes',
   'close_reason', 'waiting_on', 'waiting_until', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'answer', 'answered_by', 'answered_at', 'archived_at', 'reopened_at', 'tags',
   'question_defaults', 'progress', 'progress_msg', 'after', 'est', 'when', 'stale_after', 'steps', 'owner_agent',
@@ -504,7 +504,7 @@ export function parseDecision(
     claimedAt: str(data.claimed_at),
     extra: Object.keys(extra).length ? extra : undefined,
     default: str(data.default),
-    pin: data.pin === 'top' || data.pin === 'bottom' ? data.pin : undefined,
+    order: orderOf(data),
     urgency: data.urgency === 'high' || data.urgency === 'low' ? data.urgency : undefined,
     due: str(data.due),
     milestone: data.milestone === true || undefined,
@@ -514,7 +514,6 @@ export function parseDecision(
     session: str(data.session),
     supersededBy: Number.isInteger(Number(data.superseded_by)) && data.superseded_by != null ? Number(data.superseded_by) : undefined,
     supersedes: Array.isArray(data.supersedes) ? data.supersedes.map(Number).filter(Number.isInteger) : undefined,
-    pinnedAt: str(data.pinned_at),
     answer: hasAnswer
       ? typeof data.answer === 'string'
         ? { choice: data.answer, by: str(data.answered_by) ?? 'owner', at: str(data.answered_at) ?? '' }
@@ -543,4 +542,11 @@ export function parseDecision(
     archived,
     project,
   }
+}
+
+/** `order:`, or a pin from before manual order: pinned to the top sits above the rest, to the bottom below. */
+function orderOf(data: Record<string, unknown>): number | undefined {
+  const n = Number(data.order)
+  if (data.order != null && Number.isFinite(n) && n !== 0) return n
+  return data.pin === 'top' ? -1 : data.pin === 'bottom' ? 1 : undefined
 }

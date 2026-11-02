@@ -25,7 +25,7 @@ import { isMouse, parseMouse, MOUSE_OFF, MOUSE_ON, type MouseEvent } from './mou
 import { clearImages, cropToPng, imageProtocol, loadForCrop, renderImage, renderImageData } from './image.ts'
 import { RESET, ZOOM_MIN, cropRect, imageLayout, pan, zoomHintText, zoomIn, zoomOut, type ZoomState } from './zoom.ts'
 import { approvalLabel } from '../core/render.ts'
-import { bodyRows, canPin, canUseDefault, clamp, firstHtmlAttachmentIndex, styleLine, type Segment } from './model.ts'
+import { bodyRows, canUseDefault, clamp, firstHtmlAttachmentIndex, styleLine, type Segment } from './model.ts'
 import { ensureVisible, imageName, nodeImages, selectableImages, stepSelectable } from './images.ts'
 import {
   DEFERRED_GROUP,
@@ -89,7 +89,7 @@ export function repaintRows(frame: Line[], from: number, to: number): string {
 const MIN_PANEL_COLS = 12
 
 type Line = Segment[]
-export type Mode = 'browse' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'close' | 'goto' | 'settings' | 'brief' | 'session'
+export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'close' | 'goto' | 'settings' | 'brief' | 'session'
 /** Modes where keystrokes go into the prompt-line draft. */
 const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'close', 'goto', 'brief']
 
@@ -331,6 +331,23 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     // scrolled it out of view, and a key press is a request to see it.
     setListTop((t) => listTopFor(next, t, geom.paneRows, list.length))
     setCursorKey(list[next].key)
+  }
+
+  /** Move mode: swaps the node with its neighbour among the rows it shares a scope with, and writes that order. */
+  const moveAmongNeighbours = (delta: -1 | 1) => {
+    const scope = list[index]?.scope
+    if (!current || !scope) return setMode('browse')
+    const peers = list.filter((r) => r.kind === 'node' && r.scope === scope).map((r) => r.node!)
+    const at = peers.indexOf(current)
+    const to = at + delta
+    if (at === -1 || to < 0 || to >= peers.length) return say(t('bench.toast.moveEdge', { ref: refOf(current) }))
+    ;[peers[at], peers[to]] = [peers[to], peers[at]]
+    try {
+      store.arrange(peers)
+    } catch (e) {
+      say((e as Error).message)
+    }
+    reload()
   }
 
   const switchView = (next: View) => {
@@ -820,6 +837,15 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       return
     }
 
+    if (mode === 'move') {
+      if (key.escape || key.return || input === 'M') {
+        setMode('browse')
+        return current ? say(t('bench.toast.moved', { ref: refOf(current) })) : undefined
+      }
+      if (key.upArrow || key.downArrow) return moveAmongNeighbours(key.upArrow ? -1 : 1)
+      return
+    }
+
     if (mode === 'session') {
       if (input === 'y' || input === 'Y') return answerSession(true)
       if (input === 'n' || input === 'N' || key.escape || key.return) return answerSession(false)
@@ -1030,14 +1056,10 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       }
       return reload()
     }
-    if (/^[tTbBuU]$/.test(input)) {
-      if (!canPin(current)) return say(t('bench.toast.notPinnable'))
-      const where = /[tT]/.test(input) ? 'top' : /[bB]/.test(input) ? 'bottom' : null
-      store.pin(current, where)
-      say(where
-        ? t('bench.toast.pinned', { ref: refOf(current), where: where === 'top' ? t('bench.toast.pinnedTop') : t('bench.toast.pinnedBottom') })
-        : t('bench.toast.unpinned', { ref: refOf(current) }))
-      return reload()
+    if (input === 'M') {
+      if (!list[index]?.scope) return say(t('bench.toast.cantMove'))
+      setMode('move')
+      return say(t('bench.toast.moveMode', { ref: refOf(current) }))
     }
     if (key.return) {
       if (current.status === 'answered') return say(t('bench.toast.alreadyAnswered'))

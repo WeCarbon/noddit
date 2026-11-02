@@ -1,7 +1,7 @@
 import { isHumanTask } from '../core/assignee.ts'
 import { untilDay } from '../core/fuzzy-date.ts'
 import { isUnclaimedBrief } from '../core/intake.ts'
-import { benchOrder, isFlagged, untilDue, urgencyRank } from '../core/order.ts'
+import { benchOrder, isFlagged, manualRank, untilDue, urgencyRank } from '../core/order.ts'
 import { parseDuration } from '../core/duration.ts'
 import { BUILTIN_IDS, builtinView, loadViews, type CondField, type Filter, type SortField, type SortKey, type ViewDef } from '../core/view-defs.ts'
 import { NOTE_KIND } from '../core/format.ts'
@@ -235,6 +235,12 @@ export interface Row {
   open?: boolean
   /** 最近: what the owner last did to this node. */
   touch?: Touch
+  /**
+   * The nodes this one can be moved among by hand (`nod order`): rows with the same scope.
+   * Siblings in a tree; one group, and one band of the keys sorted before `manual`, in a list.
+   * Absent where the list keeps its own order (a date sort, a fold of finished or older rows).
+   */
+  scope?: string
 }
 
 export const isSelectable = (r: Row) => r.kind === 'node' || r.kind === 'fold'
@@ -263,7 +269,7 @@ function childMap(items: Item[]): Map<string, Item[]> {
 /** Siblings in happening order: after the siblings it's `after`, else
  *  creation order — not by status, or a row would jump mid-watch. */
 export function siblingOrder(sibs: Item[], items: Item[]): Item[] {
-  const rest = [...sibs].sort((a, b) => Number(isFlagged(b)) - Number(isFlagged(a)) || a.id - b.id)
+  const rest = [...sibs].sort((a, b) => manualRank(a) - manualRank(b) || Number(isFlagged(b)) - Number(isFlagged(a)) || a.id - b.id)
   const placed: Item[] = []
   const isSib = (d: Item) => rest.some((s) => s === d)
   while (rest.length) {
@@ -313,12 +319,12 @@ function cutTreeRows(inCut: (i: Item) => boolean, label: string, items: Item[], 
   const out: Row[] = []
   const projects = projectsOf(items)
 
-  const walk = (d: Item, depth: number) => {
+  const walk = (d: Item, depth: number, scope: string) => {
     const children = siblingOrder((kids.get(keyOf(d)) ?? []).filter((c) => shown.has(keyOf(c))), items)
     // Only the owner's own folds — a default-folded ancestor would hide this view's node.
     const collapsed = children.length > 0 && Boolean(opts.collapsed?.has(keyOf(d)))
-    out.push({ key: keyOf(d), kind: 'node', node: d, depth, hasKids: children.length > 0, collapsed, context: !match.has(keyOf(d)) })
-    if (!collapsed) for (const c of children) walk(c, depth + 1)
+    out.push({ key: keyOf(d), kind: 'node', node: d, depth, hasKids: children.length > 0, collapsed, context: !match.has(keyOf(d)), scope })
+    if (!collapsed) for (const c of children) walk(c, depth + 1, keyOf(d))
   }
 
   for (const p of projects) {
@@ -333,7 +339,7 @@ function cutTreeRows(inCut: (i: Item) => boolean, label: string, items: Item[], 
         text: t('bench.header.viewCount', { letter: p.letter ?? 'X', project: p.name, count: n, label }) + flaggedNote(items.filter((i) => i.project === p.project && match.has(keyOf(i)))),
       })
     }
-    for (const r of roots) walk(r, 0)
+    for (const r of roots) walk(r, 0, rootScope(p.project))
   }
   return out
 }
@@ -352,13 +358,14 @@ export function treeRows(items: Item[], opts: TreeOptions = {}): Row[] {
     return open
   }
 
-  const walk = (d: Item, depth: number) => {
+  const walk = (d: Item, depth: number, scope?: string) => {
     const children = siblingOrder(kids.get(keyOf(d)) ?? [], items)
     const collapsed = children.length > 0 && isCollapsed(d, opts)
-    out.push({ key: keyOf(d), kind: 'node', node: d, depth, hasKids: children.length > 0, collapsed })
+    out.push({ key: keyOf(d), kind: 'node', node: d, depth, hasKids: children.length > 0, collapsed, ...(scope ? { scope } : {}) })
     if (collapsed) return
-    for (const c of children) if (!isTerminal(c.state)) walk(c, depth + 1)
+    for (const c of children) if (!isTerminal(c.state)) walk(c, depth + 1, keyOf(d))
     const finished = children.filter((c) => isTerminal(c.state))
+    // Finished ones list newest first, not by hand.
     if (finished.length && group(doneGroupKey(d), depth + 1, finished, 'completed')) for (const c of finished) walk(c, depth + 1)
   }
 
@@ -378,7 +385,7 @@ export function treeRows(items: Item[], opts: TreeOptions = {}): Row[] {
           : t('bench.header.inProgress', { letter: p.letter ?? 'X', project: p.name, count: mine.length - done }),
       })
     }
-    for (const r of open) walk(r, 0)
+    for (const r of open) walk(r, 0, rootScope(p.project))
     if (finished.length && group(doneGroupKey({ project: p.project }), 0, finished, 'finished')) for (const r of finished) walk(r, 0)
   }
   return out
@@ -562,8 +569,10 @@ export function rowsFor(view: View | ViewDef, items: Item[], opts: TreeOptions =
   }
   const sorted = items.filter((i) => inView(def, i, items, now)).sort(compareBy(def.sort ?? ['bench'], items))
   const touch = (def.sort ?? []).some((k) => k.replace(/^-/, '') === 'touched')
+  const scopeOf = listScope(def, items)
   const row = (d: Item, depth: number): Row => {
-    const r: Row = { key: keyOf(d), kind: 'node', node: d, depth }
+    const scope = depth === 0 ? scopeOf(d) : undefined
+    const r: Row = { key: keyOf(d), kind: 'node', node: d, depth, ...(scope ? { scope } : {}) }
     const tt = touch ? lastTouch(d) : undefined
     return tt ? { ...r, touch: tt } : r
   }
@@ -578,6 +587,31 @@ export function rowsFor(view: View | ViewDef, items: Item[], opts: TreeOptions =
   }
   if (def.deferred === 'fold') out.push(...deferredFold(items, opts))
   return out
+}
+
+const rootScope = (project: string) => `${project}#`
+
+/** The sort keys that have only a few values, so nodes sharing them can still be put in order by hand. */
+const BANDS: Partial<Record<SortField, (d: Item, items: Item[]) => string>> = {
+  blocks_ai: (d, items) => String(blocksAnAi(d, items)),
+  flag: (d) => String(isFlagged(d)),
+  urgency: (d) => String(urgencyRank(d)),
+  state: (d) => d.state,
+}
+
+/**
+ * A list row's `scope`: its group plus its values for the keys sorted before the hand-made
+ * order (`manual`, or `bench`, which begins with it). A key with too many values to share
+ * (a date, a title) leaves nothing to arrange, so the list has no scope at all.
+ */
+function listScope(def: ViewDef, items: Item[]): (d: Item) => string | undefined {
+  const keys = def.sort ?? ['bench']
+  const at = keys.findIndex((k) => k === 'manual' || k === 'bench')
+  const before = keys.slice(0, Math.max(at, 0)).map((k) => BANDS[k.replace(/^-/, '') as SortField])
+  if (at === -1 || before.some((b) => !b)) return () => undefined
+  const group = def.group ?? 'none'
+  const groupOf = (d: Item) => (group === 'project' ? d.project : group === 'state' ? d.state : group === 'assignee' ? String(isHumanTask(d)) : '')
+  return (d) => ['list', groupOf(d), ...before.map((b) => b!(d, items))].join(':')
 }
 
 /** Where a list's 「Older N」 row is remembered — 最近 keeps its old key. */
@@ -647,13 +681,12 @@ export function compareBy(keys: readonly SortKey[], items: Item[]): (a: Item, b:
 const asc = (x: number, y: number) => (x === y ? 0 : x < y ? -1 : 1)
 const timeOf = (s: string | undefined) => Date.parse(s ?? '') || 0
 const dueOf = (d: Item) => (d.due ? Date.parse(d.due) || Infinity : Infinity)
-const pinRank = (d: Item) => (d.pin === 'top' ? 0 : d.pin === 'bottom' ? 2 : 1)
 
 const SORTERS: Record<SortField, (a: Item, b: Item, items: Item[]) => number> = {
   bench: (a, b) => benchOrder(a, b),
   blocks_ai: (a, b, items) => Number(blocksAnAi(b, items)) - Number(blocksAnAi(a, items)),
   flag: (a, b) => Number(isFlagged(b)) - Number(isFlagged(a)),
-  pin: (a, b) => pinRank(a) - pinRank(b),
+  manual: (a, b) => manualRank(a) - manualRank(b),
   urgency: (a, b) => urgencyRank(a) - urgencyRank(b),
   due: (a, b) => asc(dueOf(a), dueOf(b)),
   created: (a, b) => asc(timeOf(a.created), timeOf(b.created)),

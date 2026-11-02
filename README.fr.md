@@ -339,7 +339,7 @@ Les identifiants s’écrivent `305`, `W305` (lettre du projet), `web:305`
 | `N` | répondre sans décider (le nœud retourne à l’agent) |
 | `d` | reporter / reprendre |
 | `X` · `A` | fermer avec un motif · marquer comme vu et archiver |
-| `T` `B` `U` | épingler en haut / en bas / désépingler |
+| `M` | mode déplacement : ↑/↓ déplace le nœud parmi ses frères (ou son groupe dans une liste), ⏎ pour finir ; dans l’app, on glisse |
 | `i` · `o` | choisir et voir des images · ouvrir une pièce jointe |
 | `j` `k` `Ctrl-F` `Ctrl-B` | faire défiler le panneau de détail |
 | `Z` · `?` · `q` | corps condensé · toutes les touches · quitter |

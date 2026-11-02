@@ -23,6 +23,8 @@ export interface Row {
   glyph?: Seg
   mark?: 'strong' | 'weak' | null
   has_kids?: boolean
+  /** Rows sharing a scope can be put in order by hand (drag, ⌥↑/⌥↓); null where the list keeps its own order. */
+  scope?: string | null
   collapsed?: boolean
   context?: boolean
   deferred?: boolean
@@ -118,8 +120,8 @@ export interface Node {
   parent: number | null
   children: number[]
   can_default: boolean
-  can_pin: boolean
-  pin: 'top' | 'bottom' | null
+  /** Where the owner put it by hand: negative above the rest, null if never moved. */
+  order?: number | null
   urgency: 'high' | 'normal' | 'low'
   status_line: Seg[]
   meta: Seg[][]

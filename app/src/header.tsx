@@ -1,4 +1,4 @@
-import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, Flag, GitFork, Link2, PenLine, Pin, PinOff, Radio, Star, Timer, User } from 'lucide-preact'
+import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, Flag, GitFork, Link2, PenLine, Radio, Star, Timer, User } from 'lucide-preact'
 import type { ComponentChildren } from 'preact'
 import { Bar, Glyph, segClass } from './segs.tsx'
 import { s } from './strings.ts'
@@ -107,7 +107,6 @@ export function NodeHeader({ n, onJump, listening }: { n: Node; onJump: (key: st
             {`${s('milestone')} · ${ago(n.due)}`}
           </Chip>
         )}
-        {n.pin && <Chip icon={n.pin === 'top' ? <Pin {...ICON} /> : <PinOff {...ICON} />}>{n.pin === 'top' ? s('pinnedTop') : s('pinnedBottom')}</Chip>}
         {n.deferred_at && <Chip icon={<Timer {...ICON} />}>{s('deferred')}</Chip>}
         {n.brief === 'unclaimed' && (
           <Chip icon={<PenLine {...ICON} />} tone="c-blue brief">

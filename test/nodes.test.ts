@@ -34,7 +34,7 @@ test('unknown front matter keys survive a write', (t) => {
   const store = new Store([initLayout(root)])
   const d = store.create({ title: 't', author: 'a' })
   writeFileSync(d.file, readFileSync(d.file, 'utf8').replace('---\n\n', 'future_field:\n  nested: 1\n---\n\n'))
-  store.pin(store.get(1)!, 'top')
+  store.arrange([store.get(1)!])
   const text = readFileSync(store.get(1)!.file, 'utf8')
   assert.match(text, /future_field:\n  nested: 1/)
   assert.match(text, /updated_at: /)

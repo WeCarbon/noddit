@@ -8,8 +8,8 @@ import { Viewer, itemsAround, type ViewItem } from './viewer.tsx'
 import { BodyEditor } from './editor.tsx'
 import { ViewEditor, ViewIcon } from './views.tsx'
 import {
-  ArrowDownToLine, ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
-  FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Pin, PinOff, Play, Plus, RotateCcw,
+  ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
+  FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
   Bot, Flag, Hourglass, RefreshCcw, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
@@ -23,7 +23,7 @@ import { LetterPicker, RenameField, UnlinkConfirm } from './projects.tsx'
 import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
-import { applyOps, both, dropRows, patchNode, patchRows, type PendingOp } from './optimistic.ts'
+import { applyOps, both, dropRows, moveRow, patchNode, patchRows, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
 import type { Attachment, Bench as BenchData, Node, Project, Row, View, ViewName } from './types.ts'
@@ -353,9 +353,32 @@ export function Bench(props: {
       )
     if (composer.kind === 'close') return optimistic(finished(key, 'closed'), () => api.close(root, node.id, text || 'obsolete'), s('closed'), reopen(composer))
   }
-  const pin = (where: 'top' | 'bottom' | 'off') => {
-    if (!node?.can_pin) return
-    optimistic(patchNode(node.key, (n) => ({ ...n, pin: where === 'off' ? null : where })), () => api.pin(rootOf(node), node.id, where), where === 'off' ? s('unpinned') : s('pinned'))
+  /**
+   * Puts `key`'s row before or after `target`'s among the rows sharing its scope (siblings in a
+   * tree, one group in a list) and writes that order with one `nod order`.
+   */
+  const reorder = (key: string, target: string, after: boolean) => {
+    const from = view.rows.find((r) => r.key === key)
+    if (!from?.scope || key === target) return
+    const peers = view.rows.filter((r) => r.kind === 'node' && r.scope === from.scope && r.key !== key)
+    const at = peers.findIndex((r) => r.key === target)
+    if (at === -1) return
+    peers.splice(after ? at + 1 : at, 0, from)
+    const nodes = peers.map((r) => bench.nodes[r.node ?? ''])
+    const projects = new Set(nodes.map((n) => n?.project))
+    const root = projects.size === 1 && nodes[0] ? rootOf(nodes[0]) : undefined
+    optimistic(moveRow(key, target, after), () => api.order(peers.map((r) => r.ref ?? ''), root), s('moved', { ref: from.ref ?? '' }))
+  }
+  const [dragAt, setDragAt] = useState<{ key: string | null; scope: string | null; over: string | null; after: boolean }>({ key: null, scope: null, over: null, after: false })
+  const drag: DragState = { ...dragAt, set: setDragAt, drop: reorder }
+  /** ⌥↑ / ⌥↓: the selected node one place up or down among its peers. */
+  const nudge = (delta: -1 | 1) => {
+    const row = current && view.rows.find((r) => r.key === current.key)
+    if (!row) return
+    if (!row.scope) return showToast(s('cantMove'))
+    const peers = view.rows.filter((r) => r.kind === 'node' && r.scope === row.scope)
+    const next = peers[peers.indexOf(row) + delta]
+    if (next) reorder(row.key, next.key, delta === 1)
   }
   const seen = () => {
     if (!node || node.terminal) return
@@ -483,7 +506,7 @@ export function Bench(props: {
   const isMac = /Mac/.test(navigator.platform)
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
-  latest.current = { startAnswer, pin, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign, setHoldFor } as never
+  latest.current = { startAnswer, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign, setHoldFor } as never
 
   const nodeMenu = (n: Node | undefined, r: Row): MenuItem[] => {
     const L = () => latest.current as unknown as {
@@ -493,7 +516,6 @@ export function Bench(props: {
       clearMilestone: () => void
       reassign: () => void
       setHoldFor: (n: Node) => void
-      pin: (w: 'top' | 'bottom' | 'off') => void
       seen: () => void
       startClose: () => void
       toggleDefer: () => void
@@ -522,11 +544,6 @@ export function Bench(props: {
       else if (n.status === 'needs_decision') items.push({ label: s('ctxAnswer'), icon: I(PenLine), shortcut: '⏎', run: () => L().setComposer({ kind: 'free' }) })
     }
     if (n) items.push({ label: s('ctxReplyMenu'), icon: I(MessageSquareReply), shortcut: 'N', run: () => L().setComposer({ kind: 'reply' }) })
-    if (n?.can_pin) {
-      items.push({ kind: 'separator' })
-      if (n.pin) items.push({ label: s('unpin'), icon: I(PinOff), shortcut: 'U', run: () => L().pin('off') })
-      else items.push({ label: s('pinTop'), icon: I(Pin), shortcut: 'T', run: () => L().pin('top') }, { label: s('pinBottom'), icon: I(ArrowDownToLine), shortcut: 'B', run: () => L().pin('bottom') })
-    }
     if (n && !n.terminal) {
       items.push({ kind: 'separator' })
       items.push({ label: s('ctxImportant'), icon: I(Star), shortcut: '!', checked: n.urgency === 'high', run: () => L().toggleImportant() })
@@ -763,6 +780,10 @@ export function Bench(props: {
         e.preventDefault()
         return props.onAddProject()
       }
+      if (e.altKey && !meta && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault()
+        return nudge(e.key === 'ArrowUp' ? -1 : 1)
+      }
       if (meta || e.altKey) return
       switch (e.key) {
         case 'ArrowDown':
@@ -802,15 +823,6 @@ export function Bench(props: {
           return detailRef.current?.scrollBy({ top: 80, behavior: 'smooth' })
         case 'k':
           return detailRef.current?.scrollBy({ top: -80, behavior: 'smooth' })
-        case 'T':
-        case 't':
-          return pin('top')
-        case 'B':
-        case 'b':
-          return pin('bottom')
-        case 'U':
-        case 'u':
-          return pin('off')
         case 'X':
         case 'x':
           e.preventDefault()
@@ -986,6 +998,7 @@ export function Bench(props: {
             <ListRow
               key={r.key}
               row={r}
+              drag={drag}
               selected={current?.key === r.key}
               open={isOpen(r)}
               hidden={r.kind === 'node' && !isOpen(r) ? hiddenCount(view, view.rows.indexOf(r)) : 0}
@@ -1022,7 +1035,6 @@ export function Bench(props: {
             onReply={() => setComposer({ kind: 'reply' })}
             onFree={() => setComposer({ kind: 'free' })}
             onDefer={toggleDefer}
-            onPin={pin}
             onClose={startClose}
             onSeen={seen}
             onJump={jump}
@@ -1174,7 +1186,17 @@ export function Bench(props: {
   )
 }
 
-function ListRow(p: { row: Row; selected: boolean; open: boolean; hidden: number; onClick: () => void; onToggle: () => void; onMore: (el: HTMLElement) => void }) {
+/** A row being dragged, and where it would land: before or after `over`. */
+interface DragState {
+  key: string | null
+  scope: string | null
+  over: string | null
+  after: boolean
+  set: (d: { key: string | null; scope: string | null; over: string | null; after: boolean }) => void
+  drop: (key: string, target: string, after: boolean) => void
+}
+
+function ListRow(p: { row: Row; drag: DragState; selected: boolean; open: boolean; hidden: number; onClick: () => void; onToggle: () => void; onMore: (el: HTMLElement) => void }) {
   const r = p.row
   if (r.kind === 'header') return <div class="row header">{r.text}</div>
   const indent = { paddingInlineStart: `${12 + r.depth * 18}px` }
@@ -1186,15 +1208,40 @@ function ListRow(p: { row: Row; selected: boolean; open: boolean; hidden: number
       </div>
     )
   const badge = r.badge ?? []
+  const d = p.drag
+  const landing = d.key && d.over === r.key && d.key !== r.key ? (d.after ? 'drop-after' : 'drop-before') : ''
   return (
     <div
-      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} state-${r.state}`}
+      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} state-${r.state} ${d.key === r.key ? 'dragging' : ''} ${landing}`}
       style={indent}
+      draggable={Boolean(r.scope)}
+      onDragStart={(e) => {
+        if (!r.scope) return
+        e.dataTransfer?.setData('text/plain', r.ref ?? r.key)
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+        d.set({ key: r.key, scope: r.scope, over: null, after: false })
+      }}
+      onDragOver={(e) => {
+        if (!d.key || !r.scope || r.scope !== d.scope) return
+        e.preventDefault()
+        const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+        const after = e.clientY > box.top + box.height / 2
+        if (d.over !== r.key || d.after !== after) d.set({ ...d, over: r.key, after })
+      }}
+      onDrop={(e) => {
+        if (!d.key || r.scope !== d.scope) return
+        e.preventDefault()
+        const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+        d.drop(d.key, r.key, e.clientY > box.top + box.height / 2)
+        d.set({ key: null, scope: null, over: null, after: false })
+      }}
+      onDragEnd={() => d.set({ key: null, scope: null, over: null, after: false })}
       onClick={p.onClick}
       role="option"
       aria-selected={p.selected}
       data-ctx="row"
       data-key={r.key}
+      data-scope={r.scope ?? undefined}
     >
       <span class={`mark ${r.mark ?? ''}`}>{r.mark ? '◆' : ''}</span>
       <span
@@ -1268,7 +1315,6 @@ function Detail(p: {
   onReply: () => void
   onFree: () => void
   onDefer: () => void
-  onPin: (where: 'top' | 'bottom' | 'off') => void
   onClose: () => void
   onSeen: () => void
   onJump: (key: string) => void
@@ -1442,24 +1488,6 @@ function Detail(p: {
                 {n.deferred_at ? s('undefer') : s('defer')} <kbd>D</kbd>
               </button>
             )}
-            {n.can_pin &&
-              (n.pin ? (
-                <button class="quiet" onClick={() => p.onPin('off')} title={s('unpin')}>
-                  <PinOff size={14} strokeWidth={1.75} />
-                  <span class="ql">{s('unpin')}</span> <kbd>U</kbd>
-                </button>
-              ) : (
-                <>
-                  <button class="quiet" onClick={() => p.onPin('top')} title={`${s('pinTop')} — ${s('pinTopHint')}`}>
-                    <Pin size={14} strokeWidth={1.75} />
-                    <span class="ql">{s('pinShort')}</span> <kbd>T</kbd>
-                  </button>
-                  <button class="quiet" onClick={() => p.onPin('bottom')} title={`${s('pinBottom')} — ${s('pinBottomHint')}`}>
-                    <ArrowDownToLine size={14} strokeWidth={1.75} />
-                    <span class="ql">{s('parkShort')}</span> <kbd>B</kbd>
-                  </button>
-                </>
-              ))}
             <span class="grow" />
             {!n.terminal && (
               <>
@@ -1625,7 +1653,7 @@ function Help({ onClose }: { onClose: () => void }) {
     ['⏎', s('keyDefault')],
     ['N', s('keyReply')],
     ['D', s('keyDefer')],
-    ['T B U', s('keyPin')],
+    ['⌥↑ ⌥↓', s('keyReorder')],
     ['A', s('keySeen')],
     ['X', s('keyCloseNode')],
     ['G', s('keyGoto')],

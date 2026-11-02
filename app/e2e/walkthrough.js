@@ -220,9 +220,41 @@
       $$('.row.node').find((r) => r.textContent.includes(title)).click()
       await sleep(200)
     }
+    // Pins are gone: a row is dragged among the rows it shares a scope with, or ⌥↑/⌥↓ moves it.
+    $$('.nav-item').find((b) => b.dataset.view === 'all').click()
+    await sleep(300)
     await pick('Rename the bucket')
-    key('t')
-    await toast('Pinned')
+    const rowOf = (title) => $$('.row.node').find((r) => r.textContent.includes(title))
+    const dragged = rowOf('Rename the bucket')
+    const peers = $$('.row.node').filter((r) => r.dataset.scope && r.dataset.scope === dragged.dataset.scope)
+    if (peers.length < 2) throw new Error(`nothing to reorder with: ${peers.length} row(s) in its scope`)
+    const target = peers.find((r) => r !== dragged)
+    const targetTitle = target.querySelector('.title').textContent
+    const dt = new DataTransfer()
+    const fire = (el, type) => {
+      const box = el.getBoundingClientRect()
+      const ev = new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true, clientX: box.left + 20, clientY: box.top + 2 })
+      if (!ev.dataTransfer) Object.defineProperty(ev, 'dataTransfer', { value: dt })
+      el.dispatchEvent(ev)
+    }
+    fire(dragged, 'dragstart')
+    await sleep(100)
+    fire(target, 'dragover')
+    await until('the drop line', () => target.classList.contains('drop-before'))
+    await shot('reorder-drag')
+    fire(target, 'drop')
+    fire(dragged, 'dragend')
+    await toast('Moved')
+    const order = () => $$('.row.node').map((r) => r.querySelector('.title')?.textContent)
+    await until('dropped above its neighbour', () => order().indexOf('Rename the bucket') !== -1 && order().indexOf('Rename the bucket') < order().indexOf(targetTitle))
+    const id = Number(dragged.querySelector('.ref').textContent.replace(/\D/g, ''))
+    await until('written by nod order', async () => {
+      const out = await invoke('decs', { args: ['get', String(id), '--json'], cwd: null, stdin: null })
+      return typeof JSON.parse(out.stdout).order === 'number'
+    })
+    // ⌥↓ puts it back below its neighbour.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }))
+    await until('⌥↓ moved it down', () => order().indexOf('Rename the bucket') > order().indexOf(targetTitle))
     await sleep(600)
 
     log('STEP close')

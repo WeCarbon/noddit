@@ -7,7 +7,7 @@ import { benchOrder, compareUrgency, overdue } from '../src/core/order.ts'
 import type { Decision } from '../src/core/types.ts'
 import { decs, decsResult, scratch } from './helpers.ts'
 
-test('urgency outranks age; pins outrank urgency; nearer deadline first', () => {
+test('urgency outranks age; manual order outranks urgency; nearer deadline first', () => {
   const mk = (id: number, created: string, extra: Partial<Decision> = {}) =>
     ({ id, created, options: [], tags: [], ...extra }) as unknown as Decision
   const list = [
@@ -15,8 +15,8 @@ test('urgency outranks age; pins outrank urgency; nearer deadline first', () => 
     mk(2, '2026-09-05T00:00:00+08:00', { urgency: 'high' }),
     mk(3, '2026-08-01T00:00:00+08:00', { urgency: 'low' }),
     mk(4, '2026-09-06T00:00:00+08:00', { urgency: 'high', due: '2026-09-07T00:00:00+08:00' }),
-    mk(5, '2026-09-09T00:00:00+08:00', { pin: 'top' }),
-    mk(6, '2026-07-01T00:00:00+08:00', { urgency: 'high', pin: 'bottom' }),
+    mk(5, '2026-09-09T00:00:00+08:00', { order: -1 }),
+    mk(6, '2026-07-01T00:00:00+08:00', { urgency: 'high', order: 1 }),
   ].sort(benchOrder)
   assert.deepEqual(list.map((d) => d.id), [5, 4, 2, 1, 3, 6])
   assert.ok(compareUrgency({ urgency: 'high' }, {}) < 0)

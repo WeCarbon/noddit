@@ -568,8 +568,6 @@ export function toDecision(entry: LegacyEntry, project: string): Decision {
     kind: 'decision',
     created,
     default: entry.default,
-    pin: undefined,
-    pinnedAt: undefined,
     answer: entry.answer,
     tags: [],
     body: entry.body,

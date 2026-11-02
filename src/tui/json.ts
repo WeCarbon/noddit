@@ -15,7 +15,7 @@ import type { Decision as Item } from '../core/types.ts'
 import { isRtl, lang, t } from '../i18n/index.ts'
 import { targetPath } from '../cli/commands/open.ts'
 import { metaLines, statusSegments, whoOf } from './detail.ts'
-import { bodyRows, canPin, canUseDefault, type BodyRow, type Segment } from './model.ts'
+import { bodyRows, canUseDefault, type BodyRow, type Segment } from './model.ts'
 import { imageName, nodeImages } from './images.ts'
 import {
   DEFERRED_GROUP, RECENT_OLDER_GROUP, blocksAnAi, defOf, olderGroupKey, projectTreeRows, touchLabel, viewEmpty, viewLabel, doneGroupKey, glyphOf, isCollapsed, isDeferHidden, isTreeView,
@@ -72,6 +72,7 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
     state: d.state,
     glyph: plain([glyphOf(d, items, now)])[0],
     mark,
+    scope: row.scope ?? null,
     has_kids: Boolean(row.hasKids),
     collapsed,
     context: Boolean(row.context),
@@ -199,7 +200,6 @@ function nodeJson(d: Item, items: Item[], now: number, backlinks: Item[]): Recor
     key: keyOf(d),
     who: whoOf(d),
     can_default: canUseDefault(d),
-    can_pin: canPin(d),
     status_line: plain(statusSegments(d, items, now)),
     meta: metaLines(d, items, now, META_WIDTH, backlinks).map(plain),
     options: d.options.map((o) => ({ key: o.key, label: o.label, body: o.body.trim() || costs[o.key] || '' })),

@@ -3,7 +3,7 @@ import type { Decision, Urgency } from './types.ts'
 /**
  * The one ordering of "what should the owner look at first", shared by
  * `decs show`, `decs status` and the bench so they can never disagree.
- * Urgency outranks age; the owner's own pins outrank both.
+ * Urgency outranks age; where the owner put a node by hand outranks both.
  */
 export const URGENCIES: readonly Urgency[] = ['high', 'normal', 'low']
 
@@ -43,10 +43,13 @@ export function compareUrgency(a: Pick<Decision, 'urgency' | 'due' | 'milestone'
   return da === db ? 0 : da < db ? -1 : 1
 }
 
-/** Pinned to the top first, then by urgency and deadline, then longest-waiting, then whatever was parked. */
+/** Where the owner put it by hand: negative above the rest, 0 for nodes never moved. */
+export const manualRank = (d: Pick<Decision, 'order'>) => d.order ?? 0
+
+/** By hand first (see `manualRank`), then by urgency and deadline, then longest-waiting. */
 export function benchOrder(a: Decision, b: Decision): number {
-  const rank = (d: Decision) => (d.pin === 'top' ? 0 : d.pin === 'bottom' ? 2 : 1)
-  if (rank(a) !== rank(b)) return rank(a) - rank(b)
+  const m = manualRank(a) - manualRank(b)
+  if (m) return m
   const u = compareUrgency(a, b)
   if (u) return u
   const ta = a.created || ''

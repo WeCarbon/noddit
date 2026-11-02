@@ -30,7 +30,7 @@ const BOOLEAN = new Set([
   'human', 'agent', 'fyi', 'defaults', 'done', 'notify', 'task', 'tree', 'root', 'upgrade', 'strip-prefix', 'attachments',
   // Not `stale`: `decs queue --stale 1h` takes a value; a bare `--stale` still reads as set.
   'unhandled', 'no-sources', 'here',
-  'replace', 'approval-content', 'off', 'brief', 'no-brief', 'no-heartbeat',
+  'replace', 'approval-content', 'off', 'brief', 'no-brief', 'no-heartbeat', 'clear',
 ])
 
 export function parseArgs(argv: string[]): Args {

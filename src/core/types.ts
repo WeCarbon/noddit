@@ -143,7 +143,6 @@ export interface PreviousRound {
 export const ACCEPTANCE_OPTION = { key: '1', label: OPTION_LABEL.accept }
 /** An fyi entry needs no answer, but one key to clear it from the bench is still handy. */
 export const FYI_OPTION = { key: '1', label: OPTION_LABEL.fyi }
-export type DecisionPin = 'top' | 'bottom'
 
 /** How soon the owner should look. Absent in front matter means normal. */
 export type Urgency = 'high' | 'normal' | 'low'
@@ -190,8 +189,11 @@ export interface Decision {
   default?: string
   /** The owner touched this and no agent has picked it up yet (see `core/queue.ts`). */
   queued?: boolean
-  /** Bench triage: `top` = deal with first, `bottom` = parked. */
-  pin?: DecisionPin
+  /**
+   * Where the owner put it by hand among the nodes it is listed with: lower first. Absent is 0 —
+   * nodes arranged above the rest are negative, the rest keep the view's own order (core/order.ts).
+   */
+  order?: number
   /** Absent = normal. See core/order.ts for how it sorts. */
   urgency?: Urgency
   /** ISO time the proposer needs an answer by. */
@@ -242,7 +244,6 @@ export interface Decision {
   supersededBy?: number
   /** The entries this one replaced. */
   supersedes?: number[]
-  pinnedAt?: string
   answer?: DecisionAnswer
   /** Last time the entry was filed into archived/. */
   archivedAt?: string

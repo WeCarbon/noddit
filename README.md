@@ -317,7 +317,7 @@ Ids are `305`, `W305` (project letter), `web:305` (project name), or legacy
 | `N` | reply without deciding (the node goes back to the agent) |
 | `d` | defer / undefer |
 | `X` · `A` | close with a reason · mark looked-at and archive |
-| `T` `B` `U` | pin top / bottom / unpin |
+| `M` | move mode: ↑/↓ moves the node among its siblings (or its group in a list), ⏎ done; the app takes a drag |
 | `i` · `o` | pick and view images · open an attachment |
 | `j` `k` `Ctrl-F` `Ctrl-B` | scroll the detail pane |
 | `Z` · `?` · `q` | condensed body · all keys · quit |

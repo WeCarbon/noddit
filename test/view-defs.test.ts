@@ -80,7 +80,9 @@ test('the built-in views, run from their definitions, list exactly what the hand
   store.note(store.all()[0], { text: 'looks good', role: 'human', author: 'owner', kind: '回复' })
   const items = store.all()
   const open = { openGroups: new Set(['fold:deferred', 'fold:recent-older']) }
-  assert.deepEqual(rowsFor('decide', items), ownerRows(items))
+  // `scope` (what a row can be moved among by hand) came after the hand-written lists.
+  const unscoped = rowsFor('decide', items).map(({ scope: _, ...r }) => r)
+  assert.deepEqual(unscoped, ownerRows(items))
   assert.deepEqual(rowsFor('waiting', items, open), waitingRows(items, open))
   assert.deepEqual(rowsFor('recent', items, open), recentRows(items, open))
   assert.deepEqual(viewIds(), ['available', 'active', 'decide', 'all', 'waiting', 'recent'])

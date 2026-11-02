@@ -412,13 +412,13 @@ test('concurrent writers never collide on a number', (t) => {
   })
 })
 
-test('bench order: pinned top, then longest waiting, then parked', () => {
-  const mk = (id: number, created: string, pin?: 'top' | 'bottom') =>
-    ({ id, created, pin, options: [], tags: [] }) as unknown as Decision
+test('bench order: arranged by hand above, then longest waiting, then an old bottom pin', () => {
+  const mk = (id: number, created: string, order?: number) =>
+    ({ id, created, order, options: [], tags: [] }) as unknown as Decision
   const list = [
     mk(1, '2026-09-01T00:00:00+08:00'),
-    mk(2, '2026-09-03T00:00:00+08:00', 'top'),
-    mk(3, '2026-08-01T00:00:00+08:00', 'bottom'),
+    mk(2, '2026-09-03T00:00:00+08:00', -1),
+    mk(3, '2026-08-01T00:00:00+08:00', 1),
     mk(4, '2026-08-20T00:00:00+08:00'),
   ].sort(benchOrder)
   assert.deepEqual(list.map((d) => d.id), [2, 4, 1, 3])

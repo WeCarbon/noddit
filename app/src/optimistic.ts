@@ -48,3 +48,30 @@ export const both =
   (...patches: ((b: Bench) => Bench)[]) =>
   (b: Bench): Bench =>
     patches.reduce((acc, p) => p(acc), b)
+
+/** Where the rows under `rows[i]` (deeper than it) end. */
+function blockEnd(rows: Row[], i: number): number {
+  let j = i + 1
+  while (j < rows.length && rows[j].depth > rows[i].depth) j++
+  return j
+}
+
+function movedRows(rows: Row[], key: string, target: string, after: boolean): Row[] {
+  const i = rows.findIndex((r) => r.key === key)
+  const t = rows.findIndex((r) => r.key === target)
+  if (i < 0 || t < 0 || !rows[i].scope || rows[i].scope !== rows[t].scope) return rows
+  const piece = rows.slice(i, blockEnd(rows, i))
+  const rest = [...rows.slice(0, i), ...rows.slice(blockEnd(rows, i))]
+  const ti = rest.findIndex((r) => r.key === target)
+  const at = after ? blockEnd(rest, ti) : ti
+  return [...rest.slice(0, at), ...piece, ...rest.slice(at)]
+}
+
+/** `key`'s row, with the rows under it, moved before or after `target`'s, in every list that has both in one scope. */
+export const moveRow =
+  (key: string, target: string, after: boolean) =>
+  (b: Bench): Bench => ({
+    ...b,
+    views: b.views.map((v) => ({ ...v, rows: movedRows(v.rows, key, target, after) })),
+    project_views: b.project_views?.map((p) => ({ ...p, rows: movedRows(p.rows, key, target, after) })),
+  })

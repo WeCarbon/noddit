@@ -96,13 +96,13 @@ fi
 
 if [ "$status" -eq 0 ]; then
   cd "$NODDIT_APP_PICK"
-  check() { "$NODDIT_BIN" get "$1" --json | CHECK="$2" node -e 'const d = JSON.parse(require("fs").readFileSync(0)); if (!eval(process.env.CHECK)) { console.error("check failed on " + process.argv[1] + ": " + process.env.CHECK + " — " + JSON.stringify({ title: d.title, status: d.status, pin: d.pin, notes: d.notes.map((n) => n.kind) })); process.exit(1) }' "$1"; }
+  check() { "$NODDIT_BIN" get "$1" --json | CHECK="$2" node -e 'const d = JSON.parse(require("fs").readFileSync(0)); if (!eval(process.env.CHECK)) { console.error("check failed on " + process.argv[1] + ": " + process.env.CHECK + " — " + JSON.stringify({ title: d.title, status: d.status, order: d.order, notes: d.notes.map((n) => n.kind) })); process.exit(1) }' "$1"; }
   check 1 "d.answer.choice==='2' && /JSON columns/.test(d.answer.note) && d.answer.by==='owner'"
   check 3 "d.answer.choice==='2' && d.notes.filter((n) => n.kind === '已答').length === 2"
   check 2 "d.notes.some(n=>n.role==='human' && /索引/.test(n.text))"
   check 2 "d.important === true && d.milestone === true && /^2030-01-15T23:59:59/.test(d.due)"
   check 4 "d.deferred_at"
-  check 5 "d.pin === 'top'"
+  check 5 "typeof d.order === 'number'"
   check 6 "d.status === 'closed' && d.close_reason === 'merged into X5'"
   check 7 "d.status === 'completed'"
   check 1 "d.project_name === 'Shop front' && d.ref === 'Q1'"
