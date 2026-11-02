@@ -6,10 +6,11 @@ import { QuickEntry, StartSession } from './quick.tsx'
 import { DeferDialog, NewNode } from './newnode.tsx'
 import { Viewer, itemsAround, type ViewItem } from './viewer.tsx'
 import { BodyEditor } from './editor.tsx'
+import { ViewEditor, ViewIcon } from './views.tsx'
 import {
   ArrowDownToLine, ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Pin, PinOff, Play, Plus, RotateCcw,
-  Bot, Flag, RefreshCcw, Settings as SettingsIcon, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
+  Bot, Flag, RefreshCcw, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -413,6 +414,7 @@ export function Bench(props: {
     )
   }
   const [newOpen, setNewOpen] = useState(false)
+  const [viewEditor, setViewEditor] = useState<{ start?: string } | null>(null)
   /** The description (`body`) or a note (its index) being edited, on which node. */
   const [editing, setEditing] = useState<{ key: string; target: 'body' | number } | null>(null)
   const [editConflict, setEditConflict] = useState<{ n: Node; target: 'body' | number; markdown: string } | null>(null)
@@ -535,6 +537,7 @@ export function Bench(props: {
       }
       items.push({ kind: 'separator' }, { label: s('ctxExpandAll'), icon: I(ChevronsUpDown), run: () => all(true) }, { label: s('ctxCollapseAll'), icon: I(ChevronsDownUp), run: () => all(false) })
     }
+    items.push({ kind: 'separator' }, { label: s('viewEditThis'), icon: I(SlidersHorizontal), run: () => setViewEditor({ start: v.view }) })
     return items
   }
 
@@ -676,6 +679,7 @@ export function Bench(props: {
       if (e.key === 'Escape') {
         if (lightbox !== null) return setLightbox(null)
         if (palette) return setPalette(false)
+        if (viewEditor) return setViewEditor(null)
         if (help) return setHelp(false)
         if (settingsOpen) return setSettingsOpen(false)
         if (composer) {
@@ -688,7 +692,7 @@ export function Bench(props: {
         if (scope) return setScope(null)
         return
       }
-      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || milestoneFor || editing || editConflict || isTyping(e)) return
+      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || milestoneFor || editing || editConflict || viewEditor || isTyping(e)) return
       if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault()
         return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
@@ -837,12 +841,21 @@ export function Bench(props: {
       <aside class="sidebar" ref={sidebarRef}>
         <div class="drag" data-tauri-drag-region />
         <nav>
-          <div class="section-label">{s('views')}</div>
+          <div class="section-label with-tool">
+            {s('views')}
+            <button class="section-tool" onClick={() => setViewEditor({})} title={s('viewEditorTitle')} aria-label={s('viewEditorTitle')}>
+              <SlidersHorizontal size={13} strokeWidth={1.75} />
+            </button>
+          </div>
           {views.map((v, i) => (
-            <button key={v.view} data-ctx="view" data-view={v.view} class={`nav-item ${!scope && v.view === view.view ? 'on' : ''}`} onClick={() => switchView(v.view)} title={`⌘${i + 1}`}>
-              <svg viewBox="0 0 16 16" class={`ico ico-${v.view}`}>
-                <path d={VIEW_ICON[v.view as keyof typeof VIEW_ICON] ?? VIEW_ICON.all} />
-              </svg>
+            <button key={v.view} data-ctx="view" data-view={v.view} class={`nav-item ${!scope && v.view === view.view ? 'on' : ''}`} onClick={() => switchView(v.view)} title={i < 9 ? `⌘${i + 1}` : undefined}>
+              {v.icon ? (
+                <ViewIcon name={v.icon} tone={v.view} />
+              ) : (
+                <svg viewBox="0 0 16 16" class={`ico ico-${v.view}`}>
+                  <path d={VIEW_ICON[v.view as keyof typeof VIEW_ICON] ?? VIEW_ICON.all} />
+                </svg>
+              )}
               <span class="label">{v.label}</span>
               {v.count !== null && v.count > 0 && <span class={`count ${v.view === 'decide' ? 'hot' : ''}`}>{v.count}</span>}
             </button>
@@ -1036,6 +1049,7 @@ export function Bench(props: {
           }}
         />
       )}
+      {viewEditor && <ViewEditor start={viewEditor.start} onClose={() => setViewEditor(null)} onChanged={() => void refresh()} />}
       {editConflict && (
         <EditConflict
           onReload={() => (setEditConflict(null), void refresh())}

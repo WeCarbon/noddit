@@ -358,6 +358,27 @@
     $$('.nav-item').find((b) => b.textContent.includes('Available')).click()
     await until('a view lets go of the project', () => !$('.project.on') && $('.nav-item.on'))
 
+    log('STEP views')
+    // Views are data: add one, change what it shows, see it in the sidebar, remove it, restore defaults.
+    $('.section-tool').click()
+    await until('view editor', () => $('.view-editor .ve-item'))
+    const viewsBefore = $$('.nav-item[data-view]').length
+    $$('.ve-item').find((b) => b.classList.contains('add')).click()
+    await until('the new view in the sidebar', () => $$('.nav-item[data-view]').length === viewsBefore + 1)
+    const filter = await until('its filter', () => $('.view-editor .ve-filter'))
+    type(filter, 'state:waiting')
+    await until('a live count', () => /\d/.test($('.ve-preview')?.textContent ?? ''))
+    await shot('view-editor')
+    $('.view-editor .primary').click()
+    await sleep(800)
+    const defs = JSON.parse((await invoke('decs', { args: ['views', '--json'], cwd: null, stdin: null })).stdout)
+    const mine = defs.views.find((x) => x.id === 'view-1')
+    if (mine?.filter_text !== 'state:waiting') throw new Error(`the view editor did not save: ${JSON.stringify(mine)}`)
+    $('.view-editor .ve-reset').click()
+    await until('back to the built-ins', () => $$('.nav-item[data-view]').length === viewsBefore)
+    key('Escape')
+    await until('view editor closed', () => !$('.view-editor'))
+
     log('STEP settings')
     key(',', { metaKey: true })
     await until('settings', () => $('.settings'))

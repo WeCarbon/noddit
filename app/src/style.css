@@ -237,6 +237,11 @@ kbd {
   flex: none;
 }
 
+.ico.line-ico,
+svg.lucide.ico {
+  fill: none;
+}
+
 .ico-decide { color: var(--yellow); opacity: 1; }
 .ico-active { color: var(--cyan); opacity: 1; }
 .ico-waiting { color: var(--magenta); opacity: 1; }
@@ -2294,4 +2299,230 @@ figcaption {
 
 .ed-host .ProseMirror li[data-item-type='task'] {
   list-style: none;
+}
+
+/* Views as data: the editor. */
+.section-label.with-tool {
+  display: flex;
+  align-items: center;
+}
+
+.section-tool {
+  margin-inline-start: auto;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--text-3);
+  opacity: 0;
+}
+
+.sidebar:hover .section-tool,
+.section-tool:focus-visible {
+  opacity: 1;
+}
+
+.section-tool:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.view-editor {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  width: min(860px, 94vw);
+  height: min(620px, 90vh);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  outline: none;
+}
+
+.ve-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px;
+  background: var(--sidebar);
+  border-inline-end: 1px solid var(--line);
+  overflow: auto;
+}
+
+.ve-head {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 4px 8px 8px;
+}
+
+.ve-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--text-2);
+  text-align: start;
+}
+
+.ve-item.on {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.ve-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ve-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-inline-start: auto;
+}
+
+.ve-list .grow {
+  flex: 1;
+}
+
+.ve-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.ve-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  overflow: auto;
+}
+
+.ve-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ve-name {
+  flex: 1;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  padding: 4px 2px;
+  outline: none;
+}
+
+.ed-tool.danger:hover {
+  color: var(--red);
+}
+
+.ve-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ve-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-2);
+}
+
+.ve-icon.on {
+  background: var(--sel);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px var(--sel-ring);
+}
+
+.ve-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.ve-filter,
+.ve-field input[type='number'],
+.ve-sort select {
+  font: 12.5px/1.4 var(--mono);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.ve-preview {
+  color: var(--accent);
+}
+
+.ve-hint {
+  margin: -6px 0 0;
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.ve-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: flex-end;
+}
+
+.ve-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--code-bg);
+}
+
+.ve-seg button {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.ve-seg button.on {
+  background: var(--raised, var(--panel));
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.ve-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ve-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
 }

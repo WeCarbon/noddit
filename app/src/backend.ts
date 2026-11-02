@@ -492,3 +492,71 @@ export async function attachFiles(root: string, id: number, files: File[], to: '
     await ok(['attach', String(id), path, '--to', to === 'body' ? 'body' : String(to + 1), '--dir', root])
   }
 }
+
+/** One view as `nod views --json` lists it: its definition plus how it reads. */
+export interface ViewDef {
+  id: string
+  name?: string | Record<string, string>
+  icon?: string
+  layout: 'tree' | 'list'
+  group?: string
+  sort?: string[]
+  finished?: string
+  deferred?: string
+  window?: { days?: number; max?: number }
+  count?: boolean
+  label: string
+  filter_text?: string
+  builtin: boolean
+  pristine: boolean
+}
+
+export interface ViewsList {
+  file: string
+  views: ViewDef[]
+  schema: { layouts: string[]; groups: string[]; finished: string[]; deferred: string[]; sort: string[]; filter_fields: string[]; is_values: string[]; builtin: string[] }
+}
+
+const DEMO_VIEWS: ViewsList = {
+  file: '~/.decs/views.json',
+  views: [
+    { id: 'available', icon: 'list-todo', layout: 'tree', label: 'Available', filter_text: 'state:in_progress,waiting,needs_decision,decided or state:not_started is:startable', builtin: true, pristine: true },
+    { id: 'decide', icon: 'hand', layout: 'list', group: 'project', sort: ['blocks_ai', 'flag', 'bench'], label: 'Needs you', filter_text: 'state:needs_decision or assignee:human', builtin: true, pristine: true },
+    { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['flag', 'waiting_since'], deferred: 'fold', label: 'Waiting', filter_text: 'state:waiting', builtin: true, pristine: true },
+  ],
+  schema: {
+    layouts: ['tree', 'list'],
+    groups: ['project', 'state', 'assignee', 'none'],
+    finished: ['hide', 'show', 'fold'],
+    deferred: ['hide', 'show', 'fold'],
+    sort: ['bench', 'blocks_ai', 'flag', 'pin', 'urgency', 'due', 'created', 'updated', 'waiting_since', 'touched', 'id', 'title', 'state'],
+    filter_fields: ['state', 'assignee', 'flag', 'kind', 'project', 'author', 'tag', 'is', 'due', 'updated', 'title'],
+    is_values: ['startable', 'deferred', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'],
+    builtin: ['available', 'active', 'decide', 'all', 'waiting', 'recent'],
+  },
+}
+
+export const viewsList = async (): Promise<ViewsList> => (inDesktop ? (JSON.parse(await ok(['views', '--json'])) as ViewsList) : DEMO_VIEWS)
+
+/** The definition as `--def` takes it: the filter in its text form. */
+const defJson = (d: Partial<ViewDef> & { filter?: string }) => {
+  const { label: _l, filter_text, builtin: _b, pristine: _p, ...rest } = d as ViewDef & { filter?: string }
+  return JSON.stringify({ ...rest, ...(filter_text !== undefined ? { filter: filter_text } : {}) })
+}
+
+/** How many nodes `d` would list right now (an unsaved definition, nothing written). */
+export async function previewView(d: ViewDef): Promise<number> {
+  if (!inDesktop) return 3
+  const b = JSON.parse(await ok(['bench', '--json', '--def', defJson({ ...d, id: d.id })])) as { views: { rows: { kind: string; context?: boolean }[] }[] }
+  return (b.views[0]?.rows ?? []).filter((r) => r.kind === 'node' && !r.context).length
+}
+
+export const editView = (id: string, patch: Partial<ViewDef> & { filter?: string; name?: string }) => {
+  const { name, ...def } = patch
+  return ok(['view', 'edit', id, '--def', JSON.stringify(def), ...(name !== undefined ? ['--name', name] : []), '--json'])
+}
+export const addView = (id: string, def: Record<string, unknown>) => ok(['view', 'add', id, '--def', JSON.stringify(def), '--json'])
+export const removeView = (id: string) => ok(['view', 'rm', id])
+export const resetViews = (id?: string) => ok(['view', 'reset', ...(id ? [id] : [])])
+/** `n` is 1-based, as nod view move takes it. */
+export const moveView = (id: string, n: number) => ok(['view', 'move', id, String(n)])

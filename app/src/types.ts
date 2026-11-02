@@ -44,6 +44,8 @@ export interface Row {
 
 export interface View {
   view: ViewName
+  /** A lucide icon name, from the view's definition. */
+  icon?: string
   label: string
   empty: string
   count: number | null
