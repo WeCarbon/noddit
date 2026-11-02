@@ -51,6 +51,7 @@ import {
 } from './views.ts'
 import { summaryLines } from './summary.ts'
 import { loadViews } from '../core/view-defs.ts'
+import { readPreview, TEXT_PREVIEW } from './preview.ts'
 import { DEFERRED_FOLD_KEY, foldFor, foldKey, foldSets, groupFoldKey, loadFolds, saveFold, type FoldMap } from './folds.ts'
 import { cycleOption, initialPicks, metaLines, optionForKey, picksSummary, questionLines, statusSegments } from './detail.ts'
 
@@ -87,7 +88,7 @@ export function repaintRows(frame: Line[], from: number, to: number): string {
 const MIN_PANEL_COLS = 12
 
 type Line = Segment[]
-export type Mode = 'browse' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'questions' | 'qnote' | 'close' | 'goto' | 'settings' | 'brief' | 'session'
+export type Mode = 'browse' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'close' | 'goto' | 'settings' | 'brief' | 'session'
 /** Modes where keystrokes go into the prompt-line draft. */
 const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'close', 'goto', 'brief']
 
@@ -207,6 +208,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const [qNotes, setQNotes] = useState<Record<string, string>>({})
   /** 0-based into `nodeImages(current)`: the selected `🖼️` placeholder, and what the big view shows. */
   const [imageSel, setImageSel] = useState(0)
+  /** An attachment read as text (mode 'text'): which one, its lines, how far down. */
+  const [textView, setTextView] = useState<{ n: number; label: string; lines: string[]; truncated: boolean; top: number } | null>(null)
   // Detail focus (`i`/→, left with ←/Esc): ↑/↓ move the image selection instead of the list cursor.
   const [detailFocus, setDetailFocus] = useState(false)
   /** The attachment picker was opened by `O`: a digit hands that file to the OS viewer instead of drawing it. */
@@ -567,13 +570,25 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     selectImage(imageSel)
   }
 
-  /** Shows an attachment: a picture is drawn in-terminal, anything else goes to the OS. */
+  /** Shows an attachment: a picture is drawn in-terminal, text and markdown read here, anything else goes to the OS. */
   const showAttachment = (n: number) => {
     if (!current) return
     const a = current.attachments[n - 1]
     if (!a) return say(t('bench.toast.onlyAttachments', { count: current.attachments.length }))
     const at = images.findIndex((img) => img.attachment === n - 1)
-    return at >= 0 ? showImage(at) : openAttachment(n)
+    if (at >= 0) return showImage(at)
+    const p = targetPath(current.file, a.target)
+    if (!a.target.includes('://') && TEXT_PREVIEW.test(p) && existsSync(p)) {
+      try {
+        const { text, truncated } = readPreview(p)
+        setTextView({ n, label: a.label, lines: text.replace(/\r\n/g, '\n').split('\n'), truncated, top: 0 })
+        setBanner(null)
+        return setMode('text')
+      } catch (e) {
+        return say((e as Error).message)
+      }
+    }
+    return openAttachment(n)
   }
 
   const pick = (key: string) => {
@@ -719,7 +734,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     rows, width, listTop, offset, condensed, mode, draft, caret, imageSel, pendingKey, banner,
     zoom, zoomable: imgMeta !== null, detailFocus, pickToOpen,
     imageSize: imgMeta ? { width: imgMeta.width, height: imgMeta.height } : null,
-    qIndex, qPicks, qNotes, settingIndex,
+    qIndex, qPicks, qNotes, settingIndex, textView,
     briefTarget: briefAt ? (briefAt.parent ? refOf(briefAt.parent) : store.projectName(briefAt.layout)) : undefined,
     briefForMe: Boolean(briefAt?.forMe),
     sessionProject: sessionFor?.project,
@@ -866,6 +881,26 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         return setQIndex((i) => Math.min(qs.length - 1, i + 1))
       }
       if (input === 'n' || input === 'N') return startText('qnote', qNotes[q.key] ?? '')
+      return
+    }
+
+    if (mode === 'text' && textView) {
+      const page = Math.max(1, rows - 4)
+      const last = Math.max(0, textView.lines.length - page)
+      const to = (top: number) => setTextView({ ...textView, top: Math.max(0, Math.min(last, top)) })
+      if (input === 'q' || key.escape) return (setMode('browse'), setTextView(null))
+      if (input === 'O') return openAttachment(textView.n)
+      if (key.downArrow || input === 'j') return to(textView.top + 1)
+      if (key.upArrow || input === 'k') return to(textView.top - 1)
+      if (key.pageDown || input === ' ') return to(textView.top + page)
+      if (key.pageUp) return to(textView.top - page)
+      if (input === 'g') return to(0)
+      if (input === 'G') return to(last)
+      // ←→: the node's other attachments.
+      if ((key.leftArrow || key.rightArrow) && current) {
+        const next = textView.n + (key.rightArrow ? 1 : -1)
+        if (next >= 1 && next <= current.attachments.length) return showAttachment(next)
+      }
       return
     }
 
@@ -1018,7 +1053,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     [
       list, index, current, view, items, overview, now, backlinks, rows, width, listTop, offset, condensed, mode, draft, caret,
       imageSel, pendingKey, banner, geom, zoom, imgMeta, detailFocus, pickToOpen, qIndex, qPicks, qNotes, settingIndex, settingsVersion,
-      briefAt, sessionFor,
+      briefAt, sessionFor, textView,
     ],
   )
   frameRef.current = frame
@@ -1086,6 +1121,8 @@ export interface FrameInput {
   briefForMe?: boolean
   /** `session` mode: the project nobody is listening in. */
   sessionProject?: string
+  /** An attachment read as text (mode 'text'). */
+  textView?: { n: number; label: string; lines: string[]; truncated: boolean; top: number } | null
 }
 
 /** Below this, the full hint line (natural truncation aside) crowds out too
@@ -1602,6 +1639,23 @@ export function buildFrame(s: FrameInput, g: Geometry = geometry(s)): Line[] {
     const rule: Line = [{ text: '─'.repeat(s.width), dim: true }]
     const body = helpText().map((l): Line => [{ text: l }])
     return clampFrame(rtl ? [header, rule, ...body.map((l) => mirrorLine(l, mode))] : [header, rule, ...body])
+  }
+
+  if (s.mode === 'text' && s.textView) {
+    const v = s.textView
+    const page = Math.max(1, s.rows - 4)
+    const head: Line = [
+      { text: `${s.current ? refOf(s.current) : ''} · ${v.label}`, bold: true },
+      { text: `  ${Math.min(v.top + 1, v.lines.length)}–${Math.min(v.top + page, v.lines.length)}/${v.lines.length}`, dim: true },
+      { text: `   ${t('bench.prompt.textView')}`, dim: true },
+    ]
+    const markdown = /\.(md|markdown)$/i.test(v.label)
+    const body = v.lines.slice(v.top, v.top + page).map((l): Line => {
+      const h = markdown ? /^(#{1,6})\s+(.*)$/.exec(l) : null
+      return [h ? { text: fit(h[2], s.width), bold: true, color: 'cyan' } : { text: fit(l, s.width) }]
+    })
+    const tail: Line[] = v.truncated && v.top + page >= v.lines.length ? [[{ text: t('bench.prompt.textTruncated'), dim: true }]] : []
+    return clampFrame([head, [{ text: '─'.repeat(s.width), dim: true }], ...body, ...tail])
   }
 
   if (s.mode === 'image') {

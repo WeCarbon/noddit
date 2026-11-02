@@ -226,7 +226,9 @@
     "imagePicker": "Choisir une image : ↑↓ sélectionner  i/⏎ voir en grand (←→ changer)  O ouvre dans l’application système  ←/Esc retour à la liste",
     "brief": "Nouvelle demande pour une IA dans {{target}} (⇥ pour vous) : ",
     "startSession": "Aucune session d’IA n’écoute {{project}}. En ouvrir une maintenant ? (y/n)",
-    "todo": "Nouvelle tâche pour vous dans {{target}} (⇥ pour une IA) : "
+    "todo": "Nouvelle tâche pour vous dans {{target}} (⇥ pour une IA) : ",
+    "textView": "↑↓ défiler  espace page  ←→ autres pièces jointes  O ouvrir à l’extérieur  q retour",
+    "textTruncated": "Seul le premier mégaoctet est affiché — O ouvre le fichier entier."
   },
   "placeholder": {
     "optional": "(facultatif)",

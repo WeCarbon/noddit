@@ -220,7 +220,9 @@
     "imagePicker": "選圖：↑↓ 選  i/⏎ 看大圖（←→ 換圖）  O 用系統程式打開  ←/Esc 回列表",
     "brief": "派活到 {{target}}（⇥ 改成你自己的事）：",
     "startSession": "{{project}} 現在沒有 AI 會話在線。現在開一個？(y/n)",
-    "todo": "你自己的事，記到 {{target}}（⇥ 改成派活）："
+    "todo": "你自己的事，記到 {{target}}（⇥ 改成派活）：",
+    "textView": "↑↓ 捲動  空白 翻頁  ←→ 其他附件  O 用外部程式開啟  q 返回",
+    "textTruncated": "只顯示了前 1 MB——按 O 開啟整個檔案。"
   },
   "placeholder": {
     "optional": "(可留空)",

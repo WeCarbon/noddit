@@ -223,7 +223,9 @@
     "imagePicker": "Pick image: ↑↓ select  i/⏎ view full-size (←→ switch)  O opens in system viewer  ←/Esc back to list",
     "brief": "New brief for an AI in {{target}} (⇥ for you): ",
     "startSession": "No AI session is listening in {{project}}. Open one now? (y/n)",
-    "todo": "New to-do for you in {{target}} (⇥ for an AI): "
+    "todo": "New to-do for you in {{target}} (⇥ for an AI): ",
+    "textView": "↑↓ scroll  space page  ←→ other attachments  O open outside  q back",
+    "textTruncated": "Only the first megabyte is shown — O opens the whole file."
   },
   "placeholder": {
     "optional": "(optional)",
