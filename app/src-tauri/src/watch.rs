@@ -399,7 +399,7 @@ pub fn start_monitor(app: &AppHandle) {
     }
     start_clock(app);
     let app = app.clone();
-    let mut args: Vec<String> = ["monitor", "--updates", "--json", "--idle-exit", "0", "--interval", "800", "--all", "--unclaimed-after", "10m", "--with-parent"]
+    let mut args: Vec<String> = ["monitor", "--updates", "--json", "--idle-exit", "0", "--interval", "800", "--all", "--all-projects", "--unclaimed-after", "10m", "--with-parent"]
         .iter()
         .map(|s| s.to_string())
         .collect();
