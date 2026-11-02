@@ -16,6 +16,10 @@
   --cyan: #2b7de9;
   --yellow: #d68a00;
   --yellow-soft: rgba(214, 138, 0, 0.12);
+  --important-bg: rgba(245, 184, 61, 0.24);
+  --important-text: #8a5700;
+  /* Anything that can wrap to two lines: a pill would turn into a lozenge. */
+  --chip-radius: 8px;
   --green: #2f9e6a;
   --green-soft: rgba(47, 158, 106, 0.12);
   --magenta: #8f4fd0;
@@ -50,6 +54,8 @@
     --cyan: #5aa9ff;
     --yellow: #f5b83d;
     --yellow-soft: rgba(245, 184, 61, 0.13);
+    --important-bg: rgba(245, 184, 61, 0.2);
+    --important-text: #f7c75e;
     --green: #4cc38a;
     --green-soft: rgba(76, 195, 138, 0.13);
     --magenta: #c08cf5;
@@ -81,6 +87,8 @@
   --cyan: #5aa9ff;
   --yellow: #f5b83d;
   --yellow-soft: rgba(245, 184, 61, 0.13);
+  --important-bg: rgba(245, 184, 61, 0.2);
+  --important-text: #f7c75e;
   --green: #4cc38a;
   --green-soft: rgba(76, 195, 138, 0.13);
   --magenta: #c08cf5;
@@ -715,7 +723,7 @@ svg.lucide.ico {
   font-weight: 500;
   color: var(--text-2);
   background: var(--code-bg);
-  border-radius: 999px;
+  border-radius: var(--chip-radius);
   padding: 2px 8px;
 }
 
@@ -746,7 +754,7 @@ svg.lucide.ico {
 
 .pick {
   padding: 5px 11px;
-  border-radius: 999px;
+  border-radius: var(--chip-radius);
   box-shadow: 0 0 0 1px var(--line-strong);
   font-size: 12.5px;
   transition: all 120ms ease;
@@ -1236,7 +1244,7 @@ svg.lucide.ico {
   color: var(--bg);
   font-weight: 500;
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: var(--chip-radius);
   box-shadow: var(--shadow-pop);
   transition: all 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   z-index: 30;
@@ -1857,7 +1865,7 @@ figcaption {
   max-width: 50%;
   margin-inline-start: 8px;
   padding: 2px 4px 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--chip-radius);
   background: var(--sel);
   color: var(--accent);
   font-size: 12px;
@@ -2566,7 +2574,7 @@ figcaption {
   max-width: 100%;
   min-width: 0;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--chip-radius);
   border: 1px solid var(--line);
   background: var(--panel);
   font-size: 12px;

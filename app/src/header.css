@@ -23,7 +23,7 @@
   gap: 6px;
   height: 24px;
   padding: 0 10px 0 8px;
-  border-radius: 999px;
+  border-radius: var(--chip-radius);
   font-size: 12px;
   font-weight: 600;
   background: color-mix(in srgb, currentColor 11%, transparent);
@@ -64,7 +64,7 @@
 .nhead-top .mchip {
   height: 24px;
   padding: 0 9px;
-  border-radius: 999px;
+  border-radius: var(--chip-radius);
   background: var(--code-bg);
   font-size: 12px;
   font-weight: 500;

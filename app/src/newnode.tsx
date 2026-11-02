@@ -120,7 +120,7 @@ export function NewNode(p: {
         <div class="sheet-section">
         <div class="sheet-label">{s('newMarks')}</div>
         <div class="new-row">
-          <button class={`qchip ${important ? 'on' : ''}`} onClick={() => setImportant(!important)} aria-pressed={important}>
+          <button class={`qchip important ${important ? 'on' : ''}`} onClick={() => setImportant(!important)} aria-pressed={important}>
             <Star {...ICON} />
             {s('quickImportant')}
           </button>

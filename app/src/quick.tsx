@@ -89,7 +89,7 @@ export function QuickEntry(p: {
               {nested && <X size={12} strokeWidth={2} />}
             </button>
           )}
-          <button class={`qchip ${important ? 'on' : ''}`} onClick={() => setImportant(!important)} aria-pressed={important}>
+          <button class={`qchip important ${important ? 'on' : ''}`} onClick={() => setImportant(!important)} aria-pressed={important}>
             <Star {...ICON} />
             {s('quickImportant')}
           </button>
