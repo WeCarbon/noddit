@@ -38,6 +38,9 @@ export interface Row {
   /** The owner's mark: ★ important, ⚑ a milestone counted down to `due`. */
   flag?: 'important' | 'milestone' | null
   due?: string | null
+  /** 等待: the day to check back, and whether it has come. */
+  waiting_until?: string | null
+  wait_due?: boolean
   /** Recent: what the owner last did here. */
   touch?: { kind: string; at: string; text: string; choice?: string; label: string }
 }
@@ -49,6 +52,8 @@ export interface View {
   label: string
   empty: string
   count: number | null
+  /** Waiting nodes due to be checked on, among those counted. */
+  due_count?: number
   rows: Row[]
 }
 
@@ -139,6 +144,9 @@ export interface Node {
   created: string
   updated_at: string | null
   due: string | null
+  /** 等待: who/what, and the day to check back. */
+  waiting_on?: string | null
+  waiting_until?: string | null
   /** The owner's marks (nod flag). */
   assignee?: 'human' | 'ai'
   human_task?: boolean

@@ -3,14 +3,14 @@ import * as api from './backend.ts'
 import { Body } from './body.tsx'
 import { NodeHeader } from './header.tsx'
 import { QuickEntry, StartSession } from './quick.tsx'
-import { DeferDialog, NewNode } from './newnode.tsx'
+import { DeferDialog, HoldDialog, NewNode } from './newnode.tsx'
 import { Viewer, itemsAround, type ViewItem } from './viewer.tsx'
 import { BodyEditor } from './editor.tsx'
 import { ViewEditor, ViewIcon } from './views.tsx'
 import {
   ArrowDownToLine, ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Pin, PinOff, Play, Plus, RotateCcw,
-  Bot, Flag, RefreshCcw, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
+  Bot, Flag, Hourglass, RefreshCcw, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -347,6 +347,19 @@ export function Bench(props: {
     if (node && !node.terminal) setComposer({ kind: 'close' })
   }
   const [deferFor, setDeferFor] = useState<Node | null>(null)
+  const [holdFor, setHoldFor] = useState<Node | null>(null)
+  /** 等待 on `on` (null: only the day moves) until `date`. */
+  const holdNode = (n: Node, on: string | null, date: string) => {
+    setHoldFor(null)
+    optimistic(
+      both(
+        patchNode(n.key, (x) => ({ ...x, status: 'waiting', waiting_on: on ?? x.waiting_on, waiting_until: `${date}T00:00:00` })),
+        patchRows(n.key, (r) => ({ ...r, state: 'waiting', wait_due: false, waiting_until: `${date}T00:00:00`, glyph: r.glyph && { ...r.glyph, text: '⏸', color: 'magenta', dim: false } })),
+      ),
+      () => api.hold(rootOf(n), n.id, on, date),
+      s('heldUntil', { date }),
+    )
+  }
   /** Put off until `date` (YYYY-MM-DD), or indefinitely with null. */
   const deferNode = (n: Node, date: string | null) => {
     setDeferFor(null)
@@ -452,7 +465,7 @@ export function Bench(props: {
   const isMac = /Mac/.test(navigator.platform)
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
-  latest.current = { startAnswer, pin, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign } as never
+  latest.current = { startAnswer, pin, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign, setHoldFor } as never
 
   const nodeMenu = (n: Node | undefined, r: Row): MenuItem[] => {
     const L = () => latest.current as unknown as {
@@ -461,6 +474,7 @@ export function Bench(props: {
       setMilestoneFor: (n: Node) => void
       clearMilestone: () => void
       reassign: () => void
+      setHoldFor: (n: Node) => void
       pin: (w: 'top' | 'bottom' | 'off') => void
       seen: () => void
       startClose: () => void
@@ -506,6 +520,7 @@ export function Bench(props: {
       if (n.status === 'not_started') items.push({ label: s('ctxStart'), icon: I(Play), run: () => L().markStart() })
       if (n.status === 'in_progress' || n.status === 'waiting') items.push({ label: s('ctxDone'), icon: I(CircleCheck), run: () => L().markDone() })
       items.push({ label: n.deferred_at ? s('undefer') : s('deferMenu'), icon: n.deferred_at ? I(TimerOff) : I(Timer), shortcut: 'D', run: () => L().toggleDefer() })
+      if (n.status !== 'needs_decision') items.push({ label: n.status === 'waiting' ? s('holdChange') : s('holdMenu'), icon: I(Hourglass), run: () => L().setHoldFor(n) })
       items.push({ label: n.assignee === 'human' ? s('assignAi') : s('assignMe'), icon: n.assignee === 'human' ? I(Bot) : I(User), run: () => L().reassign() })
       items.push({ label: s('seen'), icon: I(Eye), shortcut: 'A', run: () => L().seen() })
       items.push({ label: s('ctxCloseMenu'), icon: I(Ban), shortcut: 'X', danger: true, run: () => L().startClose() })
@@ -692,7 +707,7 @@ export function Bench(props: {
         if (scope) return setScope(null)
         return
       }
-      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || milestoneFor || editing || editConflict || viewEditor || isTyping(e)) return
+      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || holdFor || milestoneFor || editing || editConflict || viewEditor || isTyping(e)) return
       if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault()
         return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
@@ -857,7 +872,14 @@ export function Bench(props: {
                 </svg>
               )}
               <span class="label">{v.label}</span>
-              {v.count !== null && v.count > 0 && <span class={`count ${v.view === 'decide' ? 'hot' : ''}`}>{v.count}</span>}
+              {v.view === 'waiting' && (v.due_count ?? 0) > 0 && (
+                <span class="count due" title={s('waitDueCount', { count: v.due_count! })}>
+                  {v.due_count}
+                </span>
+              )}
+              {v.count !== null && v.count - (v.view === 'waiting' ? (v.due_count ?? 0) : 0) > 0 && (
+                <span class={`count ${v.view === 'decide' ? 'hot' : ''}`}>{v.count - (v.view === 'waiting' ? (v.due_count ?? 0) : 0)}</span>
+              )}
             </button>
           ))}
           <div class="section-label">{s('projects')}</div>
@@ -1065,6 +1087,7 @@ export function Bench(props: {
           }}
         />
       )}
+      {holdFor && <HoldDialog node={holdFor} busy={busy} onClose={() => setHoldFor(null)} onHold={(on, date) => holdNode(holdFor, on, date)} />}
       {deferFor && <DeferDialog title={`${deferFor.ref} ${deferFor.title}`} busy={busy} onClose={() => setDeferFor(null)} onDefer={(date) => deferNode(deferFor, date)} />}
       {startFor && (
         <StartSession
@@ -1145,7 +1168,7 @@ function ListRow(p: { row: Row; selected: boolean; open: boolean; hidden: number
   const badge = r.badge ?? []
   return (
     <div
-      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} state-${r.state}`}
+      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} state-${r.state}`}
       style={indent}
       onClick={p.onClick}
       role="option"

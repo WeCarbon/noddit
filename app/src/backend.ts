@@ -560,3 +560,7 @@ export const removeView = (id: string) => ok(['view', 'rm', id])
 export const resetViews = (id?: string) => ok(['view', 'reset', ...(id ? [id] : [])])
 /** `n` is 1-based, as nod view move takes it. */
 export const moveView = (id: string, n: number) => ok(['view', 'move', id, String(n)])
+
+/** 等待: held up on `on` until `date` (YYYY-MM-DD or a loose date), the day to check back. `on` left out moves only the day. */
+export const hold = (root: string, id: number, on: string | null, date: string) =>
+  ok(['hold', String(id), ...(on ? ['--on', on] : []), '--until', date, '--dir', root])

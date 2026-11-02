@@ -171,3 +171,46 @@ export function DeferDialog(p: { title: string; busy: boolean; onClose: () => vo
     </div>
   )
 }
+
+/** Waiting on someone outside, until a day to check back on them. On a node already waiting, the who is filled in. */
+export function HoldDialog(p: { node: import('./types.ts').Node; busy: boolean; onClose: () => void; onHold: (on: string | null, date: string) => void }) {
+  const waiting = p.node.status === 'waiting'
+  const [on, setOn] = useState(waiting ? (p.node.waiting_on ?? '') : '')
+  const [text, setText] = useState('')
+  const [date, setDate] = useState<string | null>(null)
+  const field = useRef<HTMLInputElement>(null)
+  useDialogFocus(field)
+  const ready = Boolean(on.trim() && date)
+  const go = () => ready && p.onHold(waiting && on.trim() === (p.node.waiting_on ?? '') ? null : on.trim(), date!)
+  return (
+    <div class="overlay" onClick={p.onClose}>
+      <div class="confirm hold-dialog" role="dialog" onClick={(e) => e.stopPropagation()}>
+        <h3>{waiting ? s('holdChange') : s('holdMenu')}</h3>
+        <p class="d">
+          {p.node.ref} {p.node.title}
+        </p>
+        <input
+          ref={field}
+          class="hold-on"
+          value={on}
+          placeholder={s('holdOnPlaceholder')}
+          onInput={(e) => setOn((e.target as HTMLInputElement).value)}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Escape') p.onClose()
+          }}
+        />
+        <DateField value={text} onText={setText} onChange={setDate} onEnter={go} onEscape={p.onClose} placeholder={s('holdUntilPlaceholder')} />
+        <div class="confirm-actions">
+          <span class="grow" />
+          <button class="ghost" onClick={p.onClose}>
+            {s('cancel')}
+          </button>
+          <button class="primary" disabled={!ready || p.busy} onClick={go}>
+            {s('holdButton')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

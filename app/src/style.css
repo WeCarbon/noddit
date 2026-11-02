@@ -2526,3 +2526,38 @@ figcaption {
   gap: 6px;
   font-size: 12px;
 }
+
+/* 等待 whose day to check back has come: a purple row, and its own purple number on the tab. */
+.row.node.wait-due {
+  background: color-mix(in srgb, var(--magenta) 14%, transparent);
+}
+
+.row.node.wait-due.sel {
+  background: color-mix(in srgb, var(--magenta) 22%, transparent);
+}
+
+.count.due {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--magenta);
+  color: #fff;
+  text-align: center;
+  font-weight: 600;
+}
+
+.count.due + .count {
+  margin-inline-start: 4px;
+}
+
+.hold-on {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+}
