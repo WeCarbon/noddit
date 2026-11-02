@@ -1,4 +1,4 @@
-import { Bot, CalendarClock, CornerLeftUp, Flame, GitFork, Link2, MessageSquare, PenLine, Pin, PinOff, Plus, Radio, CheckCheck, Timer, User } from 'lucide-preact'
+import { Bot, CalendarClock, CornerLeftUp, Flame, GitFork, Link2, PenLine, Pin, PinOff, Radio, Timer, User } from 'lucide-preact'
 import type { ComponentChildren } from 'preact'
 import { Bar, Glyph, segClass } from './segs.tsx'
 import { s } from './strings.ts'
@@ -82,36 +82,6 @@ function StatusPill({ segs }: { segs: Seg[] }) {
   )
 }
 
-interface Event {
-  at: string
-  kind: 'created' | 'agent' | 'human' | 'answer'
-  who: string
-  text: string
-}
-
-/** Created, then every note and answer, oldest first: a row of dots, each with its own tooltip. */
-function Timeline({ n }: { n: Node }) {
-  const events: Event[] = [{ at: n.created, kind: 'created', who: n.who, text: '' }]
-  for (const note of n.notes ?? []) {
-    const answer = /^(已答|Answered)/.test(note.kind)
-    events.push({ at: note.at, kind: answer ? 'answer' : note.role === 'human' ? 'human' : 'agent', who: note.author.split(/\s*·\s*/)[0], text: note.text })
-  }
-  if (events.length < 2) return null
-  const icon = (k: Event['kind']) =>
-    k === 'created' ? <Plus {...ICON} /> : k === 'answer' ? <CheckCheck {...ICON} /> : k === 'human' ? <MessageSquare {...ICON} /> : <Bot {...ICON} />
-  const last = events.at(-1)!
-  return (
-    <div class="timeline" aria-label="timeline">
-      {events.map((e, i) => (
-        <span key={i} class={`tl-dot tl-${e.kind}`} title={`${e.who} · ${fullTime(e.at)}${e.text ? `\n${e.text.slice(0, 160)}` : ''}`}>
-          {icon(e.kind)}
-        </span>
-      ))}
-      <span class="tl-last">{ago(last.at)}</span>
-    </div>
-  )
-}
-
 export function NodeHeader({ n, onJump, listening }: { n: Node; onJump: (key: string) => void; listening: { on: boolean; who: string | null } | null }) {
   const waitingSince = n.status === 'needs_decision' ? n.updated_at ?? n.created : null
   const steps = Array.isArray(n.steps) ? (n.steps as { label: string; done: boolean }[]) : []
@@ -191,7 +161,6 @@ export function NodeHeader({ n, onJump, listening }: { n: Node; onJump: (key: st
           ))}
         </ol>
       )}
-      <Timeline n={n} />
     </header>
   )
 }
