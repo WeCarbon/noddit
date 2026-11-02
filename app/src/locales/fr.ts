@@ -23,6 +23,8 @@ export const fr: Strings = {
   cancel: 'Annuler',
   reply: 'Commenter',
   replyPlaceholder: 'Écrire un commentaire — il repart vers l’IA, ce n’est pas une réponse',
+  filesBelow: 'Pièces jointes ci-dessous.',
+  removeFile: 'Retirer {{name}}',
   defer: 'Reporter',
   undefer: 'Reprendre',
   attachments: 'Pièces jointes',

@@ -22,6 +22,8 @@ export const zhHans: Strings = {
   cancel: '取消',
   reply: '回复',
   replyPlaceholder: '写回复——会回到 AI 那里，不算答复',
+  filesBelow: '附件见下。',
+  removeFile: '移除 {{name}}',
   defer: '延迟',
   undefer: '取消延迟',
   attachments: '附件',

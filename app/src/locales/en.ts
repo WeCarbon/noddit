@@ -20,6 +20,8 @@ export const en = {
   cancel: 'Cancel',
   reply: 'Reply',
   replyPlaceholder: 'Write a reply — it goes back to the agent, it is not an answer',
+  filesBelow: 'Files below.',
+  removeFile: 'Remove {{name}}',
   defer: 'Defer',
   undefer: 'Undefer',
   attachments: 'Attachments',

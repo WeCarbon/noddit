@@ -178,3 +178,7 @@
   -webkit-user-select: text;
   user-select: text;
 }
+
+.quick > .draft-files {
+  margin: 0 18px 10px;
+}

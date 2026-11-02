@@ -46,17 +46,45 @@ export const listProjects = async (): Promise<Project[]> =>
 
 const human = ['--human']
 
-export const answer = (root: string, id: number, choice: string, note?: string) =>
-  ok(['push', String(id), choice, ...(note ? ['--note', note] : []), ...human, '--dir', root])
+/** Files from a paste or a drop, saved where nod can attach them; their paths in the same order. */
+async function saveUploads(files: File[]): Promise<string[]> {
+  const paths: string[] = []
+  if (!inDesktop) return paths
+  for (const f of files) {
+    const bytes = new Uint8Array(await f.arrayBuffer())
+    let bin = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    paths.push(await invoke<string>('save_upload', { name: f.name || 'pasted.png', data: btoa(bin) }))
+  }
+  return paths
+}
+
+/** The owner's answer note was just written: its files go under it. */
+async function attachToAnswer(root: string, id: number, files: File[]): Promise<void> {
+  const paths = await saveUploads(files)
+  if (paths.length) await ok(['attach', String(id), ...paths, '--to', 'last', ...human, '--dir', root])
+}
+
+export const answer = async (root: string, id: number, choice: string, note?: string, files: File[] = []) => {
+  await ok(['push', String(id), choice, ...(note ? ['--note', note] : []), ...human, '--dir', root])
+  await attachToAnswer(root, id, files)
+}
 
 export const answerQuestions = (root: string, id: number, picks: Record<string, string>, note?: string) =>
   ok(['push', String(id), ...Object.entries(picks).map(([q, k]) => `${q}=${k}`), ...(note ? ['--note', note] : []), ...human, '--dir', root])
 
 export const answerDefaults = (root: string, id: number) => ok(['push', String(id), '--defaults', ...human, '--dir', root])
 
-export const answerFreeText = (root: string, id: number, note: string) => ok(['push', String(id), '--note', note, ...human, '--dir', root])
+export const answerFreeText = async (root: string, id: number, note: string, files: File[] = []) => {
+  await ok(['push', String(id), '--note', note, ...human, '--dir', root])
+  await attachToAnswer(root, id, files)
+}
 
-export const reply = (root: string, id: number, text: string) => ok(['note', String(id), text, ...human, '--dir', root])
+/** One `nod note … --attach …`: the reply and the files it presents land in the same section. */
+export const reply = async (root: string, id: number, text: string, files: File[] = []) => {
+  const paths = await saveUploads(files)
+  return ok(['note', String(id), text, ...paths.flatMap((p) => ['--attach', p]), ...human, '--dir', root])
+}
 
 export const defer = (root: string, id: number, off: boolean) => ok(['defer', String(id), ...(off ? ['--off'] : []), ...human, '--dir', root])
 
@@ -483,14 +511,7 @@ export const editNode = (root: string, id: number, target: 'body' | number, mark
 
 /** Files pasted or dropped into the editor: saved, then attached to that part of the node. */
 export async function attachFiles(root: string, id: number, files: File[], to: 'body' | number): Promise<void> {
-  if (!inDesktop) return
-  for (const f of files) {
-    const bytes = new Uint8Array(await f.arrayBuffer())
-    let bin = ''
-    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-    const path = await invoke<string>('save_upload', { name: f.name || 'pasted.png', data: btoa(bin) })
-    await ok(['attach', String(id), path, '--to', to === 'body' ? 'body' : String(to + 1), '--dir', root])
-  }
+  for (const path of await saveUploads(files)) await ok(['attach', String(id), path, '--to', to === 'body' ? 'body' : String(to + 1), '--dir', root])
 }
 
 /** One view as `nod views --json` lists it: its definition plus how it reads. */

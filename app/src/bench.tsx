@@ -22,6 +22,7 @@ import { popupNative } from './native-menu.ts'
 import { LetterPicker, RenameField, UnlinkConfirm } from './projects.tsx'
 import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
+import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, patchNode, patchRows, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
@@ -110,7 +111,13 @@ export function Bench(props: {
     if (c && (composerOn.c?.kind !== c.kind || composerOn.key !== shownKey.current)) setDraft('')
     setComposerOn({ c, key: shownKey.current })
   }
-  const [draft, setDraft] = useState('')
+  const [draft, setDraftText] = useState('')
+  // Files pasted or dropped into the composer go with its text.
+  const [draftFiles, setDraftFiles] = useState<File[]>([])
+  const setDraft = (text: string) => {
+    setDraftText(text)
+    if (!text) setDraftFiles([])
+  }
   const [busy, setBusy] = useState(false)
   const [palette, setPalette] = useState(false)
   const [help, setHelp] = useState(false)
@@ -317,19 +324,30 @@ export function Bench(props: {
   /** `typed` is the box as it is now — Enter can land before the last keystroke has re-rendered. */
   const send = (typed: string = draft) => {
     if (!node || !composer) return
-    const text = typed.trim()
+    const files = composer.kind === 'close' ? [] : draftFiles
+    const text = typed.trim() || (files.length && composer.kind !== 'answer' ? s('filesBelow') : '')
     const root = rootOf(node)
     const key = node.key
-    const reopen = (c: Composer) => () => (setComposerOn({ c, key }), setDraft(typed))
+    const reopen = (c: Composer) => () => (setComposerOn({ c, key }), setDraftText(typed), setDraftFiles(files))
     if (composer.kind === 'answer') {
       setUnlocked(null)
-      return optimistic(answered(key, composer.key), () => api.answer(root, node.id, composer.key, text || undefined), s('sent'), reopen(composer))
+      return optimistic(answered(key, composer.key), () => api.answer(root, node.id, composer.key, text || undefined, files), s('sent'), reopen(composer))
     }
-    if (composer.kind === 'free' && text) return optimistic(answered(key), () => api.answerFreeText(root, node.id, text), s('sent'), reopen(composer))
+    if (composer.kind === 'free' && text) return optimistic(answered(key), () => api.answerFreeText(root, node.id, text, files), s('sent'), reopen(composer))
     if (composer.kind === 'reply' && text)
       return optimistic(
-        patchNode(key, (n) => ({ ...n, body_rows: [...n.body_rows, { text: '' }, { text: `${s('you')} | ${s('justNow')}`, style: { text: '', bold: true, color: 'magenta' } }, { text: '' }, ...text.split('\n').map((t) => ({ text: t }))] })),
-        () => api.reply(root, node.id, text),
+        patchNode(key, (n) => ({
+          ...n,
+          body_rows: [
+            ...n.body_rows,
+            { text: '' },
+            { text: `${s('you')} | ${s('justNow')}`, style: { text: '', bold: true, color: 'magenta' } },
+            { text: '' },
+            ...text.split('\n').map((t) => ({ text: t })),
+            ...files.map((f) => ({ text: `- ${f.name || 'pasted.png'}` })),
+          ],
+        })),
+        () => api.reply(root, node.id, text, files),
         s('replied'),
         reopen(composer),
       )
@@ -991,6 +1009,8 @@ export function Bench(props: {
             composer={composer}
             draft={draft}
             setDraft={setDraft}
+            files={draftFiles}
+            setFiles={setDraftFiles}
             busy={busy}
             error={error}
             canAnswer={canAnswer(node)}
@@ -1234,6 +1254,8 @@ function Detail(p: {
   composer: Composer
   draft: string
   setDraft: (s: string) => void
+  files: File[]
+  setFiles: (f: File[] | ((prev: File[]) => File[])) => void
   busy: boolean
   error: string | null
   canAnswer: boolean
@@ -1458,7 +1480,17 @@ function Detail(p: {
   )
 }
 
-function ComposerBox(p: { node: Node; composer: Composer; draft: string; setDraft: (s: string) => void; busy: boolean; onSend: (typed?: string) => void; onCancel: () => void }) {
+function ComposerBox(p: {
+  node: Node
+  composer: Composer
+  draft: string
+  setDraft: (s: string) => void
+  files: File[]
+  setFiles: (f: File[] | ((prev: File[]) => File[])) => void
+  busy: boolean
+  onSend: (typed?: string) => void
+  onCancel: () => void
+}) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useDialogFocus(ref, {}, [p.composer])
   const c = p.composer!
@@ -1468,11 +1500,24 @@ function ComposerBox(p: { node: Node; composer: Composer; draft: string; setDraf
   const placeholder =
     c.kind === 'answer' ? s('addNote') : c.kind === 'reply' ? s('replyPlaceholder') : c.kind === 'close' ? s('closeReasonPlaceholder') : s('freeTextPlaceholder')
   const blankIsFine = c.kind === 'answer' || c.kind === 'close'
-  const canSend = blankIsFine || p.draft.trim().length > 0
+  const takesFiles = c.kind !== 'close'
+  const canSend = blankIsFine || p.draft.trim().length > 0 || (takesFiles && p.files.length > 0)
+  const add = (files: File[]) => p.setFiles((prev) => [...prev, ...files])
   return (
-    <div class={`composer ${c.kind}`}>
+    <div
+      class={`composer ${c.kind}`}
+      onDragOver={(e) => takesFiles && e.dataTransfer?.types.includes('Files') && e.preventDefault()}
+      onDrop={(e) => {
+        const files = filesOf(e.dataTransfer)
+        if (takesFiles && files.length) (e.preventDefault(), add(files))
+      }}
+    >
       <div class="composer-title">{title}</div>
       <textarea
+        onPaste={(e) => {
+          const files = filesOf(e.clipboardData)
+          if (takesFiles && files.length) (e.preventDefault(), add(files))
+        }}
         ref={ref}
         rows={c.kind === 'answer' ? 2 : 3}
         value={p.draft}
@@ -1482,10 +1527,11 @@ function ComposerBox(p: { node: Node; composer: Composer; draft: string; setDraf
           if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
             e.preventDefault()
             const typed = (e.currentTarget as HTMLTextAreaElement).value
-            if (blankIsFine || typed.trim()) p.onSend(typed)
+            if (blankIsFine || typed.trim() || (takesFiles && p.files.length)) p.onSend(typed)
           }
         }}
       />
+      <DraftFiles files={p.files} onRemove={(i) => p.setFiles((prev) => prev.filter((_, j) => j !== i))} />
       <div class="composer-actions">
         <span class="hint">⏎ {s('send')} · ⇧⏎ ↵ · Esc {s('cancel')}</span>
         <button class="ghost" onClick={p.onCancel}>

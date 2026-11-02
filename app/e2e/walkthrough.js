@@ -10,7 +10,7 @@
   async function until(what, fn, ms = 15000) {
     const end = Date.now() + ms
     for (;;) {
-      const v = fn()
+      const v = await fn()
       if (v) return v
       if (Date.now() > end) throw new Error(`timed out: ${what}`)
       await sleep(100)
@@ -113,8 +113,33 @@
     const replyBox = await until('reply composer', () => $('.composer textarea'))
     await focused('reply composer', '.composer textarea')
     type(replyBox, '先把 users 表的索引补上，再跑迁移。')
+    // A pasted image and a dropped file ride along with the reply: one nod note … --attach.
+    const png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0))
+    const pasted = new DataTransfer()
+    pasted.items.add(new File([png], 'schema-shot.png', { type: 'image/png' }))
+    const paste = new ClipboardEvent('paste', { clipboardData: pasted, bubbles: true, cancelable: true })
+    if (!paste.clipboardData) Object.defineProperty(paste, 'clipboardData', { value: pasted })
+    replyBox.dispatchEvent(paste)
+    const dropped = new DataTransfer()
+    dropped.items.add(new File(['id,name\n1,Alice\n'], 'users.csv', { type: 'text/csv' }))
+    const dropEv = new DragEvent('drop', { dataTransfer: dropped, bubbles: true, cancelable: true })
+    if (!dropEv.dataTransfer) Object.defineProperty(dropEv, 'dataTransfer', { value: dropped })
+    $('.composer').dispatchEvent(dropEv)
+    await until('two draft files', () => $$('.draft-file').length === 2)
+    await until('the thumbnail', () => $('.draft-file.image img'))
+    await shot('reply-files')
     replyBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await toast('Reply added')
+    const replied = await until(
+      'the reply with its files',
+      async () => {
+        const out = await invoke('decs', { args: ['get', String(Number($('.ref-pill')?.textContent.replace(/\D/g, ''))), '--json'], cwd: null, stdin: null })
+        const last = JSON.parse(out.stdout).notes?.at(-1)
+        return last && /索引/.test(last.text) && (last.attachments ?? []).length === 2 ? last : null
+      },
+      20000,
+    )
+    if (!replied) throw new Error('the reply lost its files')
     await sleep(800)
     await shot('replied')
 

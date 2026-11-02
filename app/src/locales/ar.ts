@@ -22,6 +22,8 @@ export const ar: Strings = {
   cancel: 'إلغاء',
   reply: 'رد',
   replyPlaceholder: 'اكتب ردًا — يعود إلى الوكيل، وليس إجابة',
+  filesBelow: 'المرفقات أدناه.',
+  removeFile: 'إزالة {{name}}',
   defer: 'تأجيل',
   undefer: 'استئناف',
   attachments: 'المرفقات',

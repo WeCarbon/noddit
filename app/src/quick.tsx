@@ -2,6 +2,7 @@ import { CornerDownRight, FolderGit2, PenLine, SquareTerminal, Star, X } from 'l
 import { useEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { useDialogFocus } from './focus.ts'
+import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { s } from './strings.ts'
 import type { Project } from './types.ts'
 
@@ -22,6 +23,7 @@ export function QuickEntry(p: {
   const [project, setProject] = useState(p.project)
   const [nested, setNested] = useState(false)
   const [important, setImportant] = useState(false)
+  const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
@@ -35,6 +37,7 @@ export function QuickEntry(p: {
     setError(null)
     try {
       const brief = await api.fileBrief(project.root, words, asChild && under ? under.ref : undefined, important)
+      if (files.length) await api.attachFiles(project.root, brief.id, files, 'body')
       p.onFiled(brief, project)
     } catch (e) {
       setError((e as Error).message)
@@ -44,7 +47,17 @@ export function QuickEntry(p: {
 
   return (
     <div class="overlay" onClick={p.onClose}>
-      <div class="quick" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={s('quickTitle')}>
+      <div
+        class="quick"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label={s('quickTitle')}
+        onDragOver={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()}
+        onDrop={(e) => {
+          const dropped = filesOf(e.dataTransfer)
+          if (dropped.length) (e.preventDefault(), setFiles((prev) => [...prev, ...dropped]))
+        }}
+      >
         <div class="quick-row">
           <PenLine {...ICON} class="quick-ico" />
           <textarea
@@ -52,6 +65,10 @@ export function QuickEntry(p: {
             rows={1}
             value={text}
             placeholder={s('quickPlaceholder')}
+            onPaste={(e) => {
+              const pasted = filesOf(e.clipboardData)
+              if (pasted.length) (e.preventDefault(), setFiles((prev) => [...prev, ...pasted]))
+            }}
             onInput={(e) => {
               const t = e.currentTarget
               setText(t.value)
@@ -68,6 +85,7 @@ export function QuickEntry(p: {
             }}
           />
         </div>
+        <DraftFiles files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, j) => j !== i))} />
         <div class="quick-meta">
           <label class="qchip" title={s('quickProject')}>
             <FolderGit2 {...ICON} />
