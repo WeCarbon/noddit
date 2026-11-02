@@ -7,7 +7,7 @@ import type { Attachment, Decision, DecisionOption, NoteRole, AttachmentApproval
 
 /** Front matter key order — stable so diffs stay readable. */
 const KEY_ORDER = [
-  'id', 'title', 'author', 'status', 'close_reason', 'waiting_on', 'deferred_at', 'deferred_by', 'created', 'updated_at',
+  'id', 'title', 'author', 'status', 'close_reason', 'waiting_on', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'created', 'updated_at',
   'after', 'progress', 'progress_msg', 'est', 'when', 'stale_after', 'steps', 'owner_agent', 'intake', 'claimed_by', 'claimed_at',
   'kind', 'urgency', 'due', 'milestone', 'default', 'question_defaults', 'if_no_answer', 'reversible',
   'pin', 'pinned_at', 'tags', 'session', 'supersedes', 'superseded_by', 'answer', 'approvals',
@@ -26,6 +26,8 @@ export function frontMatterOf(d: Decision): Record<string, unknown> {
   if (d.waitingOn) fm.waiting_on = d.waitingOn
   if (d.deferredAt) fm.deferred_at = d.deferredAt
   if (d.deferredAt && d.deferredBy) fm.deferred_by = d.deferredBy
+  if (d.deferredAt && d.deferredUntil) fm.deferred_until = d.deferredUntil
+  if (d.assignee) fm.assignee = d.assignee
   if (d.updatedAt) fm.updated_at = d.updatedAt
   if (d.after?.length) fm.after = d.after
   if (d.progress !== undefined) fm.progress = d.progress

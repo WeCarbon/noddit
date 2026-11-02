@@ -196,7 +196,7 @@ test('an empty queue renders calmly instead of crashing', () => {
     const store = new Store([initLayout(root)])
     const frame = frameFor(store)
     assert.equal(frame.length, 23)
-    assert.ok(frame.some((l) => l.some((s) => s.text.includes('Nothing needs a decision'))))
+    assert.ok(frame.some((l) => l.some((s) => s.text.includes('Nothing waits on you'))))
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

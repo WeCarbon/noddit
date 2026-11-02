@@ -20,7 +20,8 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 | 开始 / 做完 / 不做了 | `nod start` / `nod done --note` / `nod close --reason` |
 | 要 owner 拍板 / 再看一眼 | `nod ask <id> -o 1="…" 2="…"` / `nod ask <id>` |
 | 等外部（同事、客户、供应商、服务恢复） | `nod hold <id> --on "<谁/什么>"`，恢复用 `nod start` |
-| owner 延迟了 / 解除 | owner 可以把节点延迟（bench 里按 d / `nod defer`）：它从可用/活动/待决里消失，状态不变；你收到「owner 延迟」就先停手，解除前别动它（`nod undefer` 解除，`nod show deferred` 列出） |
+| owner 延迟了 / 解除 | owner 可以把节点延迟（bench 里按 d / `nod defer`）：它从可用/活动/需要人类里消失，状态不变；你收到「owner 延迟」就先停手，解除前别动它（`nod undefer` 解除，`nod show deferred` 列出）。`nod defer <id> --until 周五`（3d、15 nov、下周一……，`nod date "<文字>"` 先看是哪天）到那天自己回来，monitor 打 `NODDIT-UNDEFERRED <id>` |
+| owner 自己的事 | `assignee: human`，bench 上「你来做」，列在「需要人类」里：**不要开始、接走、展开或去做**，也不会有 check-in 和催办。需要 owner 亲手做的事替他记：`nod add --for me "给供应商打电话" --parent <id>`，等它的活 `--after` 它；`nod assign <id> me` 交给 owner，交回 AI（`--force`）只在他说了时 |
 | 进度 | `nod progress <pct> "…"` / `nod steps` / `nod step`；还在做但没新内容时回 check-in 用 `nod beat <id>` |
 | 等 owner 答复、等外部来源 | 主 session：plugin 自动启动的 decs monitor；DECS-IDLE 之后或子 agent：用 Monitor 挂 `nod monitor`（子 agent 加 --mine） |
 | 附件 / 改标题 / 挪位置 | `nod attach` / `nod retitle` / `nod move` |

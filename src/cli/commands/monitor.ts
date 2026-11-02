@@ -12,7 +12,7 @@ import { parseDuration, parseSince } from '../../core/duration.ts'
 import { currentIdentity } from '../../core/identity.ts'
 import { findLayout } from '../../core/paths.ts'
 import { listSources, sourceEventsSince } from '../../core/sources.ts'
-import { isLatestNoteOwnerFacing, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
+import { DEFERRAL_CLOCK, isLatestNoteOwnerFacing, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
 import { isUnclaimedBrief, originalWords } from '../../core/intake.ts'
 import { HEARTBEAT_MS, harnessOf, removeHeartbeat, writeHeartbeat } from '../../core/listeners.ts'
 import type { Decision } from '../../core/types.ts'
@@ -351,6 +351,22 @@ export async function run(args: Args): Promise<number> {
     }
   }
 
+  /**
+   * `nod defer --until`: a deferral whose day has come is ended (by this monitor, or
+   * whichever bench got there first), and each one goes out once as NODDIT-UNDEFERRED.
+   */
+  const reportBackFromDeferral = () => {
+    store.returnDueDeferrals()
+    for (const d of store.all()) {
+      if (author && !ownedBy(d, author)) continue
+      const note = d.notes.findLast((n) => n.kind === NOTE_KIND.undeferred && n.author === DEFERRAL_CLOCK)
+      if (!note || Date.parse(note.at) < Date.parse(cursor) - 60_000) continue
+      emit(`b|${d.project}|${d.id}|${note.at}`, note.at, `NODDIT-UNDEFERRED ${t('cli.monitor.backFromDeferral', { ref: refOfNode(d), title: d.title })}`, {
+        event: 'undeferred', ref: refOfNode(d), id: d.id, project: d.project, title: d.title, at: note.at,
+      })
+    }
+  }
+
   const pass = (first = false) => {
     const startedAt = nowStamp(new Date(), { ms: true })
     if (updates) {
@@ -407,6 +423,11 @@ export async function run(args: Args): Promise<number> {
     }
     try {
       reportBriefs()
+    } catch (err) {
+      process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
+    }
+    try {
+      reportBackFromDeferral()
     } catch (err) {
       process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
     }

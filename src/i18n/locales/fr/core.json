@@ -42,7 +42,9 @@
     "answerNotApproving": "la réponse était {{answer}}, qui ne l’approuve pas{{on}}",
     "pendingApproval": "en attente d’approbation{{on}}",
     "contentChangedNeedsReapproval": "contenu changé, réapprobation nécessaire",
-    "approved": "approuvé ({{by}})"
+    "approved": "approuvé ({{by}})",
+    "deferredUntil": "Reporté au {{date}}",
+    "deferredUntilWithWho": "Reporté au {{date}} ({{who}})"
   },
   "store": {
     "idInMultipleProjects": "{{id}} existe dans plus d’un projet ({{where}}) — utilisez la forme avec lettre, ex. {{example}}",
@@ -103,7 +105,8 @@
     "alreadyClaimed": "{{ref}} a déjà été pris par {{by}} à {{at}} : laissez-le-lui (--force pour le reprendre)",
     "milestoneNeedsDue": "{{ref}} : un jalon a besoin d’une date — ajoutez --due 2026-11-15 (ou 3d)",
     "attachToOutOfRange": "--to {{n}} est hors limites (notes sur ce nœud : {{count}})",
-    "attachToNotFound": "aucune note ne correspond à --to {{to}}"
+    "attachToNotFound": "aucune note ne correspond à --to {{to}}",
+    "humanTaskNoClaim": "{{ref}} est une tâche du responsable, pas une demande pour une IA"
   },
   "duration": {
     "notADuration": "« {{value}} » n’est pas une durée — ex. 90s, 30m, 1h, 2d"

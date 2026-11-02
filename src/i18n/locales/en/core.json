@@ -40,7 +40,9 @@
     "answerNotApproving": "the answer was {{answer}}, which doesn't approve it{{on}}",
     "pendingApproval": "pending approval{{on}}",
     "contentChangedNeedsReapproval": "content changed, needs re-approval",
-    "approved": "approved ({{by}})"
+    "approved": "approved ({{by}})",
+    "deferredUntil": "Deferred until {{date}}",
+    "deferredUntilWithWho": "Deferred until {{date}} ({{who}})"
   },
   "store": {
     "idInMultipleProjects": "{{id}} exists in more than one project ({{where}}) — use the lettered form, e.g. {{example}}",
@@ -100,7 +102,8 @@
     "alreadyClaimed": "{{ref}} was already picked up by {{by}} at {{at}} — leave it to them (--force takes it over)",
     "milestoneNeedsDue": "{{ref}}: a milestone needs a date — add --due 2026-11-15 (or 3d)",
     "attachToOutOfRange": "--to {{n}} is out of range for this node (notes: {{count}})",
-    "attachToNotFound": "no note matches --to {{to}}"
+    "attachToNotFound": "no note matches --to {{to}}",
+    "humanTaskNoClaim": "{{ref}} is the owner's own to-do, not a brief for an AI"
   },
   "duration": {
     "notADuration": "\"{{value}}\" is not a duration — e.g. 90s, 30m, 1h, 2d"

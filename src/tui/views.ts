@@ -1,3 +1,5 @@
+import { isHumanTask } from '../core/assignee.ts'
+import { untilDay } from '../core/fuzzy-date.ts'
 import { isUnclaimedBrief } from '../core/intake.ts'
 import { benchOrder, isFlagged, untilDue } from '../core/order.ts'
 import { NOTE_KIND } from '../core/format.ts'
@@ -9,7 +11,7 @@ import { deferHidden, dependenciesOf, isDeferred, isStartable, isTerminal, statu
 import { parseSteps, stepProgress } from '../core/steps.ts'
 import type { Decision as Item } from '../core/types.ts'
 import { isRtl, t } from '../i18n/index.ts'
-import { elapsed, fromNow } from '../i18n/time.ts'
+import { dayFromToday, dayText, elapsed, fromNow } from '../i18n/time.ts'
 import type { Segment } from './model.ts'
 import { fit, padToWidth, stringWidth } from './width.ts'
 
@@ -19,7 +21,9 @@ import { fit, padToWidth, stringWidth } from './width.ts'
  * - 可用 (default): executing, startable, waiting on owner, or answered and
  *   awaiting an AI — as the tree.
  * - 活动: executing or waiting on the owner — as the tree.
- * - 待决: only what the owner must rule on, AI-stuck first.
+ * - 需要人类 (key `decide`): everything waiting on a person — what the owner must
+ *   rule on and the human-assigned tasks that can be done now — AI-blocking first,
+ *   then ★/⚑, then the rest.
  * - 全部: every node; finished ones fold into 「✓ 已完成/已结束 N」.
  * - 等待: held up outside, longest first, plus a 「延迟 N」 fold row.
  * - 最近: what the owner answered, replied to, filed or deferred, latest first —
@@ -101,12 +105,18 @@ export function inView(view: View, d: Item, items: Item[]): boolean {
     case 'active':
       return d.state === 'in_progress' || d.state === 'needs_decision'
     case 'decide':
-      return d.state === 'needs_decision'
+      return d.state === 'needs_decision' || isOpenHumanTask(d, items)
     case 'waiting':
       return d.state === 'waiting'
     case 'all':
       return true
   }
+}
+
+/** The owner's own to-do that can be done now: started, held up outside, or startable. */
+export function isOpenHumanTask(d: Item, items: Item[]): boolean {
+  if (!isHumanTask(d) || isTerminal(d.state)) return false
+  return d.state === 'in_progress' || d.state === 'waiting' || d.state === 'decided' || (d.state === 'not_started' && isStartable(d, items))
 }
 
 /** The number on a tab; 全部 and 最近 have none. */
@@ -199,9 +209,21 @@ const isRoot = (i: Item, byKey: Map<string, Item>) => i.parent === undefined || 
 /** 可用/活动: the tree cut to the view's nodes, keeping dim ancestor
  *  context so a match is never shown without where it belongs. */
 export function filteredTreeRows(view: View, items: Item[], opts: TreeOptions = {}): Row[] {
+  return cutTreeRows((i) => inView(view, i, items), VIEW_LABEL[view], items, opts)
+}
+
+/**
+ * A project picked on its own (not a view): every live node of it as the tree,
+ * deferred ones included (drawn dim). Finished nodes are left out. `items` is one project's.
+ */
+export function projectTreeRows(items: Item[], opts: TreeOptions = {}): Row[] {
+  return cutTreeRows((i) => !isTerminal(i.state), '', items, opts)
+}
+
+function cutTreeRows(inCut: (i: Item) => boolean, label: string, items: Item[], opts: TreeOptions): Row[] {
   const kids = childMap(items)
   const byKey = new Map(items.map((i) => [keyOf(i), i]))
-  const match = new Set(items.filter((i) => inView(view, i, items)).map(keyOf))
+  const match = new Set(items.filter(inCut).map(keyOf))
   const shown = new Set(match)
   for (const k of match) for (const a of ancestorsOf(byKey.get(k)!, items)) shown.add(keyOf(a))
   const out: Row[] = []
@@ -224,7 +246,7 @@ export function filteredTreeRows(view: View, items: Item[], opts: TreeOptions = 
         key: `project:${p.project}`,
         kind: 'header',
         depth: 0,
-        text: t('bench.header.viewCount', { letter: p.letter ?? 'X', project: p.name, count: n, label: VIEW_LABEL[view] }) + flaggedNote(items.filter((i) => i.project === p.project && match.has(keyOf(i)))),
+        text: t('bench.header.viewCount', { letter: p.letter ?? 'X', project: p.name, count: n, label }) + flaggedNote(items.filter((i) => i.project === p.project && match.has(keyOf(i)))),
       })
     }
     for (const r of roots) walk(r, 0)
@@ -596,10 +618,16 @@ function refsShort(refs: string[], max = 2): string {
 
 /** Row's right end, longest form first; the renderer uses the first that fits beside the full title. */
 export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
-  const countdown = row?.touch ? null : milestoneCountdown(d, now)
-  if (!countdown) return stateSuffix(d, items, now, row)
   const sep: Segment = { text: ' · ', dim: true }
-  return [...stateSuffix(d, items, now, row).map((f) => [countdown, sep, ...f]), [countdown]]
+  const lead = (forms: Segment[][], seg: Segment | null) => (seg ? [...forms.map((f) => [seg, sep, ...f]), [seg]] : forms)
+  const you = row?.touch ? null : forYouMark(d)
+  const countdown = row?.touch ? null : milestoneCountdown(d, now)
+  return lead(lead(stateSuffix(d, items, now, row), you), countdown)
+}
+
+/** 「你来做」 on the owner's own live to-do. */
+export function forYouMark(d: Item): Segment | null {
+  return isHumanTask(d) && !isTerminal(d.state) ? { text: t('bench.badge.forYou'), color: 'blue', bold: true } : null
 }
 
 function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
@@ -612,8 +640,14 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
     forms.push([{ text: `${what} · ${when}`, color: 'blue' }])
     return forms
   }
-  if (isDeferred(d)) {
+  if (isDeferred(d, now)) {
     const since = d.deferredAt ? ago(minutesSince({ updatedAt: d.deferredAt, created: d.created }, now)) : ''
+    const back = d.deferredUntil ? untilDay(d.deferredUntil) : undefined
+    if (back) {
+      const date = dayText(back, new Date(now))
+      forms.push([...fold, { text: t('bench.badge.deferredUntil', { date, relative: dayFromToday(back, new Date(now)) }), dim: true }])
+      forms.push([...fold, { text: t('bench.badge.deferredUntilShort', { date }), dim: true }])
+    }
     if (since) forms.push([...fold, { text: t('bench.badge.deferredSince', { since }), dim: true }])
     forms.push([...fold, { text: t('bench.badge.deferred'), dim: true }])
     return forms
@@ -648,7 +682,7 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
       const blocks = dependentsOf(d, items).length
       // Important shows as ★ before the title; the badge need not say it again.
       const urgent: Segment[] = []
-      const decide = t('bench.tabs.decide')
+      const decide = t('bench.badge.decide')
       if (waitingOnOwner(d, items)) {
         const tail: Segment[] = blocks ? [{ text: ` · ${t('bench.summary.blockingNote', { count: blocks })}`, dim: true }] : []
         forms.push([...fold, ...urgent, { text: decide, color: 'yellow', bold: true }, ...tail])
@@ -758,10 +792,19 @@ function nodeRowParts(row: Row, items: Item[], width: number, now: number, opts:
   return [...lead, { ...title, text: padToWidth(d.title, room) }]
 }
 
-/** Order of the needs-owner rows: AI-blocking first, then early; bench order (pins, urgency, age) within each. */
+/**
+ * Order of 需要人类: what holds an AI up first (a question it is stuck on, or the
+ * owner's to-do that other work is `after`), then what the owner flagged ★/⚑,
+ * then the rest (to-dos, questions answerable early); bench order within each.
+ */
 export function ownerQueue(items: Item[]): Item[] {
   const open = items.filter((i) => inView('decide', i, items))
-  const blocking = open.filter((i) => isStartable(i, items)).sort(benchOrder)
-  const early = open.filter((i) => !isStartable(i, items)).sort(benchOrder)
-  return [...blocking, ...early]
+  const rank = (i: Item) => (blocksAnAi(i, items) ? 0 : isFlagged(i) ? 1 : 2)
+  return open.sort((a, b) => rank(a) - rank(b) || benchOrder(a, b))
+}
+
+/** An AI is held up on the owner here: stuck on this question, or waiting for this to-do to be done. */
+export function blocksAnAi(d: Item, items: Item[]): boolean {
+  if (d.state === 'needs_decision') return waitingOnOwner(d, items)
+  return isHumanTask(d) && dependentsOf(d, items).some((x) => !isTerminal(x.state) && !isHumanTask(x))
 }

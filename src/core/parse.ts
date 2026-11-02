@@ -341,7 +341,7 @@ export function legacyStatus(state: ItemStatus, answered: boolean): DecisionStat
 const KNOWN_KEYS = new Set([
   'id', 'title', 'author', 'status', 'created', 'updated_at', 'default', 'pin', 'pinned_at',
   'urgency', 'due', 'milestone', 'if_no_answer', 'reversible', 'kind', 'session', 'superseded_by', 'supersedes',
-  'close_reason', 'waiting_on', 'deferred_at', 'deferred_by', 'answer', 'answered_by', 'answered_at', 'archived_at', 'reopened_at', 'tags',
+  'close_reason', 'waiting_on', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'answer', 'answered_by', 'answered_at', 'archived_at', 'reopened_at', 'tags',
   'question_defaults', 'progress', 'progress_msg', 'after', 'est', 'when', 'stale_after', 'steps', 'owner_agent',
   'approvals', 'intake', 'claimed_by', 'claimed_at',
 ])
@@ -349,6 +349,12 @@ const KNOWN_KEYS = new Set([
 function strMap(v: unknown): Record<string, string> | undefined {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined
   return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, String(x)]))
+}
+
+/** `ai` (or nothing) is the default and reads as absent. */
+function assigneeOf(v: unknown): string | undefined {
+  const s = str(v)?.trim()
+  return !s || s.toLowerCase() === 'ai' ? undefined : s
 }
 
 function str(v: unknown): string | undefined {
@@ -393,6 +399,8 @@ export function parseDecision(
     waitingOn: str(data.waiting_on),
     deferredAt: str(data.deferred_at),
     deferredBy: data.deferred_at ? str(data.deferred_by) : undefined,
+    deferredUntil: data.deferred_at ? str(data.deferred_until) : undefined,
+    assignee: assigneeOf(data.assignee),
     created: str(data.created) ?? '',
     updatedAt: str(data.updated_at),
     progress: data.progress !== undefined && Number.isFinite(progress) ? progress : undefined,

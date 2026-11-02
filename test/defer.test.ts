@@ -242,7 +242,7 @@ test('App: d in Available defers the cursor node — it leaves, the cursor moves
   store.start(store.create({ title: 'b second one', author: A, task: true }))
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a first one/))
-  assert.match(b.frame()[0], /^decs +Available 2 +Active 2 +Decide +All +Waiting +Recent *$/)
+  assert.match(b.frame()[0], /^decs +Available 2 +Active 2 +Needs you +All +Waiting +Recent *$/)
   await b.press('d')
   await b.until(has(b, /deferred \(undo it in Waiting → Deferred\)/))
   const f = b.frame().join('\n')
@@ -274,7 +274,7 @@ test('App: Waiting → + opens "Deferred N", d un-defers from there, - folds it;
   assert.equal(store.get(a.id)!.deferredAt, undefined)
   assert.equal(store.get(a.id)!.state, 'needs_decision')
   await b.until(has(b, /Deferred 1  - collapse/))
-  assert.match(b.frame()[0], /Decide 1/, 'back in its views')
+  assert.match(b.frame()[0], /Needs you 1/, 'back in its views')
   await b.press('-')
   await b.until(has(b, /Deferred 1  \+ expand/))
 

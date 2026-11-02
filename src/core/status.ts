@@ -23,9 +23,17 @@ export function isTerminal(s: ItemStatus): boolean {
   return s === 'completed' || s === 'closed'
 }
 
-/** 延迟 and not finished. A flag left on a node that later completed means nothing. */
-export function isDeferred(i: Pick<Item, 'deferredAt' | 'state'>): boolean {
-  return Boolean(i.deferredAt) && !isTerminal(i.state)
+/** 延迟 and not finished. A flag left on a node that later completed means nothing;
+ *  one deferred `--until` a moment that has come is back, even before anything clears the flag. */
+export function isDeferred(i: Pick<Item, 'deferredAt' | 'state'> & Partial<Pick<Item, 'deferredUntil'>>, now = Date.now()): boolean {
+  return Boolean(i.deferredAt) && !isTerminal(i.state) && !deferralOver(i, now)
+}
+
+/** Deferred `--until` a moment that has now come. */
+export function deferralOver(i: Partial<Pick<Item, 'deferredAt' | 'deferredUntil'>>, now = Date.now()): boolean {
+  if (!i.deferredAt || !i.deferredUntil) return false
+  const until = Date.parse(i.deferredUntil)
+  return !Number.isNaN(until) && until <= now
 }
 
 const nodeKey = (i: Pick<Item, 'project' | 'id'>) => `${i.project}\u0000${i.id}`

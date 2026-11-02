@@ -261,7 +261,7 @@ test('◆ bold is an AI stuck on the owner; ◆ dim is a question that can be an
 
   const rows = ownerRows(items)
   const groups = rows.filter((r) => r.kind === 'header').map((r) => r.text)
-  assert.deepEqual(groups, [`X · ${s.release.project}  Decide 2`], 'one header per project')
+  assert.deepEqual(groups, [`X · ${s.release.project}  Needs you 2`], 'one header per project')
   assert.deepEqual(nodeKeys(rows), [s.release.id, s.form.id], 'AI-stuck first, then the early one')
   const formRow = rows.find((r) => r.node?.id === s.form.id)!
   const drawn = text(nodeRowSegments(formRow, items, 70, Date.now()))

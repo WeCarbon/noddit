@@ -4,7 +4,8 @@ import { bool, many, one, oneLine, optionsAndDefault, questionsFromArgs, type Ar
 import { readStdin, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
 import { briefTitle } from '../../core/intake.ts'
 import { isListening } from '../../core/listeners.ts'
-import { parseDuration } from '../../core/duration.ts'
+import { assigneeArg, HUMAN } from '../../core/assignee.ts'
+import { milestoneDue } from './flag.ts'
 import { nodditEnv, setNodditEnv } from '../../core/env.ts'
 import { URGENCIES } from '../../core/order.ts'
 import { parseOptions, splitFrontMatter } from '../../core/parse.ts'
@@ -50,7 +51,12 @@ export async function run(args: Args): Promise<number> {
   const meta = piped.meta
   const { options: cliOptions, default: cliDefault } = optionsAndDefault(args)
   const questions = questionsFromArgs(args)
-  const brief = isBrief(args, { options: cliOptions.length > 0, questions: questions.length > 0, meta, body: piped.body })
+  const forWho = one(args, 'for') ?? (bool(args, 'human-task') ? 'me' : meta.assignee !== undefined ? String(meta.assignee) : undefined)
+  const assignee = forWho !== undefined ? assigneeArg(forWho) : undefined
+  if (assignee && (bool(args, 'brief') || cliOptions.length || questions.length || bool(args, 'fyi'))) throw new Error(t('cli.send.humanTaskIsTask'))
+  const brief = !assignee && isBrief(args, { options: cliOptions.length > 0, questions: questions.length > 0, meta, body: piped.body })
+  const milestone = bool(args, 'milestone')
+  if (milestone && !one(args, 'due')) throw new Error(t('cli.send.milestoneNeedsDue'))
 
   const title = brief && words ? briefTitle(words) : words || piped.title
   if (!title) throw new Error(`${t('cli.send.titleRequired')}\n\n${help()}`)
@@ -58,18 +64,20 @@ export async function run(args: Args): Promise<number> {
 
   const input: NewDecision = {
     title: oneLine(title),
-    author: one(args, 'author', 'a') ?? (meta.author ? String(meta.author) : brief && shellRole() === 'human' ? 'owner' : resolveAuthor(args)),
+    author: one(args, 'author', 'a') ?? (meta.author ? String(meta.author) : (brief || assignee === HUMAN) && shellRole() === 'human' ? 'owner' : resolveAuthor(args)),
     body: brief ? [words, piped.body].filter(Boolean).join('\n\n') : piped.body,
     options: cliOptions,
     questions,
     default: cliDefault ?? (meta.default !== undefined ? String(meta.default) : undefined),
     tags: many(args, 'tag').length ? many(args, 'tag') : Array.isArray(meta.tags) ? meta.tags.map(String) : [],
-    urgency: urgencyArg(one(args, 'urgency') ?? (meta.urgency !== undefined ? String(meta.urgency) : undefined)),
+    urgency: bool(args, 'important') ? 'high' : urgencyArg(one(args, 'urgency') ?? (meta.urgency !== undefined ? String(meta.urgency) : undefined)),
+    milestone: milestone || undefined,
+    assignee,
     due: dueOf(one(args, 'due') ?? (meta.due !== undefined ? String(meta.due) : undefined)),
     ifNoAnswer: one(args, 'if-no-answer') ?? (meta.if_no_answer !== undefined ? String(meta.if_no_answer) : undefined),
     reversible: yesNo(one(args, 'reversible') ?? (meta.reversible !== undefined ? String(meta.reversible) : undefined), 'reversible'),
     kind: bool(args, 'fyi') || meta.kind === 'fyi' ? 'fyi' : undefined,
-    task: brief || bool(args, 'task'),
+    task: brief || Boolean(assignee) || bool(args, 'task'),
     intake: brief || undefined,
     parent: one(args, 'parent'),
     after: many(args, 'after').flatMap((s) => s.split(/[,\s]+/)).filter(Boolean),
@@ -178,7 +186,7 @@ function dueOf(raw: string | undefined): string | undefined {
     if (Number.isNaN(Date.parse(raw))) throw new Error(t('cli.send.badDue', { value: raw }))
     return raw
   }
-  return nowStamp(new Date(Date.now() + parseDuration(raw)))
+  return milestoneDue(raw)
 }
 
 /** Runs `$NODDIT_NOTIFY_CMD` (or the older `$DECS_NOTIFY_CMD`) if set — no built-in channel, since pinging by default gets muted. */

@@ -1,10 +1,12 @@
+import { isHumanTask } from './assignee.ts'
 import { parseDuration } from './duration.ts'
+import { deferralOver } from './status.ts'
 import { settingValue } from './settings.ts'
 import type { Decision as Item } from './types.ts'
 
 /** in_progress with no update for a while → due a check-in (see `core/checkins.ts`). */
 
-type Staleish = Pick<Item, 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt'> & Partial<Pick<Item, 'deferredAt'>>
+type Staleish = Pick<Item, 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt'> & Partial<Pick<Item, 'deferredAt' | 'deferredUntil' | 'assignee'>>
 
 /** Minutes since the node's `updatedAt` (falling back to `created`). `Infinity` when neither parses. */
 export function minutesSince(i: Pick<Item, 'updatedAt' | 'created' | 'activeAt'>, now = Date.now()): number {
@@ -26,7 +28,9 @@ export function checkinThresholdMs(staleAfter?: string): number {
 export function stalenessOf(i: Staleish, now = Date.now()): Staleness {
   if (i.state !== 'in_progress') return 'fresh'
   // 延迟: the owner put it off; nobody is expected to move it.
-  if (i.deferredAt) return 'fresh'
+  if (i.deferredAt && !deferralOver(i, now)) return 'fresh'
+  // The owner's own to-do: nobody chases the owner.
+  if (isHumanTask(i)) return 'fresh'
   const thresholdMs = checkinThresholdMs(i.staleAfter)
   const t = Date.parse(i.activeAt || i.updatedAt || i.created || '')
   if (Number.isNaN(t)) return 'fresh'

@@ -18,7 +18,18 @@ export async function run(args: Args): Promise<number> {
     const { benchJson, nodeDetailJson } = await import('../../tui/json.ts')
     const ref = one(args, 'node')
     const store = resolveStore(args, { allowRegistry: true, preferRegistry: true, positionalDirs: !ref })
-    console.log(JSON.stringify(ref ? nodeDetailJson(store, requireDecision(store, ref, args)) : benchJson(store, { project: one(args, 'project', 'p') })))
+    if (ref) {
+      console.log(JSON.stringify(nodeDetailJson(store, requireDecision(store, ref, args))))
+      return 0
+    }
+    // A window polling this is a bench too: deferrals whose day has come end here.
+    let back: Awaited<ReturnType<typeof store.returnDueDeferrals>> = []
+    try {
+      back = store.returnDueDeferrals()
+    } catch {
+      /* the next read tries again */
+    }
+    console.log(JSON.stringify(benchJson(store, { project: one(args, 'project', 'p'), back })))
     return 0
   }
   if (!process.stdout.isTTY) {

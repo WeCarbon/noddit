@@ -1,4 +1,3 @@
-import { isStartable } from './status.ts'
 /**
  * Check-in asks: an `in_progress` node idle past its span (`core/staleness.ts`'s
  * `checkinThresholdMs`, default 30m) gets asked for a status update, and a
@@ -17,7 +16,9 @@ import { join } from 'node:path'
 import { ensureGitignoreLines } from './gitignore.ts'
 import { withFileLock, writeFileAtomic } from './lock.ts'
 import type { Layout } from './paths.ts'
+import { isHumanTask } from './assignee.ts'
 import { checkinThresholdMs } from './staleness.ts'
+import { isDeferred, isStartable } from './status.ts'
 import type { Decision } from './types.ts'
 
 /** After this many unanswered asks, the bench shows an alert. */
@@ -119,10 +120,10 @@ function dueAndRecord(l: Layout, id: number, lastWrite: number, thresholdMs: num
  */
 export function askIfDue(
   l: Layout,
-  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt'>,
+  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt' | 'deferredUntil' | 'assignee'>,
   now = Date.now(),
 ): CheckinStatus | undefined {
-  if (d.state !== 'in_progress' || d.deferredAt) return undefined
+  if (d.state !== 'in_progress' || isDeferred(d) || isHumanTask(d)) return undefined
   const lastWrite = Date.parse(d.activeAt || d.updatedAt || d.created || '')
   return dueAndRecord(l, d.id, lastWrite, checkinThresholdMs(d.staleAfter), now)
 }
@@ -135,20 +136,20 @@ export function askIfDue(
  */
 export function staleNagDue(
   l: Layout,
-  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt'>,
+  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt' | 'deferredUntil' | 'assignee'>,
   now = Date.now(),
 ): CheckinStatus | undefined {
-  if (d.state !== 'not_started' || d.deferredAt) return undefined
+  if (d.state !== 'not_started' || isDeferred(d) || isHumanTask(d)) return undefined
   const lastWrite = Date.parse(d.activeAt || d.updatedAt || d.created || '')
   return dueAndRecord(l, d.id, lastWrite, checkinThresholdMs(d.staleAfter), now)
 }
 
-/** Not-started, not deferred and free to start — the owner's "stale task":
- *  neither waiting on a decision nor being worked on. A node queued behind an
- *  unfinished `--after` is waiting its turn, not stale. Oldest first, so the
- *  nag (and `stale_count` in the bench/JSON) surfaces what's sat longest. */
+/** Not-started, not deferred, free to start and not the owner's own to-do — the owner's
+ *  "stale task": neither waiting on a decision nor being worked on. A node queued behind
+ *  an unfinished `--after` is waiting its turn, not stale. Oldest first, so the nag (and
+ *  `stale_count` in the bench/JSON) surfaces what's sat longest. */
 export function staleTasksOf<T extends Decision>(items: T[]): T[] {
   return items
-    .filter((d) => d.state === 'not_started' && !d.deferredAt && isStartable(d, items))
+    .filter((d) => d.state === 'not_started' && !isDeferred(d) && !isHumanTask(d) && isStartable(d, items))
     .sort((a, b) => Date.parse(a.created) - Date.parse(b.created))
 }

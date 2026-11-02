@@ -151,6 +151,13 @@ export interface Decision {
   deferredAt?: string
   /** Who deferred it — `owner`, or the lane that did it for them. */
   deferredBy?: string
+  /** `nod defer --until`: back in the working lists from this moment on. Absent = until undeferred. */
+  deferredUntil?: string
+  /**
+   * Who does it. Absent = an AI. `human` = the owner: an agent never works on it,
+   * never gets checked in on or nagged about it, never picks it up as a brief.
+   */
+  assignee?: string
   created: string
   /** Stamped on every write. */
   updatedAt?: string
@@ -274,6 +281,9 @@ export interface NewDecision {
   staleAfter?: string
   /** 派活: a brief for an AI to expand. The owner's words go under `## 原话`, verbatim. */
   intake?: boolean
+  /** `human` for the owner's own to-do; absent for AI work. */
+  assignee?: string
+  milestone?: boolean
 }
 
 /** Tasks and decisions are one entity; this is its name in new code. */

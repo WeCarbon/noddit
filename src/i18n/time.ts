@@ -61,3 +61,24 @@ export function elapsed(at: When, now: When = Date.now()): string {
 export function durationText(ms: number): string {
   return elapsed(0, Math.max(0, ms))
 }
+
+const INTL_LOCALE: Record<Lang, string> = { en: 'en', 'zh-Hans': 'zh-CN', 'zh-Hant': 'zh-TW', fr: 'fr', ar: 'ar-u-nu-latn' }
+
+const dayOf = (key: string) => {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+/** A calendar day (`YYYY-MM-DD`) the way the current language writes it: "Fri, Nov 13" / "11月13日周五"; the year only when it isn't this one. */
+export function dayText(key: string, now: Date = new Date()): string {
+  const day = dayOf(key)
+  const opts: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric', ...(day.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) }
+  return new Intl.DateTimeFormat(INTL_LOCALE[lang()], opts).format(day)
+}
+
+/** "tomorrow" / "in 3 days" / "明天" / "3天后" — whole days from today to `key`. */
+export function dayFromToday(key: string, now: Date = new Date()): string {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const days = Math.round((dayOf(key).getTime() - today.getTime()) / 86_400_000)
+  return new Intl.RelativeTimeFormat(INTL_LOCALE[lang()], { numeric: 'auto' }).format(days, 'day')
+}

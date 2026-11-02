@@ -73,6 +73,8 @@ export const NOTE_TEXT = {
   waitingOn: (on: string) => `等 ${on}`,
   deferred: '后面再做。解除延迟之前先别动它。',
   undeferred: '可以接着做了。',
+  deferredUntil: (day: string) => `后面再做，${day} 再拿出来。到那天之前先别动它。`,
+  backFromDeferral: (day: string) => `延迟到 ${day}，到期了，可以接着做了。`,
   seen: '看过了，不用处理。',
   seenAnswer: '看过了，不用处理',
   dependencyDone: (ref: string) => `${ref} 已完成，这个节点的决定早已取走，开始执行。`,

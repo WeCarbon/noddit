@@ -58,6 +58,16 @@ load the decs skill.
 - **Deferring**: the owner can defer a node (`d` in the bench, or
   `nod defer`) — it leaves available/active/decide without changing
   state; seeing 「owner 延迟」means stop until it's lifted.
+  `nod defer <id> --until fri` (or 3d, 15 nov, 下周一) brings it back on
+  its own that day; the monitor then prints `NODDIT-UNDEFERRED <id>` —
+  pick it up again as if it were just undeferred.
+- **The owner's own to-dos** (`assignee: human`, 「For you」 on the
+  bench, listed in Needs you): never start, claim, expand or work on
+  one — no check-ins or stale nags come for them. You may file one when
+  something needs the owner's hands: `nod add --for me "Call the vendor"
+  --parent <id>`, and put the work that waits on it `--after` it. Hand a
+  task to the owner with `nod assign <id> me`; taking one back for an AI
+  (`nod assign <id> ai --force`) only when they said so.
 - **Relay the owner's chat replies**: before replying, record what they
   said about a node (W305, X4, or one you recognize): `nod note <id>
   --human --by "owner (said in chat, relayed by <you>)" "<their words>"`

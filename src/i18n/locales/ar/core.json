@@ -48,7 +48,9 @@
     "answerNotApproving": "الرد كان {{answer}}، ولا يوافق{{on}}",
     "pendingApproval": "بانتظار الموافقة{{on}}",
     "contentChangedNeedsReapproval": "المحتوى تغيّر، يحتاج موافقة جديدة",
-    "approved": "تمت الموافقة ({{by}})"
+    "approved": "تمت الموافقة ({{by}})",
+    "deferredUntil": "مؤجَّل حتى {{date}}",
+    "deferredUntilWithWho": "مؤجَّل حتى {{date}} ({{who}})"
   },
   "store": {
     "idInMultipleProjects": "{{id}} موجود في أكثر من مشروع ({{where}}) — استخدم الصيغة بالحرف، مثل {{example}}",
@@ -112,7 +114,8 @@
     "alreadyClaimed": "استلم {{by}} العقدة {{ref}} في {{at}}، اتركها له (--force للاستيلاء عليها)",
     "milestoneNeedsDue": "{{ref}}: المرحلة الأساسية تحتاج تاريخًا — أضف ‎--due 2026-11-15 (أو 3d)",
     "attachToOutOfRange": "--to {{n}} خارج النطاق (ملاحظات هذه العقدة: {{count}})",
-    "attachToNotFound": "لا توجد ملاحظة تطابق --to {{to}}"
+    "attachToNotFound": "لا توجد ملاحظة تطابق --to {{to}}",
+    "humanTaskNoClaim": "{{ref}} مهمة المالك نفسه، لا مهمة مُسندة لذكاء اصطناعي"
   },
   "duration": {
     "notADuration": "\"{{value}}\" ليست مدة — مثل 90s أو 30m أو 1h أو 2d"

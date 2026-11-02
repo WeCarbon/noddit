@@ -1,3 +1,4 @@
+import { HUMAN } from '../core/assignee.ts'
 import { briefTitle } from '../core/intake.ts'
 import { isListening } from '../core/listeners.ts'
 import type { Layout } from '../core/paths.ts'
@@ -194,7 +195,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const [caret, setCaret] = useState(0)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   /** 派活 (`p` / `P`): where the new brief goes, and — once filed with nobody listening — which project to offer a session for. */
-  const [briefAt, setBriefAt] = useState<{ parent?: Decision; layout: Layout } | null>(null)
+  const [briefAt, setBriefAt] = useState<{ parent?: Decision; layout: Layout; forMe?: boolean } | null>(null)
   const [sessionFor, setSessionFor] = useState<{ layout: Layout; project: string } | null>(null)
   const [qIndex, setQIndex] = useState(0)
   const [qPicks, setQPicks] = useState<Record<string, string>>({})
@@ -264,6 +265,14 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const backlinks = useMemo(() => (current ? store.backlinks(current, items) : []), [store, current, items])
 
   const reload = useCallback(() => {
+    // A deferral whose date has come ends here too, not only in `nod monitor`.
+    let back: Decision[] = []
+    try {
+      back = store.returnDueDeferrals()
+    } catch {
+      /* a lock hiccup: the next tick tries again */
+    }
+    if (back.length) say(t('bench.toast.backFromDeferral', { refs: back.map(refOf).join(' ') }))
     setSnap((prev) => {
       const next = snapshot(store, project)
       // Same array back means nothing changed; only advance the clock for 「N 分钟前」 labels.
@@ -455,7 +464,13 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     setMode('browse')
     if (!at || !words) return
     try {
-      const d = store.create({ title: briefTitle(words), author: 'owner', body: words, task: true, intake: true, parent: at.parent ? refOf(at.parent) : undefined }, at.layout)
+      const parent = at.parent ? refOf(at.parent) : undefined
+      if (at.forMe) {
+        const d = store.create({ title: briefTitle(words), author: 'owner', body: words === briefTitle(words) ? '' : words, task: true, assignee: HUMAN, parent }, at.layout)
+        reload()
+        return say(t('bench.toast.todoFiled', { ref: refOf(d) }))
+      }
+      const d = store.create({ title: briefTitle(words), author: 'owner', body: words, task: true, intake: true, parent }, at.layout)
       reload()
       if (isListening(at.layout.projectRoot)) return say(t('bench.toast.briefFiled', { ref: refOf(d) }))
       say(t('bench.toast.briefNobody', { ref: refOf(d) }))
@@ -581,7 +596,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   /** `w`: the next node an AI is stuck on, in the order the owner should take them. */
   const nextWaiting = () => {
     const queue = ownerQueue(items).filter((d) => waitingOnOwner(d, items))
-    const pool = queue.length ? queue : ownerQueue(items)
+    const pool = queue.length ? queue : ownerQueue(items).filter((d) => d.state === 'needs_decision')
     if (!pool.length) return say(t('bench.toast.noDecisions'))
     const at = current ? pool.findIndex((d) => keyOf(d) === keyOf(current)) : -1
     reveal(pool[(at + 1) % pool.length])
@@ -691,6 +706,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     imageSize: imgMeta ? { width: imgMeta.width, height: imgMeta.height } : null,
     qIndex, qPicks, qNotes, settingIndex,
     briefTarget: briefAt ? (briefAt.parent ? refOf(briefAt.parent) : store.projectName(briefAt.layout)) : undefined,
+    briefForMe: Boolean(briefAt?.forMe),
     sessionProject: sessionFor?.project,
   }
   const geom = useMemo(
@@ -797,6 +813,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         if (mode === 'brief') return commitBrief()
         return commitGoto()
       }
+      // The add prompt: ⇥ switches between a brief for an AI and a to-do for the owner.
+      if (key.tab && mode === 'brief') return setBriefAt((at) => (at ? { ...at, forMe: !at.forMe } : at))
       if (key.leftArrow) return setCaret((c) => Math.max(0, c - 1))
       if (key.rightArrow) return setCaret((c) => Math.min([...draft].length, c + 1))
       if (key.backspace || key.delete) {
@@ -1049,6 +1067,8 @@ export interface FrameInput {
   settingIndex?: number
   /** `brief` mode: the ref or project the new brief goes under. */
   briefTarget?: string
+  /** The add prompt files a to-do for the owner rather than a brief for an AI. */
+  briefForMe?: boolean
   /** `session` mode: the project nobody is listening in. */
   sessionProject?: string
 }
@@ -1792,7 +1812,7 @@ function promptPrefix(s: FrameInput): Line | null {
   const d = s.current
   if (s.banner) return null
   if (s.mode === 'goto') return [{ text: t('bench.prompt.goto'), color: 'cyan', bold: true }]
-  if (s.mode === 'brief') return [{ text: t('bench.prompt.brief', { target: s.briefTarget ?? '' }), color: 'blue', bold: true }]
+  if (s.mode === 'brief') return [{ text: t(s.briefForMe ? 'bench.prompt.todo' : 'bench.prompt.brief', { target: s.briefTarget ?? '' }), color: 'blue', bold: true }]
   if (!d) return null
   if (s.mode === 'confirm') {
     const qs = d.questions ?? []

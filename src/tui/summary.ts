@@ -41,11 +41,13 @@ export function needsOwnerLine(ov: Overview, items: Item[], width: number): Line
   const byKey = new Map(items.map((i) => [`${i.project}#${i.id}`, i]))
   const queue = ownerQueue(items)
   const blocking = queue.filter((i) => waitingOnOwner(i, items))
-  const early = queue.length - blocking.length
+  const early = queue.filter((i) => i.state === 'needs_decision').length - blocking.length
+  const todos = queue.filter((i) => i.state !== 'needs_decision').length
   const blocksOf = (i: Item) => ov.needsOwner.find((r) => r.id === i.id && r.project === i.project)?.blocks.length ?? 0
 
   const tail: Segment[] = []
   if (early) tail.push({ text: t('bench.summary.early', { glyph: GLYPH.needs_decision, count: early }), color: 'yellow', dim: true })
+  if (todos) tail.push({ text: t('bench.summary.forYou', { count: todos }), color: 'blue' })
   if (ov.decidedNotCollected) tail.push({ text: t('bench.summary.answered', { count: ov.decidedNotCollected }), color: 'green' })
 
   if (!blocking.length) {

@@ -5,7 +5,8 @@ import { QUESTIONS_HEADING_RE } from '../core/questions.ts'
 import { toJSON } from '../core/render.ts'
 import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf } from '../core/sequence.ts'
-import { dependenciesOf, isTerminal } from '../core/status.ts'
+import { isHumanTask } from '../core/assignee.ts'
+import { dependenciesOf, isDeferred, isTerminal } from '../core/status.ts'
 import { projectSessions } from '../core/listeners.ts'
 import type { Store } from '../core/store.ts'
 import type { Decision as Item } from '../core/types.ts'
@@ -15,7 +16,7 @@ import { metaLines, statusSegments, whoOf } from './detail.ts'
 import { bodyRows, canPin, canUseDefault, type BodyRow, type Segment } from './model.ts'
 import { imageName, nodeImages } from './images.ts'
 import {
-  DEFERRED_GROUP, RECENT_OLDER_GROUP, touchLabel, VIEWS, VIEW_EMPTY, VIEW_LABEL, doneGroupKey, glyphOf, isCollapsed, isDeferHidden, isTreeView,
+  DEFERRED_GROUP, RECENT_OLDER_GROUP, blocksAnAi, projectTreeRows, touchLabel, VIEWS, VIEW_EMPTY, VIEW_LABEL, doneGroupKey, glyphOf, isCollapsed, isDeferHidden, isTreeView,
   keyOf, progressOf, rowsFor, subtreeWaiting, suffixOf, viewCount, type Row, type View,
 } from './views.ts'
 
@@ -78,6 +79,13 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
     // The owner's marks: 'important' (★) or 'milestone' (⚑, counted down to `due`).
     flag: isTerminal(d.state) ? null : d.milestone && d.due ? 'milestone' : d.urgency === 'high' ? 'important' : null,
     due: d.due ?? null,
+    // Who does it: 'human' (the owner's own to-do — no agent works on it) or 'ai'.
+    assignee: isHumanTask(d) ? (d.assignee ?? 'human') : 'ai',
+    human_task: isHumanTask(d),
+    // `nod defer --until`: the moment it comes back on its own (null: deferred indefinitely, or not deferred).
+    deferred_until: isDeferred(d, now) ? (d.deferredUntil ?? null) : null,
+    // 需要人类: an AI is held up on the owner here (a question it is stuck on, or a to-do other work waits for).
+    blocks_ai: blocksAnAi(d, items),
     // 最近: what the owner did, for a window that shows it its own way.
     ...(row.touch ? { touch: { ...row.touch, label: touchLabel(row.touch) } } : {}),
   }
@@ -211,7 +219,7 @@ export function nodeDetailJson(store: Store, d: Item, now = Date.now()): Record<
  * rows, and the detail pane of every node still in active/ (archived ones,
  * often most of a long-lived project, come one at a time via `nodeDetailJson`).
  */
-export function benchJson(store: Store, opts: { project?: string; now?: number } = {}): Record<string, unknown> {
+export function benchJson(store: Store, opts: { project?: string; now?: number; back?: Item[] } = {}): Record<string, unknown> {
   const now = opts.now ?? Date.now()
   const all = store.all()
   const key = store.projectKey(opts.project)
@@ -228,6 +236,21 @@ export function benchJson(store: Store, opts: { project?: string; now?: number }
       rows: rows.map((r, i) => rowJson(view, r, items, now, folds[i])),
     }
   })
+  // A project picked on its own: all its live nodes as one tree, never mixed with a view's filter.
+  const projectViews = store.layouts
+    .map((l) => store.projectName(l))
+    .filter((p) => items.some((d) => d.project === p))
+    .map((project) => {
+      const mine = items.filter((d) => d.project === project)
+      const rows = projectTreeRows(mine, openAll)
+      const folds = withFolds(rows)
+      return {
+        project,
+        count: mine.filter((d) => !isTerminal(d.state)).length,
+        empty: t('bench.viewEmpty.project'),
+        rows: rows.map((r, i) => rowJson('all', r, mine, now, folds[i])),
+      }
+    })
   const links = backlinkIndex(store, items)
   const nodes = Object.fromEntries(items.filter((d) => !d.archived).map((d) => [keyOf(d), nodeJson(d, items, now, links.get(keyOf(d)) ?? [])]))
   const sessions = projectSessions(store, now)
@@ -250,6 +273,9 @@ export function benchJson(store: Store, opts: { project?: string; now?: number }
       stale_count: staleTasksOf(items.filter((d) => d.project === store.projectName(l))).length,
     })),
     views,
+    project_views: projectViews,
+    // Deferred `--until` a day that has come: brought back by this read (or one just before it).
+    back_from_deferral: (opts.back ?? []).map((d) => ({ key: keyOf(d), ref: refOf(d), title: d.title, text: t('bench.toast.backFromDeferral', { refs: refOf(d) }) })),
     nodes,
   }
 }

@@ -11,7 +11,9 @@ import { parseBodyRefs, parseRef, refOf } from './ref.ts'
 import { dequeue, enqueue, readQueue } from './queue.ts'
 import { DEFAULT_MARK, HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
 import { OPTIONS_HEADING_RE, parseDecision, parseNoteHeading, parseOptions } from './parse.ts'
-import { findRef, isStartable, isTerminal, statusLabel } from './status.ts'
+import { deferralOver, findRef, isDeferred, isStartable, isTerminal, statusLabel } from './status.ts'
+import { isHumanTask } from './assignee.ts'
+import { untilDay } from './fuzzy-date.ts'
 import { withDescription } from './intake.ts'
 import { list, t } from '../i18n/index.ts'
 import {
@@ -481,6 +483,8 @@ export class Store {
       reversible: input.reversible,
       session: input.session,
       intake: input.intake || undefined,
+      assignee: input.assignee || undefined,
+      milestone: input.milestone || undefined,
       tags: input.tags ?? [],
       body: body + '\n',
       options,
@@ -806,6 +810,7 @@ export class Store {
     let already = false
     const node = this.mutate(d, (d) => {
       if (isTerminal(d.state)) throw new Error(t('core.store.claimFinished', { ref: refOf(d), state: statusLabel(d.state) }))
+      if (isHumanTask(d) && !opts.force) throw new Error(t('core.store.humanTaskNoClaim', { ref: refOf(d) }))
       if (d.claimedBy && (sameAgent(d.claimedBy, by) || sameAgent(by, d.claimedBy))) {
         already = true
         return { next: d }
@@ -849,18 +854,23 @@ export class Store {
     }))
   }
 
-  /** 延迟: owner wants this done later. Only a flag — state is unchanged, so `undefer` restores it exactly. */
-  defer(d: Decision, opts: { by: string; role: NoteRole }): Decision {
+  /**
+   * 延迟: owner wants this done later. Only a flag — state is unchanged, so `undefer` restores it exactly.
+   * `until` (an ISO stamp) brings it back on its own at that moment; deferring again changes or drops it.
+   */
+  defer(d: Decision, opts: { by: string; role: NoteRole; until?: string }): Decision {
     if (d.state === 'completed' || d.state === 'closed') throw new Error(t('core.store.alreadyFinishedNoDefer', { ref: refOf(d) }))
-    if (d.deferredAt) return d
+    if (isDeferred(d) && d.deferredUntil === opts.until) return d
     return this.mutate(d, (d) => {
       const at = nowStamp(new Date(), { ms: true })
+      const day = opts.until ? untilDay(opts.until) : undefined
       return {
         next: {
           ...d,
           deferredAt: at,
           deferredBy: opts.by,
-          body: appendSection(d.body, noteHeading(NOTE_KIND.deferred, opts.role, opts.by, nowStamp()), NOTE_TEXT.deferred),
+          deferredUntil: opts.until,
+          body: appendSection(d.body, noteHeading(NOTE_KIND.deferred, opts.role, opts.by, nowStamp()), day ? NOTE_TEXT.deferredUntil(day) : NOTE_TEXT.deferred),
         },
       }
     })
@@ -874,9 +884,45 @@ export class Store {
         ...d,
         deferredAt: undefined,
         deferredBy: undefined,
+        deferredUntil: undefined,
         body: appendSection(d.body, noteHeading(NOTE_KIND.undeferred, opts.role, opts.by, nowStamp()), NOTE_TEXT.undeferred),
       },
     }))
+  }
+
+  /**
+   * Nodes deferred `--until` a moment that has come: the flag is cleared (once — under each
+   * node's lock, so two processes racing return it once) with a 「解除延迟」 note signed `nod`.
+   * Returns the nodes this call brought back.
+   */
+  returnDueDeferrals(now = Date.now()): Decision[] {
+    const back: Decision[] = []
+    for (const d of this.all()) {
+      if (!deferralOver(d, now) || isTerminal(d.state)) continue
+      let done = false
+      const next = this.mutate(d, (d) => {
+        if (!deferralOver(d, now)) return { next: d }
+        done = true
+        const day = untilDay(d.deferredUntil!) ?? d.deferredUntil!
+        return {
+          next: {
+            ...d,
+            deferredAt: undefined,
+            deferredBy: undefined,
+            deferredUntil: undefined,
+            body: appendSection(d.body, noteHeading(NOTE_KIND.undeferred, 'agent', DEFERRAL_CLOCK, nowStamp()), NOTE_TEXT.backFromDeferral(day)),
+          },
+        }
+      })
+      if (done) back.push(next)
+    }
+    return back
+  }
+
+  /** Who does it: `human` (the owner's to-do) or undefined (an AI). */
+  assign(d: Decision, assignee: string | undefined): Decision {
+    if ((d.assignee ?? undefined) === assignee) return d
+    return this.mutate(d, (d) => ({ next: { ...d, assignee } }))
   }
 
   /**
@@ -1478,6 +1524,9 @@ function historyVersions(histDir: string, baseName: string): number[] {
 export { benchOrder } from './order.ts'
 
 /** A label marked （默认） / (default) in a body's own options block. */
+/** Who signs the note when a deferral runs out on its own. */
+export const DEFERRAL_CLOCK = 'nod'
+
 const BODY_DEFAULT_MARK = /[（(]\s*(默认|default)\s*[)）]/i
 
 function bodyDefault(options: DecisionOption[]): string | undefined {

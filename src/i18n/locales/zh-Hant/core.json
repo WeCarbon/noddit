@@ -38,7 +38,9 @@
     "answerNotApproving": "答覆是 {{answer}}，不算批准{{on}}",
     "pendingApproval": "待批准{{on}}",
     "contentChangedNeedsReapproval": "內容已變更，需重新批准",
-    "approved": "已批准（{{by}}）"
+    "approved": "已批准（{{by}}）",
+    "deferredUntil": "延後到 {{date}}",
+    "deferredUntilWithWho": "延後到 {{date}}（{{who}}）"
   },
   "store": {
     "idInMultipleProjects": "{{id}} 同時存在於不止一個專案（{{where}}）——用帶字母的形式，例如 {{example}}",
@@ -97,7 +99,8 @@
     "alreadyClaimed": "{{ref}} 已被 {{by}} 在 {{at}} 接走，交給它做（--force 強行接手）",
     "milestoneNeedsDue": "{{ref}}：里程碑要有日期——加 --due 2026-11-15（或 3d）",
     "attachToOutOfRange": "--to {{n}} 超出範圍（這個節點一共 {{count}} 條段落）",
-    "attachToNotFound": "沒有段落符合 --to {{to}}"
+    "attachToNotFound": "沒有段落符合 --to {{to}}",
+    "humanTaskNoClaim": "{{ref}} 是負責人自己的事，不是派給 AI 的活"
   },
   "duration": {
     "notADuration": "「{{value}}」不是一個時長——例如 90s、30m、1h、2d"

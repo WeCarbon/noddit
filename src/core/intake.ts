@@ -1,7 +1,8 @@
 import stringWidth from 'string-width'
 import { NOTE_KIND } from './format.ts'
 import { parseNoteHeading } from './parse.ts'
-import { isTerminal } from './status.ts'
+import { isHumanTask } from './assignee.ts'
+import { isDeferred, isTerminal } from './status.ts'
 import { TITLE_MAX_COLS } from './title.ts'
 import type { Decision } from './types.ts'
 
@@ -24,8 +25,8 @@ export function briefState(d: Pick<Decision, 'intake' | 'claimedBy' | 'state'>):
   return d.claimedBy ? 'claimed' : 'unclaimed'
 }
 
-export const isUnclaimedBrief = (d: Pick<Decision, 'intake' | 'claimedBy' | 'state' | 'deferredAt'>) =>
-  briefState(d) === 'unclaimed' && !d.deferredAt
+export const isUnclaimedBrief = (d: Pick<Decision, 'intake' | 'claimedBy' | 'state' | 'deferredAt'> & Partial<Pick<Decision, 'deferredUntil' | 'assignee'>>) =>
+  briefState(d) === 'unclaimed' && !isDeferred(d) && !isHumanTask(d)
 
 /** The owner's words as filed — the first `## 原话` section. */
 export function originalWords(d: Pick<Decision, 'notes'>): string | undefined {

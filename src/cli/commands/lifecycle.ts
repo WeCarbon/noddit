@@ -1,6 +1,7 @@
 import { statusLabel } from '../../core/status.ts'
 import { bool, one, optionsAndDefault, type Args } from '../args.ts'
-import { guardOtherAuthor, readStdin, requireDecision, resolveAuthor, resolveStore, warnOtherAuthor } from '../context.ts'
+import { guardOtherAuthor, readStdin, requireDecision, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
+import { isHumanTask } from '../../core/assignee.ts'
 import { refOf } from '../../core/ref.ts'
 import { dim, toJSON } from '../../core/render.ts'
 import { type Decision } from '../../core/types.ts'
@@ -47,6 +48,8 @@ export async function run(args: Args, verb = ''): Promise<number> {
     // Starting a brief goes through `claim`, which settles (and says) who has it.
     if (!(verb === 'start' && d.intake)) guardOtherAuthor(store, d, args)
     if (verb === 'start') {
+      // The owner's own to-do: an agent doesn't work on it (`--force` when the owner said so).
+      if (isHumanTask(d) && shellRole() === 'agent' && !force) throw new Error(t('cli.lifecycle.humanTask', { ref: refOf(d) }))
       // Starting a brief is taking it: the same atomic claim as `nod claim`.
       const node = d.intake ? store.claim(d, resolveAuthor(args), { force }).node : d
       report(args, store.start(node, { force }), t('cli.lifecycle.started'))

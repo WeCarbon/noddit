@@ -1,7 +1,9 @@
 import { isRtl, t as i18n } from '../i18n/index.ts'
-import { durationText, elapsed, fromNow } from '../i18n/time.ts'
+import { dayText, durationText, elapsed, fromNow } from '../i18n/time.ts'
 import { stringWidth } from '../tui/width.ts'
 import { parseNoteHeading } from './parse.ts'
+import { isHumanTask } from './assignee.ts'
+import { untilDay } from './fuzzy-date.ts'
 import { briefState, originalWords } from './intake.ts'
 import { overdue } from './order.ts'
 import { formatRef, refOf } from './ref.ts'
@@ -41,9 +43,11 @@ export function alignRow(line: string): string {
 }
 
 /** 「已延迟（owner · 3 天前）」 — `decs get`'s status line and `decs show`'s tail. */
-export function deferredLabel(d: Pick<Decision, 'deferredAt' | 'deferredBy'>, now = Date.now()): string {
+export function deferredLabel(d: Pick<Decision, 'deferredAt' | 'deferredBy' | 'deferredUntil'>, now = Date.now()): string {
   const when = d.deferredAt ? fromNow(d.deferredAt, now) : ''
   const who = [d.deferredBy, when].filter(Boolean).join(' · ')
+  const until = d.deferredUntil ? untilDay(d.deferredUntil) : undefined
+  if (until) return i18n(who ? 'core.render.deferredUntilWithWho' : 'core.render.deferredUntil', { who, date: dayText(until, new Date(now)) })
   return who ? i18n('core.render.deferredWithWho', { who }) : i18n('core.render.deferred')
 }
 
@@ -170,6 +174,11 @@ export function toJSON(d: Decision): Record<string, unknown> {
     waiting_on: d.waitingOn ?? null,
     deferred_at: d.deferredAt ?? null,
     deferred_by: d.deferredBy ?? null,
+    /** `nod defer --until`: when it comes back on its own; null = deferred until undeferred (or not deferred). */
+    deferred_until: d.deferredAt ? (d.deferredUntil ?? null) : null,
+    /** Who does it: `human` (the owner's own to-do — agents don't work on it) or `ai`. */
+    assignee: d.assignee ?? 'ai',
+    human_task: isHumanTask(d),
     created: d.created,
     updated_at: d.updatedAt ?? null,
     after: d.after ?? [],

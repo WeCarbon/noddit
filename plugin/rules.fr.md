@@ -61,7 +61,11 @@ suite — tout est dans `nod bench`. Hors nod, invisible. Détails :
 - **Reporter** : le responsable peut reporter un nœud (`d` dans le tableau, ou
   `nod defer`) — il quitte disponible/actif/à décider sans changer
   d'état ; voir qu'il a été reporté par le responsable signifie s'arrêter
-  jusqu'à sa reprise.
+  jusqu'à sa reprise ; `--until fri` le fait revenir ce jour-là
+  (`NODDIT-UNDEFERRED <id>` dans le monitor).
+- **Tâches du responsable** (`assignee: human`, « À vous ») : ne jamais
+  y travailler. En noter une pour lui : `nod add --for me "…"` ;
+  `nod assign <id> me|ai` (ai seulement s'il l'a dit).
 - **Relayez les réponses du chat** : avant de répondre, enregistrez ce
   que le responsable a dit d'un nœud (W305, X4, ou un repéré) :
   `nod note <id> --human --by "owner (dit dans le chat, relayé par
