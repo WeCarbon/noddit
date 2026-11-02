@@ -152,6 +152,20 @@
     if ($('.detail section.files')) throw new Error('a trailing attachments list is still drawn')
     await shot('files-per-note')
 
+    log('STEP html-preview')
+    // An HTML attachment shows as a page (no scripts), with the image next to it; Source shows the code.
+    ;(await until('the html attachment', () => $$('.file').find((f) => f.textContent.includes('report.html')))).click()
+    const frame = await until('the page', () => $('.viewer-page'))
+    await until('page loaded', () => frame.contentDocument?.querySelector('h1')?.textContent === 'Release report')
+    const pic = frame.contentDocument.getElementById('pic')
+    await until('the image next to it', () => pic.complete && pic.naturalWidth > 0, 5000)
+    if (frame.contentDocument.title === 'ran' || frame.contentDocument.querySelector('script')) throw new Error('a script in the page was kept or ran')
+    await shot('html-preview')
+    $$('.viewer .viewer-open').find((b) => b.textContent.includes('Source')).click()
+    await until('the source', () => $('.viewer-stage.html pre')?.textContent.includes('<h1>Release report</h1>'))
+    key('Escape')
+    await until('viewer closed again', () => !$('.viewer'))
+
     log('STEP preview')
     // An attachment opens in the window: markdown read in place, ←→ to the next one, Esc closes.
     $$('.row.node').find((r) => r.textContent.includes('Write the schema')).click()

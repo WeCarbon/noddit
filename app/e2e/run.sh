@@ -45,6 +45,9 @@ printf 'week 44\n' > "$work/week44.txt"
 printf 'week 45\n' > "$work/week45.txt"
 decs note 7 "Week 44 numbers" --attach "$work/week44.txt"
 decs note 7 "Week 45 numbers" --attach "$work/week45.txt"
+printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > "$work/pic.png"
+printf '<html><head><title>Report</title><script>document.title="ran"</script></head><body><h1>Release report</h1><img id="pic" src="pic.png"><a id="out" href="https://example.com/">site</a></body></html>' > "$work/report.html"
+decs note 7 "Rendered report" --attach "$work/report.html" --attach "$work/pic.png"
 
 "$app" > "$work/log" 2>&1 &
 pid=$!
