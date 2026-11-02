@@ -1,3 +1,4 @@
+import { replaceDescription, replaceNoteText } from './edit.ts'
 import { createHash } from 'node:crypto'
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
@@ -1105,6 +1106,26 @@ export class Store {
         due,
       },
     }))
+  }
+
+  /**
+   * Rewrites the description, or the text of appended note `note` (1-based), and nothing
+   * else in the file (core/edit.ts), then says so in a note of its own so whoever works
+   * on the node sees it changed. `expect`: the node's `updatedAt` when the editor opened —
+   * a write since then refuses, rather than overwrite it.
+   */
+  edit(d: Decision, how: { text: string; note?: number; expect?: string; by: string; role: NoteRole; force?: boolean }): Decision {
+    if (how.expect && d.updatedAt !== how.expect) throw new Error(t('core.store.editStale', { ref: refOf(d) }))
+    if (how.note !== undefined) {
+      const target = d.notes[how.note - 1]
+      if (!target) throw new Error(t('core.store.noSuchNote', { ref: refOf(d), n: how.note, count: d.notes.length }))
+      if (target.role !== how.role && !how.force) throw new Error(t('core.store.notYourNote', { ref: refOf(d), n: how.note }))
+    }
+    const body = how.note !== undefined ? replaceNoteText(d.body, how.note, how.text) : replaceDescription(d.body, how.text)
+    if (body === null || body === d.body) return d
+    const edited = this.mutate(d, (d) => ({ next: { ...d, body } }))
+    const what = how.note !== undefined ? NOTE_TEXT.editedNote(how.note) : NOTE_TEXT.editedDescription
+    return this.append(edited, noteHeading(NOTE_KIND.addendum, how.role, how.by, nowStamp()), what, how.by, how.role)
   }
 
   /** Changes the title only; the filename keeps its slug, since the id is the stable reference. */

@@ -100,7 +100,10 @@
     "milestoneNeedsDue": "{{ref}}：里程碑要有日期——加 --due 2026-11-15（或 3d）",
     "attachToOutOfRange": "--to {{n}} 超出范围（这个节点一共 {{count}} 条段落）",
     "attachToNotFound": "没有段落匹配 --to {{to}}",
-    "humanTaskNoClaim": "{{ref}} 是负责人自己的事，不是派给 AI 的活"
+    "humanTaskNoClaim": "{{ref}} 是负责人自己的事，不是派给 AI 的活",
+    "editStale": "{{ref}} 在你打开之后有人改过——重新载入再改",
+    "noSuchNote": "{{ref}} 没有第 {{n}} 条（一共 {{count}} 条）",
+    "notYourNote": "{{ref}}：第 {{n}} 条是别人写的——确实要改，加 --force"
   },
   "duration": {
     "notADuration": "「{{value}}」不是一个时长——例如 90s、30m、1h、2d"

@@ -106,7 +106,10 @@
     "milestoneNeedsDue": "{{ref}} : un jalon a besoin d’une date — ajoutez --due 2026-11-15 (ou 3d)",
     "attachToOutOfRange": "--to {{n}} est hors limites (notes sur ce nœud : {{count}})",
     "attachToNotFound": "aucune note ne correspond à --to {{to}}",
-    "humanTaskNoClaim": "{{ref}} est une tâche du responsable, pas une demande pour une IA"
+    "humanTaskNoClaim": "{{ref}} est une tâche du responsable, pas une demande pour une IA",
+    "editStale": "{{ref}} a changé depuis que vous l’avez ouvert — rechargez et recommencez",
+    "noSuchNote": "{{ref}} n’a pas de note {{n}} (il en a {{count}})",
+    "notYourNote": "{{ref}} : la note {{n}} a été écrite par quelqu’un d’autre — --force pour la modifier quand même"
   },
   "duration": {
     "notADuration": "« {{value}} » n’est pas une durée — ex. 90s, 30m, 1h, 2d"

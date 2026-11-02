@@ -115,7 +115,10 @@
     "milestoneNeedsDue": "{{ref}}: المرحلة الأساسية تحتاج تاريخًا — أضف ‎--due 2026-11-15 (أو 3d)",
     "attachToOutOfRange": "--to {{n}} خارج النطاق (ملاحظات هذه العقدة: {{count}})",
     "attachToNotFound": "لا توجد ملاحظة تطابق --to {{to}}",
-    "humanTaskNoClaim": "{{ref}} مهمة المالك نفسه، لا مهمة مُسندة لذكاء اصطناعي"
+    "humanTaskNoClaim": "{{ref}} مهمة المالك نفسه، لا مهمة مُسندة لذكاء اصطناعي",
+    "editStale": "تغيّرت {{ref}} منذ أن فتحتها — أعد التحميل وعدّل من جديد",
+    "noSuchNote": "لا توجد في {{ref}} ملاحظة رقم {{n}} (فيها {{count}})",
+    "notYourNote": "{{ref}}: الملاحظة {{n}} كتبها غيرك — ‎--force لتعديلها رغم ذلك"
   },
   "duration": {
     "notADuration": "\"{{value}}\" ليست مدة — مثل 90s أو 30m أو 1h أو 2d"

@@ -3,6 +3,7 @@ import { parseBodyRefs, refOf } from '../core/ref.ts'
 import { OPTIONS_HEADING_RE } from '../core/parse.ts'
 import { QUESTIONS_HEADING_RE } from '../core/questions.ts'
 import { toJSON } from '../core/render.ts'
+import { descriptionOf } from '../core/edit.ts'
 import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isHumanTask } from '../core/assignee.ts'
@@ -203,6 +204,8 @@ function nodeJson(d: Item, items: Item[], now: number, backlinks: Item[]): Recor
     // `notes[].attachments` for that note — same shape, plus `path`.
     attachments: d.attachments.map((a) => withPath(d, a)),
     body_attachments: d.bodyAttachments.map((a) => withPath(d, a)),
+    // The description as written (markdown), for a window that edits it (nod edit --body).
+    description: descriptionOf(d.body),
     notes: d.notes.map((n) => ({ kind: n.kind, role: n.role, author: n.author, at: n.at, text: n.text, attachments: n.attachments.map((a) => withPath(d, a)) })),
     terminal: isTerminal(d.state),
     backlinks: backlinks.map((b) => keyOf(b)),
