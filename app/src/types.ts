@@ -72,6 +72,19 @@ export interface Question {
   options: Option[]
 }
 
+/** An earlier `nod ask` round of a node, with what it was answered — history, not live state. */
+export interface PreviousRound {
+  round: number
+  options: Option[]
+  /** That round's own sub-questions. */
+  questions: Question[]
+  /** `<choice> —— <label>`, or null when the next round replaced it unanswered. */
+  answer: string | null
+  sub_answers: Record<string, string> | null
+  by: string | null
+  at: string | null
+}
+
 export interface BodyRow {
   text: string
   image?: number
@@ -114,6 +127,7 @@ export interface Node {
   default: string | null
   options: Option[]
   questions: Question[]
+  previous_rounds?: PreviousRound[]
   answer: { choice?: string; note?: string; by: string; at: string } | null
   answers: Record<string, string> | null
   deferred_at: string | null

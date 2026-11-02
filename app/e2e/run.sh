@@ -38,6 +38,9 @@ decs add "Tidy the logs" --task
 decs add "Rename the bucket" -o 1=Yes 2=No
 decs add "Rotate the keys" -o 1=Now 2=Later
 decs add "Weekly report is ready" --body "Nothing unusual this week."
+# A second round on 1: the first answer stays as history under the live options.
+(cd "$NODDIT_APP_PICK" && "$NODDIT_BIN" push 1 1 --human >/dev/null)
+decs ask 1 -o 1=SQLite 2=Postgres --text "Asking again: the JSON columns matter now."
 printf '# Schema notes\n\n- users: id, email\n' > "$work/schema.md"
 printf 'migration 1 ok\nmigration 2 ok\n' > "$work/migrate.log"
 decs attach 2 "$work/schema.md" "$work/migrate.log"

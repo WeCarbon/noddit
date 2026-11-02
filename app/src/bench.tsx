@@ -26,7 +26,7 @@ import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, moveRow, patchNode, patchRows, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
-import type { Attachment, Bench as BenchData, Node, Project, Row, View, ViewName } from './types.ts'
+import type { Attachment, Bench as BenchData, Node, PreviousRound, Project, Row, View, ViewName } from './types.ts'
 
 export interface Prefs {
   view: ViewName
@@ -1409,6 +1409,7 @@ function Detail(p: {
         )}
 
         {n.questions.length > 0 && <Questions node={n} busy={p.busy} onSubmit={p.onQuestions} />}
+        {(n.previous_rounds?.length ?? 0) > 0 && <PreviousRounds rounds={n.previous_rounds!} />}
 
         {n.status === 'needs_decision' && !n.options.length && !n.questions.length && p.composer?.kind !== 'free' && (
           <section class="decide">
@@ -1570,6 +1571,53 @@ function ComposerBox(p: {
         </button>
       </div>
     </div>
+  )
+}
+
+/** Earlier rounds of `nod ask`, newest first, folded: each with its options and what it was answered. */
+function PreviousRounds({ rounds }: { rounds: PreviousRound[] }) {
+  const newestFirst = [...rounds].sort((a, b) => b.round - a.round)
+  return (
+    <details class="prev-rounds">
+      <summary>{rounds.length === 1 ? s('previousRound') : s('previousRounds', { count: rounds.length })}</summary>
+      {newestFirst.map((r) => {
+        const chosen = r.answer?.split(/\s*——\s*/)[0]?.trim()
+        return (
+          <div key={r.round} class="prev-round">
+            <div class="prev-round-head">
+              <span class="prev-round-n">{s('roundN', { n: r.round })}</span>
+              {r.answer ? (
+                <span class="d small">{[r.by, r.at ? new Date(r.at).toLocaleString(document.documentElement.lang || undefined) : null].filter(Boolean).join(' · ')}</span>
+              ) : (
+                <span class="d small">{s('roundUnanswered')}</span>
+              )}
+            </div>
+            <ul class="prev-options">
+              {r.options.map((o) => (
+                <li key={o.key} class={o.key === chosen ? 'chosen' : ''}>
+                  <span class="key">{o.key}</span>
+                  {o.label}
+                  {o.key === chosen && <span class="chip ok">✓ {s('answered')}</span>}
+                </li>
+              ))}
+            </ul>
+            {r.sub_answers && r.questions.length > 0 && (
+              <ul class="prev-subs">
+                {r.questions.map((q) => {
+                  const pick = r.sub_answers?.[q.key]
+                  const label = q.options.find((o) => o.key === pick)?.label ?? pick
+                  return pick ? (
+                    <li key={q.key}>
+                      <span class="d">{q.label}</span> {label}
+                    </li>
+                  ) : null
+                })}
+              </ul>
+            )}
+          </div>
+        )
+      })}
+    </details>
   )
 }
 

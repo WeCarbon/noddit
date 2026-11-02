@@ -65,6 +65,12 @@
     await sleep(200)
     $$('.row.node').find((r) => r.textContent.includes('Pick a database')).click()
     await sleep(200)
+    // The first round's answer is history, folded under the live options.
+    const prev = await until('the previous round', () => $('.prev-rounds'))
+    if (prev.open) throw new Error('previous rounds should start folded')
+    prev.querySelector('summary').click()
+    await until('round 1 with its answer', () => $('.prev-round .prev-options li.chosen')?.textContent.includes('SQLite'))
+    await shot('previous-rounds')
     key('2')
     const answerBox = await until('answer composer', () => $('.composer textarea'))
     await focused('answer composer', '.composer textarea')

@@ -2774,3 +2774,64 @@ figcaption {
   background: var(--code-bg);
 }
 
+/* Earlier rounds of a decision, folded under the live one. */
+.prev-rounds {
+  margin: 4px 0 18px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.prev-rounds > summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-3);
+  padding: 4px 0;
+}
+
+.prev-round {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+}
+
+.prev-round-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.prev-round-n {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.prev-options,
+.prev-subs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.prev-options li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.prev-options li.chosen {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.prev-options .key {
+  font: 600 11px var(--mono);
+  color: var(--text-3);
+  min-width: 14px;
+}
+
+.prev-subs li {
+  padding: 1px 0 1px 22px;
+}
