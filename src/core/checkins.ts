@@ -1,3 +1,4 @@
+import { isStartable } from './status.ts'
 /**
  * Check-in asks: an `in_progress` node idle past its span (`core/staleness.ts`'s
  * `checkinThresholdMs`, default 30m) gets asked for a status update, and a
@@ -142,11 +143,12 @@ export function staleNagDue(
   return dueAndRecord(l, d.id, lastWrite, checkinThresholdMs(d.staleAfter), now)
 }
 
-/** Not-started, not deferred — the owner's "stale task": neither waiting on a
- *  decision nor being worked on. Oldest first, so the nag (and `stale_count`
- *  in the bench/JSON) surfaces what's been sitting longest. */
-export function staleTasksOf<T extends Pick<Decision, 'state' | 'deferredAt' | 'created'>>(items: T[]): T[] {
+/** Not-started, not deferred and free to start — the owner's "stale task":
+ *  neither waiting on a decision nor being worked on. A node queued behind an
+ *  unfinished `--after` is waiting its turn, not stale. Oldest first, so the
+ *  nag (and `stale_count` in the bench/JSON) surfaces what's sat longest. */
+export function staleTasksOf<T extends Decision>(items: T[]): T[] {
   return items
-    .filter((d) => d.state === 'not_started' && !d.deferredAt)
+    .filter((d) => d.state === 'not_started' && !d.deferredAt && isStartable(d, items))
     .sort((a, b) => Date.parse(a.created) - Date.parse(b.created))
 }

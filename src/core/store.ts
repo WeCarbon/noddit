@@ -1068,6 +1068,11 @@ export class Store {
     return this.mutate(d, (d) => ({ next: { ...d, title: trimmed } }))
   }
 
+  /** `nod after`: what this node waits for. An empty list clears it. */
+  setAfter(d: Decision, after: string[]): Decision {
+    return this.mutate(d, (d) => ({ next: { ...d, after: after.length ? after : undefined } }))
+  }
+
   /** Writes the node back as it reads now — what `decs migrate --upgrade` uses to make read-time mappings permanent. */
   rewrite(d: Decision): Decision {
     return this.mutate(d, (d) => ({ next: d }))

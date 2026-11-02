@@ -58,7 +58,8 @@
     "session": "nod sessions [--json]                     每个项目里有哪些 AI 会话在线\nnod session start [--agent claude|codex|kimi] [--dir <项目>] [--dry-run] [--json]\n                                          在那里开一个新终端窗口，跑这个智能体\n\n会话在线，是说它的 nod monitor 在这个项目里跑着（插件在每个会话里都会自动启动一个）。\n每个监听在 $NODDIT_HOME/sessions/ 下维持一个心跳（pid、署名、所在终端程序、主控还是子智能体、\n开始时间、最后一次心跳）；pid 已经不在或者心跳超过 90 秒的不算。\n\n`session start` 开一个新的前台窗口：macOS 上装了 iTerm2 用 iTerm2，否则用「终端」；Windows 上用\nWindows Terminal，否则 cmd；Linux 上用找到的第一个终端，找不到就把命令打印出来。它在项目的真实根目录\n里启动智能体，第一句话让它去接等着的派活。这里已经有主控会话在线时不开，并说明是谁。\n\n  --agent     claude（默认，或 $NODDIT_AGENT）| codex | kimi\n  --dry-run   只打印确切的 AppleScript / 命令，什么都不打开\n  --json      `sessions`：`{\"projects\": [{project, letter, root, listening, sessions: [{pid, author, harness, role, started_at, last_seen}]}]}`\n              `start`：`{\"ok\": true, \"started\": bool, \"plan\": {agent, root, terminal, command, exec, script?}}`\n                     或 `{\"ok\": false, \"reason\": \"already_listening\", \"session\": {…}}`",
     "whoami": "nod whoami [--json]     这个进程现在的身份（core/identity.ts）\n\n每次写入会打在看不见的 `<!-- nod:by=… -->` 标记里（这样 nod monitor 能分清是不是\n自己写的，转记负责人的话时不会反过来推给转记的那个人自己）；也是 --mine 匹配的依据。\n\n  NODDIT_IDENTITY / DECS_IDENTITY   每个智能体设一次就固定住——跟 NODDIT_AGENT\n                                     （nod session start 选 claude/codex/kimi 用的）\n                                     是两个不同的变量\n  没设的话：署名里「 · 」前面的名字（NODDIT_AUTHOR）加上会话 id\n             （CLAUDE_SESSION_ID 或 NODDIT_SESSION）\n\n两个都没有 → 没有身份：写入不带标记，也不会被跳过，--mine 还是只按名字匹配。\n\n  --json    `{identity, explicit, author, session, harness}`",
     "flag": "nod flag <编号> important                   标为很重要：每个列表里排最前，看板上带 ★\nnod flag <编号> milestone --due 2026-11-15   关键时间节点：排最前，倒计时（⚑ 3 天后）\nnod flag <编号> normal                      两个标记都去掉（也可以写 off）\n\n  --due <日期|4h|3d>   里程碑的日期；只写日期就是那天结束\n  --json               输出改完的节点\n  --force              AI 也直接改（负责人在对话里说了）\n\n由负责人来定。AI 运行时（有 CLAUDECODE 或 NODDIT_ROLE=agent）只在节点上记一条建议，\n负责人标了才算。重要就是 urgency high；里程碑是 due 加 milestone: true。",
-    "beat": "nod beat [<id>…] [--note \"…\"]     「我还在做」——算一次 check-in 回复\n\n跟其他写入一样会更新 updated_at、清零 check-in 的问询次数（core/checkins.ts），\n不给 --note 就不留可见记录。不给 <id> 就用 NODDIT_NODE（跟 nod progress 默认取的一样）。\n\n  --note \"…\"    写成一条「心跳」记录，而不是只悄悄更新时间\n  --json"
+    "beat": "nod beat [<id>…] [--note \"…\"]     「我还在做」——算一次 check-in 回复\n\n跟其他写入一样会更新 updated_at、清零 check-in 的问询次数（core/checkins.ts），\n不给 --note 就不留可见记录。不给 <id> 就用 NODDIT_NODE（跟 nod progress 默认取的一样）。\n\n  --note \"…\"    写成一条「心跳」记录，而不是只悄悄更新时间\n  --json",
+    "after": "nod after <id> <id>… [--clear]\n\n让节点排在别的节点后面：前面的完成或关闭之前，它排队等着（这期间不算 stale）。--clear 取消排队。"
   },
   "send": {
     "badUrgency": "--urgency 只能是 {{urgencies}}，收到「{{value}}」",
@@ -447,5 +448,9 @@
   "beat": {
     "whichNode": "改哪个节点？给个 id，或者设 NODDIT_NODE",
     "done": "还在做"
+  },
+  "after": {
+    "set": "{{ref}} 现在排在 {{deps}} 后面",
+    "cleared": "{{ref}} 不再排队"
   }
 }

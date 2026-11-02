@@ -39,6 +39,7 @@ const COMMANDS: Record<string, () => Promise<CommandModule>> = {
   migrate: () => import('./commands/migrate.ts'),
   projects: () => import('./commands/projects.ts'),
   retitle: () => import('./commands/retitle.ts'),
+  after: () => import('./commands/after.ts'),
   start: () => import('./commands/lifecycle.ts'),
   done: () => import('./commands/lifecycle.ts'),
   close: () => import('./commands/lifecycle.ts'),

@@ -84,3 +84,14 @@ test('the owner\'s words typed in the bench and relayed again by an agent are re
   assert.equal(decsResult(root, ['note', '1', 'a different reply'], owner).code, 0)
   assert.equal(decsResult(root, ['get', '1'], { DECS_LANG: 'en' }).stdout.split('a different reply').length - 1, 1)
 })
+
+test('nod after queues a node behind another and --clear lets it go', () => {
+  const root = scratch()
+  decsResult(root, ['init', '--no-register'], { DECS_LANG: 'en' })
+  const env = { DECS_LANG: 'en', DECS_AUTHOR: 'lead · x' }
+  decsResult(root, ['add', 'first', '--task', '--author', 'lead · x'], env)
+  decsResult(root, ['add', 'second', '--task', '--author', 'lead · x'], env)
+  assert.match(decsResult(root, ['after', '2', '1'], env).stdout, /waits for/)
+  assert.match(decsResult(root, ['get', '2', '--json'], env).stdout, /"after":\s*\[\s*"X?1"/)
+  assert.match(decsResult(root, ['after', '2', '--clear'], env).stdout, /no longer waits/)
+})

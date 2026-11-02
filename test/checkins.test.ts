@@ -67,7 +67,7 @@ test('askIfDue: never for a deferred node, a not-in_progress node, or one still 
 
 test('staleTasksOf: only not_started, not deferred; oldest created first', () => {
   const mk = (id: number, created: string, overrides: Partial<Decision> = {}) =>
-    ({ id, state: 'not_started', created, deferredAt: undefined, ...overrides }) as Pick<Decision, 'state' | 'deferredAt' | 'created'> & { id: number }
+    ({ id, project: 'p', state: 'not_started', created, deferredAt: undefined, ...overrides }) as Decision
   const items = [
     mk(1, '2026-01-03T00:00:00Z'),
     mk(2, '2026-01-01T00:00:00Z'),
@@ -76,6 +76,15 @@ test('staleTasksOf: only not_started, not deferred; oldest created first', () =>
     mk(5, '2026-01-02T12:00:00Z'),
   ]
   assert.deepEqual(staleTasksOf(items).map((d) => d.id), [2, 5, 1])
+})
+
+test('staleTasksOf: a node queued behind an unfinished --after is waiting its turn, not stale', () => {
+  const mk = (id: number, overrides: Partial<Decision> = {}) =>
+    ({ id, project: 'p', state: 'not_started', created: '2026-01-01T00:00:00Z', ...overrides }) as Decision
+  const items = [mk(1, { state: 'in_progress' }), mk(2, { after: ['1'] }), mk(3), mk(4, { after: ['3'] })]
+  assert.deepEqual(staleTasksOf(items).map((d) => d.id), [3])
+  items[0] = mk(1, { state: 'completed' })
+  assert.deepEqual(staleTasksOf(items).map((d) => d.id).sort(), [2, 3])
 })
 
 test('staleNagDue: same spacing as askIfDue, but for not_started nodes (never in_progress, never deferred)', (t) => {
