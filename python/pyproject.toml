@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "noddit"
-version = "0.1.0"
+version = "0.1.1"
 description = "Write JSON Lines progress events from a long-running script or pytest run, for anything that wants to watch along"
 readme = "README.md"
 license = "MIT"

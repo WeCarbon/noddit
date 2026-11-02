@@ -1,6 +1,6 @@
 [package]
 name = "decs-app"
-version = "0.1.0"
+version = "0.1.1"
 description = "Desktop window for decs"
 license = "MIT"
 edition = "2021"
