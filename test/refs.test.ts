@@ -130,3 +130,32 @@ test('titles: width limit on add, retitle to fix, check warns on old ones', (t) 
   assert.ok(existsSync(join(root, 'decisions', 'active', file)), 'the filename is unchanged')
   assert.equal(decsResult(root, ['retitle', '1', long]).code, 1, 'retitle obeys the same limit')
 })
+
+test('retitle: recorded as who changed it, refuses a stale --expect, --json, and a no-op says so', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 'first title', '--task'])
+  const before = JSON.parse(decs(root, ['get', '1', '--json']))
+
+  const asOwner = JSON.parse(decs(root, ['retitle', '1', 'second title', '--human', '--json'], { CLAUDECODE: undefined }))
+  assert.equal(asOwner.title, 'second title')
+  assert.match(decs(root, ['get', '1']), new RegExp(`## 补充（human · owner · `), 'a note says who retitled it')
+  assert.match(decs(root, ['get', '1']), /原来是「first title」/, 'and what it was')
+
+  // Stale --expect refuses, same as decs edit.
+  const stale = decsResult(root, ['retitle', '1', 'third title', '--expect', before.updated_at])
+  assert.equal(stale.code, 1)
+  assert.match(stale.stderr, /changed since you opened it/)
+  assert.equal(JSON.parse(decs(root, ['get', '1', '--json'])).title, 'second title', 'the stale attempt did not land')
+
+  // A fresh --expect goes through.
+  const fresh = JSON.parse(decs(root, ['get', '1', '--json'])).updated_at
+  decs(root, ['retitle', '1', 'third title', '--expect', fresh])
+  assert.equal(JSON.parse(decs(root, ['get', '1', '--json'])).title, 'third title')
+
+  // Retitling to the same title is a no-op: no note, plain message.
+  const notesBefore = JSON.parse(decs(root, ['get', '1', '--json'])).notes.length
+  assert.match(decs(root, ['retitle', '1', 'third title']), /nothing changed/)
+  assert.equal(JSON.parse(decs(root, ['get', '1', '--json'])).notes.length, notesBefore, 'no note for a no-op retitle')
+})

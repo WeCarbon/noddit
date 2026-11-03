@@ -1,5 +1,7 @@
 import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, Flag, GitFork, Link2, PenLine, Radio, Star, Timer, User } from 'lucide-preact'
 import type { ComponentChildren } from 'preact'
+import { useRef } from 'preact/hooks'
+import { useDialogFocus } from './focus.ts'
 import { Bar, Glyph, segClass } from './segs.tsx'
 import { s } from './strings.ts'
 import type { Node, NodePill, Seg } from './types.ts'
@@ -82,7 +84,44 @@ function StatusPill({ segs }: { segs: Seg[] }) {
   )
 }
 
-export function NodeHeader({ n, onJump, listening }: { n: Node; onJump: (key: string) => void; listening: { on: boolean; who: string | null } | null }) {
+/** The title, in place: Enter saves (`nod retitle`), Esc cancels, a click outside saves too. */
+function TitleField({ title, onSave, onCancel }: { title: string; onSave: (title: string) => void; onCancel: () => void }) {
+  const ref = useRef<HTMLInputElement>(null)
+  useDialogFocus(ref, { select: true })
+  return (
+    <input
+      ref={ref}
+      class="node-title-edit"
+      defaultValue={title}
+      dir="auto"
+      aria-label={s('titleEdit')}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === 'Enter') onSave((e.currentTarget as HTMLInputElement).value)
+        if (e.key === 'Escape') onCancel()
+      }}
+      onBlur={(e) => onSave((e.currentTarget as HTMLInputElement).value)}
+    />
+  )
+}
+
+export function NodeHeader({
+  n,
+  onJump,
+  listening,
+  editingTitle,
+  onStartTitle,
+  onSaveTitle,
+  onCancelTitle,
+}: {
+  n: Node
+  onJump: (key: string) => void
+  listening: { on: boolean; who: string | null } | null
+  editingTitle: boolean
+  onStartTitle: () => void
+  onSaveTitle: (title: string) => void
+  onCancelTitle: () => void
+}) {
   const waitingSince = n.status === 'needs_decision' ? n.updated_at ?? n.created : null
   const steps = Array.isArray(n.steps) ? (n.steps as { label: string; done: boolean }[]) : []
   const next = steps.findIndex((x) => !x.done)
@@ -129,9 +168,13 @@ export function NodeHeader({ n, onJump, listening }: { n: Node; onJump: (key: st
           {statusParts(n.status_line).detail}
         </p>
       )}
-      <h2 class="node-title" dir="auto">
-        {n.title}
-      </h2>
+      {editingTitle ? (
+        <TitleField title={n.title} onSave={onSaveTitle} onCancel={onCancelTitle} />
+      ) : (
+        <h2 class="node-title clickable" dir="auto" title={s('titleEditHint')} onClick={onStartTitle}>
+          {n.title}
+        </h2>
+      )}
       {n.intake && n.original && n.original.trim() !== n.title.trim() && (
         <blockquote class="original" dir="auto" title={s('briefOriginal')}>
           {n.original}

@@ -584,6 +584,18 @@ export function Bench(props: {
       if (/changed since|改过|改過|a changé|تغيّرت/.test(e.message)) setEditConflict({ n, target, markdown })
     })
   }
+  /** The node whose title is being edited, if any — a click on it, Enter saves (`nod retitle`), Esc cancels. */
+  const [editingTitle, setEditingTitle] = useState<string | null>(null)
+  const [titleConflict, setTitleConflict] = useState<{ n: Node; title: string } | null>(null)
+  const saveTitle = (n: Node, title: string, overwrite = false) => {
+    setEditingTitle(null)
+    const trimmed = title.trim()
+    if (!trimmed || trimmed === n.title) return
+    const patch = both(patchNode(n.key, (x) => ({ ...x, title: trimmed })), patchRows(n.key, (r) => ({ ...r, title: trimmed })))
+    optimistic(patch, () => api.retitleNode(rootOf(n), n.id, trimmed, overwrite ? undefined : (n.updated_at ?? undefined)), s('editSaved'), (e) => {
+      if (/changed since|改过|改過|a changé|تغيّرت/.test(e.message)) setTitleConflict({ n, title: trimmed })
+    })
+  }
   // A deferral that ended with this read: say it once.
   const backSeen = useRef(new Set<string>())
   useEffect(() => {
@@ -854,7 +866,7 @@ export function Bench(props: {
         if (scope) return setScope(null)
         return
       }
-      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || holdFor || milestoneFor || editing || editConflict || viewEditor || isTyping(e)) return
+      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || holdFor || milestoneFor || editing || editConflict || editingTitle || titleConflict || viewEditor || isTyping(e)) return
       if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault()
         return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
@@ -1170,6 +1182,10 @@ export function Bench(props: {
             onCancelEdit={() => setEditing(null)}
             onFiles={(target, files) => void api.attachFiles(rootOf(node), node.id, files, target).then(() => (showToast(s('attachedFiles', { count: files.length })), refresh()), (e: Error) => setError(e.message))}
             onQuestions={(picks, otherText) => optimistic(answered(node.key), () => api.answerQuestions(rootOf(node), node.id, picks, otherText), s('sent'))}
+            editingTitle={editingTitle === node.key}
+            onStartTitle={() => setEditingTitle(node.key)}
+            onSaveTitle={(title) => saveTitle(node, title)}
+            onCancelTitle={() => setEditingTitle(null)}
           />
         ) : current?.kind === 'fold' ? (
           <div class="placeholder">
@@ -1235,6 +1251,21 @@ export function Bench(props: {
             const c = editConflict
             setEditConflict(null)
             setEditing({ key: c.n.key, target: c.target })
+          }}
+        />
+      )}
+      {titleConflict && (
+        <EditConflict
+          onReload={() => (setTitleConflict(null), void refresh())}
+          onOverwrite={() => {
+            const c = titleConflict
+            setTitleConflict(null)
+            saveTitle(c.n, c.title, true)
+          }}
+          onKeep={() => {
+            const c = titleConflict
+            setTitleConflict(null)
+            setEditingTitle(c.n.key)
           }}
         />
       )}
@@ -1443,6 +1474,10 @@ function Detail(p: {
   onCancelEdit: () => void
   onFiles: (target: 'body' | number, files: File[]) => void
   onQuestions: (picks: Record<string, string>, otherText: Record<string, string>) => void
+  editingTitle: boolean
+  onStartTitle: () => void
+  onSaveTitle: (title: string) => void
+  onCancelTitle: () => void
 }) {
   const n = p.node
   // Each message's files sit under it when the CLI says which message they belong to; older CLIs: one list at the end.
@@ -1468,7 +1503,15 @@ function Detail(p: {
     <>
     <div class="detail" ref={p.scrollRef}>
       <div class="detail-inner">
-        <NodeHeader n={n} onJump={p.onJump} listening={p.listening} />
+        <NodeHeader
+          n={n}
+          onJump={p.onJump}
+          listening={p.listening}
+          editingTitle={p.editingTitle}
+          onStartTitle={p.onStartTitle}
+          onSaveTitle={p.onSaveTitle}
+          onCancelTitle={p.onCancelTitle}
+        />
 
         {n.options.length > 0 && !n.questions.length && (
           <section class="decide">
@@ -1547,8 +1590,13 @@ function Detail(p: {
               <PenLine size={13} strokeWidth={1.75} />
               {s('edEdit')}
             </button>
+            {!n.description?.trim() && (
+              <button class="body-placeholder" onClick={() => p.onEdit('body')}>
+                {s('bodyPlaceholder')}
+              </button>
+            )}
             <Body
-              rows={n.body_rows}
+              rows={n.description?.trim() ? n.body_rows : afterDescription(n.body_rows)}
               images={n.images}
               onImage={p.onImage}
               notes={{

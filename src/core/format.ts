@@ -99,6 +99,7 @@ export const NOTE_TEXT = {
   attachedHere: '附件见下。',
   editedDescription: '改了描述。',
   editedNote: (n: number) => `改了第 ${n} 条。`,
+  retitled: (from: string) => `改了标题，原来是「${from}」。`,
 } as const
 
 /** `<!-- /分组 -->` — ends an attachment group; invisible in a markdown viewer. */

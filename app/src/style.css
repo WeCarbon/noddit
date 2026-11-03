@@ -596,6 +596,35 @@ svg.lucide.ico {
   text-wrap: pretty;
 }
 
+.node-title.clickable {
+  cursor: text;
+  border-radius: 4px;
+  margin: 10px -4px 14px;
+  padding: 0 4px;
+}
+
+.node-title.clickable:hover {
+  background: var(--hover);
+}
+
+.node-title-edit {
+  display: block;
+  width: calc(100% + 8px);
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  margin: 10px -4px 14px;
+  padding: 0 4px;
+  color: var(--text);
+  background: var(--panel);
+  border: 0;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1.5px var(--accent);
+  outline: none;
+}
+
 .meta {
   display: flex;
   flex-direction: column;
@@ -2233,13 +2262,31 @@ figcaption {
   height: 24px;
   padding: 0 8px;
   font-size: 12px;
-  opacity: 0;
+  /* Always legible as a button, not just on hover — opacity 0 here read as disabled. */
+  opacity: 0.65;
   transition: opacity 120ms ease;
 }
 
 .detail:hover .edit-body,
 .edit-body:focus-visible {
   opacity: 1;
+}
+
+.body-placeholder {
+  display: block;
+  width: 100%;
+  text-align: start;
+  color: var(--text-3);
+  font: inherit;
+  font-style: italic;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: text;
+}
+
+.body-placeholder:hover {
+  color: var(--text-2);
 }
 
 .note-tools {

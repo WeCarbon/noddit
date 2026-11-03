@@ -1258,11 +1258,21 @@ export class Store {
     return this.append(edited, noteHeading(NOTE_KIND.addendum, how.role, how.by, nowStamp()), what, how.by, how.role)
   }
 
-  /** Changes the title only; the filename keeps its slug, since the id is the stable reference. */
-  retitle(d: Decision, title: string): Decision {
+  /**
+   * Changes the title only; the filename keeps its slug, since the id is the stable reference.
+   * Records who changed it, like `edit`. `expect`: the node's `updatedAt` when the editor
+   * opened — a write since then refuses, rather than overwrite it.
+   */
+  retitle(d: Decision, title: string, opts: { by?: string; role?: NoteRole; expect?: string } = {}): Decision {
     const trimmed = title.trim()
     if (!trimmed) throw new Error(t('core.store.titleRequired'))
-    return this.mutate(d, (d) => ({ next: { ...d, title: trimmed } }))
+    if (opts.expect && d.updatedAt !== opts.expect) throw new Error(t('core.store.editStale', { ref: refOf(d) }))
+    if (trimmed === d.title) return d
+    const by = opts.by ?? 'owner'
+    const role = opts.role ?? 'human'
+    const from = d.title
+    const renamed = this.mutate(d, (d) => ({ next: { ...d, title: trimmed } }))
+    return this.append(renamed, noteHeading(NOTE_KIND.addendum, role, by, nowStamp()), NOTE_TEXT.retitled(from), by, role)
   }
 
   /** `nod after`: what this node waits for. An empty list clears it. */

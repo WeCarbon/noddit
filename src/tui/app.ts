@@ -16,6 +16,7 @@ import { projectSessions } from '../core/listeners.ts'
 import type { ProjectSessions } from '../core/overview.ts'
 import { findRef, isDeferred, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
 import type { Store } from '../core/store.ts'
+import { assertTitleFits } from '../core/title.ts'
 import { type Decision } from '../core/types.ts'
 import { isRtl, t } from '../i18n/index.ts'
 import { bidiMode, isolateLtr, reorderRuns, type BidiMode } from '../i18n/bidi.ts'
@@ -90,9 +91,9 @@ export function repaintRows(frame: Line[], from: number, to: number): string {
 const MIN_PANEL_COLS = 12
 
 type Line = Segment[]
-export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother' | 'close' | 'goto' | 'settings' | 'brief' | 'session'
+export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother' | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle'
 /** Modes where keystrokes go into the prompt-line draft. */
-const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief']
+const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle']
 
 interface Props {
   store: Store
@@ -447,6 +448,24 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       try {
         store.close(current, reason)
         say(t('bench.toast.closed', { ref: refOf(current), reason }))
+      } catch (e) {
+        say((e as Error).message)
+      }
+    }
+    setMode('browse')
+    setDraft('')
+    reload()
+  }
+
+  const commitRetitle = () => {
+    if (current) {
+      const title = draft.trim()
+      try {
+        if (title) {
+          assertTitleFits(title)
+          const next = store.retitle(current, title, { by: 'owner', role: 'human', expect: current.updatedAt })
+          if (next !== current) say(t('bench.toast.retitled', { ref: refOf(next) }))
+        }
       } catch (e) {
         say((e as Error).message)
       }
@@ -905,6 +924,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         if (mode === 'qother') return commitQOther()
         if (mode === 'close') return commitClose()
         if (mode === 'brief') return commitBrief()
+        if (mode === 'retitle') return commitRetitle()
         return commitGoto()
       }
       // The add prompt: ⇥ switches between a brief for an AI and a to-do for the owner.
@@ -1075,6 +1095,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       if (isTerminal(current.state)) return say(t('bench.toast.alreadyPendingChange', { ref: refOf(current), status: statusLabel(current.state) }))
       return startText('close')
     }
+    if (input === 'T') return startText('retitle', current.title)
     if (input === 'a' || input === 'A') {
       try {
         store.dismiss(current)
@@ -1973,6 +1994,7 @@ function promptPrefix(s: FrameInput): Line | null {
     return [{ text: t('bench.prompt.qother', { key: q?.key ?? '' }), color: 'magenta', bold: true }]
   }
   if (s.mode === 'close') return [{ text: t('bench.prompt.close', { ref: refOf(d) }), color: 'red', bold: true }]
+  if (s.mode === 'retitle') return [{ text: t('bench.prompt.retitle', { ref: refOf(d) }), color: 'cyan', bold: true }]
   return null
 }
 
@@ -2014,6 +2036,7 @@ const PLACEHOLDER: Partial<Record<Mode, () => string>> = {
   close: () => t('bench.placeholder.closeReason'),
   goto: () => t('bench.placeholder.goto'),
   brief: () => t('bench.placeholder.brief'),
+  retitle: () => t('bench.placeholder.retitle'),
 }
 
 function promptLine(s: FrameInput): Line {

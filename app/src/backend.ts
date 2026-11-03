@@ -546,6 +546,10 @@ export async function readPreview(path: string): Promise<{ text: string; truncat
 export const editNode = (root: string, id: number, target: 'body' | number, markdown: string, expect?: string) =>
   ok(['edit', String(id), ...(target === 'body' ? ['--body'] : ['--note', String(target + 1)]), ...(expect ? ['--expect', expect] : []), '--human', '--dir', root], undefined, markdown)
 
+/** `nod retitle`. `expect`: the updated_at it was opened at — a write since then refuses. */
+export const retitleNode = (root: string, id: number, title: string, expect?: string) =>
+  ok(['retitle', String(id), title, ...(expect ? ['--expect', expect] : []), ...human, '--json', '--dir', root])
+
 /** Files pasted or dropped into the editor: saved, then attached to that part of the node. */
 export async function attachFiles(root: string, id: number, files: File[], to: 'body' | number): Promise<void> {
   for (const path of await saveUploads(files)) await ok(['attach', String(id), path, '--to', to === 'body' ? 'body' : String(to + 1), '--dir', root])
