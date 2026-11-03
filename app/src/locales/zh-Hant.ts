@@ -13,6 +13,7 @@ export const zhHant: Strings = {
   otherOption: '其他…',
   otherPlaceholder: '寫你的答案',
   otherAnswered: '其他',
+  qNoteToggle: '給這個答案加一句備註',
   answered: '已答',
   answer: '回答',
   answerWith: '選 {{key}}',

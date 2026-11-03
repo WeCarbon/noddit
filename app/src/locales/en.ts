@@ -11,6 +11,7 @@ export const en = {
   otherOption: 'Other…',
   otherPlaceholder: 'Write your own answer',
   otherAnswered: 'Other',
+  qNoteToggle: 'Add a note to this answer',
   answered: 'Answered',
   answer: 'Answer',
   answerWith: 'Answer {{key}}',

@@ -13,6 +13,7 @@ export const ar: Strings = {
   otherOption: 'غير ذلك…',
   otherPlaceholder: 'اكتب إجابتك',
   otherAnswered: 'غير ذلك',
+  qNoteToggle: 'أضف ملاحظة على هذه الإجابة',
   answered: 'أُجيب',
   answer: 'إجابة',
   answerWith: 'الإجابة بـ {{key}}',

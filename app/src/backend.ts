@@ -1,4 +1,4 @@
-import { OTHER_KEY, type Bench, type Node, type Project, type RunOutput, type ShellEnv } from './types.ts'
+import type { Bench, Node, Project, RunOutput, ShellEnv } from './types.ts'
 
 /**
  * Everything the window knows comes from the `decs` CLI: reads are
@@ -81,13 +81,14 @@ export const answer = async (root: string, id: number, choice: string, note?: st
   await attachToAnswer(root, id, files)
 }
 
-/** `otherText[q]` is the typed answer for any question picked `OTHER_KEY` — carried in the same
- *  token (`Qx=*:<text>`) push already reads, so the CLI never sees a bare, text-less `*`. */
-export const answerQuestions = (root: string, id: number, picks: Record<string, string>, otherText: Record<string, string> = {}, note?: string) =>
+/** `notes[q]` rides the same token push already reads (`Qx=<pick>:<text>`): the typed answer
+ *  for a question picked `OTHER_KEY`, or a note on top of whichever option was picked otherwise.
+ *  `note` (the 5th arg) is the one overall note for the round, same field as a single-choice answer's. */
+export const answerQuestions = (root: string, id: number, picks: Record<string, string>, notes: Record<string, string> = {}, note?: string) =>
   ok([
     'push',
     String(id),
-    ...Object.entries(picks).map(([q, k]) => (k === OTHER_KEY ? `${q}=${OTHER_KEY}:${otherText[q] ?? ''}` : `${q}=${k}`)),
+    ...Object.entries(picks).map(([q, k]) => (notes[q] ? `${q}=${k}:${notes[q]}` : `${q}=${k}`)),
     ...(note ? ['--note', note] : []),
     ...human,
     '--dir',

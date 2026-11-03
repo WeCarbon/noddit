@@ -14,6 +14,7 @@ export const fr: Strings = {
   otherOption: 'Autre…',
   otherPlaceholder: 'Écrivez votre réponse',
   otherAnswered: 'Autre',
+  qNoteToggle: 'Ajouter une note à cette réponse',
   answered: 'Répondu',
   answer: 'Répondre',
   answerWith: 'Répondre {{key}}',

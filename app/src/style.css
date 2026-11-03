@@ -835,6 +835,52 @@ svg.lucide.ico {
   color: var(--text-3);
 }
 
+.q-note-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--text-3);
+  margin-inline-start: auto;
+}
+
+.q-note-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.q-note-btn.on {
+  color: var(--accent);
+}
+
+.q-note-input {
+  margin-top: 8px;
+}
+
+.q-overall-note {
+  display: block;
+  width: 100%;
+  margin: 8px 0 0;
+  border: 0;
+  outline: 0;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: 13px/1.4 var(--font);
+  padding: 8px 11px;
+  resize: vertical;
+}
+
+.q-overall-note:focus {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.q-overall-note::placeholder {
+  color: var(--text-3);
+}
+
 /* ---------- prose ---------- */
 
 .prose {

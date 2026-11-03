@@ -10,7 +10,7 @@ import { ViewEditor, ViewIcon } from './views.tsx'
 import {
   Archive, ArrowRight, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, FileText,
   FolderSearch, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
-  Bot, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
+  Bot, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, StickyNote, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -1230,7 +1230,7 @@ export function Bench(props: {
             onSaveEdit={(target, md) => saveEdit(node, target, md)}
             onCancelEdit={() => setEditing(null)}
             onFiles={(target, files) => void api.attachFiles(rootOf(node), node.id, files, target).then(() => (showToast(s('attachedFiles', { count: files.length })), refresh()), (e: Error) => setError(e.message))}
-            onQuestions={(picks, otherText) => optimistic(answered(node.key), () => api.answerQuestions(rootOf(node), node.id, picks, otherText), s('sent'))}
+            onQuestions={(picks, notes, note) => optimistic(answered(node.key), () => api.answerQuestions(rootOf(node), node.id, picks, notes, note), s('sent'))}
             editingTitle={editingTitle === node.key}
             onStartTitle={() => setEditingTitle(node.key)}
             onSaveTitle={(title) => saveTitle(node, title)}
@@ -1505,7 +1505,7 @@ function Detail(p: {
   onSaveEdit: (target: 'body' | number, markdown: string) => void
   onCancelEdit: () => void
   onFiles: (target: 'body' | number, files: File[]) => void
-  onQuestions: (picks: Record<string, string>, otherText: Record<string, string>) => void
+  onQuestions: (picks: Record<string, string>, notes: Record<string, string>, note?: string) => void
   editingTitle: boolean
   onStartTitle: () => void
   onSaveTitle: (title: string) => void
@@ -1810,7 +1810,7 @@ function PreviousRounds({ rounds }: { rounds: PreviousRound[] }) {
   )
 }
 
-function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubmit: (picks: Record<string, string>, otherText: Record<string, string>) => void }) {
+function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubmit: (picks: Record<string, string>, notes: Record<string, string>, note?: string) => void }) {
   // `optionPick` is the option each question would answer with if it isn't
   // (or stops being) "other"; `otherOpen`/`otherDraft` track the free-text
   // box independently, so clearing the text falls back to the last option
@@ -1819,6 +1819,10 @@ function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubm
   const [optionPick, setOptionPick] = useState<Record<string, string>>(() => Object.fromEntries(node.questions.map((q) => [q.key, optionFor(q)])))
   const [otherDraft, setOtherDraft] = useState<Record<string, string>>(() => Object.fromEntries(node.questions.filter((q) => node.answers?.[q.key] === OTHER_KEY).map((q) => [q.key, node.answer_notes?.[q.key] ?? ''])))
   const [otherOpen, setOtherOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(node.questions.filter((q) => node.answers?.[q.key] === OTHER_KEY).map((q) => [q.key, true])))
+  // A note on whichever option is picked (not "other" — the option stands, this just adds a line to it).
+  const [qNotes, setQNotes] = useState<Record<string, string>>(() => Object.fromEntries(node.questions.filter((q) => node.answers?.[q.key] !== OTHER_KEY).map((q) => [q.key, node.answer_notes?.[q.key] ?? ''])))
+  const [qNoteOpen, setQNoteOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(node.questions.filter((q) => node.answers?.[q.key] !== OTHER_KEY && node.answer_notes?.[q.key]).map((q) => [q.key, true])))
+  const [overallNote, setOverallNote] = useState('')
   const isOther = (key: string) => Boolean(otherOpen[key] && otherDraft[key]?.trim())
   const pickOption = (key: string, opt: string) => {
     setOptionPick({ ...optionPick, [key]: opt })
@@ -1826,16 +1830,21 @@ function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubm
   }
   const openOther = (key: string) => setOtherOpen({ ...otherOpen, [key]: true })
   const typeOther = (key: string, text: string) => setOtherDraft({ ...otherDraft, [key]: text })
+  const toggleQNote = (key: string) => setQNoteOpen({ ...qNoteOpen, [key]: !qNoteOpen[key] })
+  const typeQNote = (key: string, text: string) => setQNotes({ ...qNotes, [key]: text })
   const submit = () => {
     const picks: Record<string, string> = {}
-    const otherText: Record<string, string> = {}
+    const notes: Record<string, string> = {}
     for (const q of node.questions) {
       if (isOther(q.key)) {
         picks[q.key] = OTHER_KEY
-        otherText[q.key] = otherDraft[q.key].trim()
-      } else picks[q.key] = optionPick[q.key]
+        notes[q.key] = otherDraft[q.key].trim()
+      } else {
+        picks[q.key] = optionPick[q.key]
+        if (qNotes[q.key]?.trim()) notes[q.key] = qNotes[q.key].trim()
+      }
     }
-    onSubmit(picks, otherText)
+    onSubmit(picks, notes, overallNote.trim() || undefined)
   }
   return (
     <section class="decide">
@@ -1846,6 +1855,16 @@ function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubm
           <div key={q.key} class="question">
             <div class="q-label">
               <span class="key">{q.key}</span> {q.label}
+              {!other && (
+                <button
+                  class={`q-note-btn ${qNotes[q.key]?.trim() ? 'on' : ''}`}
+                  onClick={() => toggleQNote(q.key)}
+                  title={s('qNoteToggle')}
+                  aria-label={s('qNoteToggle')}
+                >
+                  <StickyNote size={12} strokeWidth={1.75} />
+                </button>
+              )}
             </div>
             <div class="chips">
               {q.options.map((o) => (
@@ -1867,15 +1886,33 @@ function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubm
                 onInput={(e) => typeOther(q.key, (e.target as HTMLInputElement).value)}
               />
             )}
+            {!other && qNoteOpen[q.key] && (
+              <input
+                class="other-input q-note-input"
+                autoFocus
+                value={qNotes[q.key] ?? ''}
+                placeholder={s('addNote')}
+                onInput={(e) => typeQNote(q.key, (e.target as HTMLInputElement).value)}
+              />
+            )}
           </div>
         )
       })}
       {!node.terminal && (
-        <div class="q-actions">
-          <button class="primary" disabled={busy} onClick={submit}>
-            {s('submitAnswers')}
-          </button>
-        </div>
+        <>
+          <textarea
+            class="q-overall-note"
+            rows={2}
+            value={overallNote}
+            placeholder={s('addNote')}
+            onInput={(e) => setOverallNote((e.target as HTMLTextAreaElement).value)}
+          />
+          <div class="q-actions">
+            <button class="primary" disabled={busy} onClick={submit}>
+              {s('submitAnswers')}
+            </button>
+          </div>
+        </>
       )}
     </section>
   )
