@@ -332,7 +332,8 @@
     "appended": "{{ref}} appended \"{{kind}}\" ({{role}})",
     "revived": ", and pulled back from archived/ into active/, flagged \"new reply after archiving\"",
     "queued": ", queued",
-    "alreadyRecorded": "{{ref}} already has these exact words from the owner ({{by}}, within the last 10 minutes) — not recorded twice."
+    "alreadyRecorded": "{{ref}} already has these exact words from the owner ({{by}}, within the last 10 minutes) — not recorded twice.",
+    "ownerHint": "hint: if the owner has to do or answer this, it isn't in their view from a note — `nod add --for me \"<what>\" --parent {{ref}}` (then `nod after {{id}} <it>`), or `nod ask {{id}}`"
   },
   "archive": {
     "whichOne": "Which one? e.g. `nod archive 415`",

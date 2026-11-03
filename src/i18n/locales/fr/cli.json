@@ -330,7 +330,8 @@
     "appended": "{{ref}} a reçu « {{kind}} » ({{role}})",
     "revived": ", et ramené de archived/ dans active/, marqué « nouvelle réponse après archivage »",
     "queued": ", mis en file",
-    "alreadyRecorded": "{{ref}} contient déjà ces mots exacts du responsable ({{by}}, dans les 10 dernières minutes) — pas enregistré deux fois."
+    "alreadyRecorded": "{{ref}} contient déjà ces mots exacts du responsable ({{by}}, dans les 10 dernières minutes) — pas enregistré deux fois.",
+    "ownerHint": "astuce : ce que le responsable doit faire ou trancher ne lui apparaît pas dans une note — `nod add --for me \"<quoi>\" --parent {{ref}}` (puis `nod after {{id}} <celui-ci>`), ou `nod ask {{id}}`"
   },
   "archive": {
     "whichOne": "Lequel ? ex. `nod archive 415`",

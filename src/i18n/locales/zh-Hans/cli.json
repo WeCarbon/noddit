@@ -318,7 +318,8 @@
     "appended": "{{ref}} 已追加「{{kind}}」（{{role}}）",
     "revived": "，并从 archived/ 拉回 active/，标了「归档后有新回复」",
     "queued": "，已进队列",
-    "alreadyRecorded": "{{ref}} 上已经有负责人这句原话（{{by}}，10 分钟内），没有重复写入。"
+    "alreadyRecorded": "{{ref}} 上已经有负责人这句原话（{{by}}，10 分钟内），没有重复写入。",
+    "ownerHint": "提示：要负责人做或回答的事，只写在备注里他看不到——用 `nod add --for me \"<要做什么>\" --parent {{ref}}`（再 `nod after {{id}} <那条>`），或 `nod ask {{id}}`"
   },
   "archive": {
     "whichOne": "哪一条？例如 `nod archive 415`",

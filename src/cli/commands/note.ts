@@ -83,6 +83,10 @@ export async function run(args: Args): Promise<number> {
   if (role === 'agent' && next.state === 'in_progress' && (/(^|[，。；：:])\s*(在等|等(?!待))\s?[^\s，。]{1,20}/.test(text) || /\b(waiting (on|for)|blocked on)\b/i.test(text))) {
     process.stderr.write(`${t('cli.note.holdHint', { ref: refOf(next), id: next.id })}\n`)
   }
+  // 「留给后续 session」, "owner must add …": something only the owner can do, written where they never look.
+  if (role === 'agent' && (/(留给(后续|之后|下一个)?\s*(session|会话)|等(负责人|owner|你)|需要(负责人|你)(来)?(做|处理|决定|确认|提供|登录|下载|添加))/i.test(text) || /\b(owner (must|to|needs to|should)|left for (a )?(later|next|future) session|needs? the owner)\b/i.test(text))) {
+    process.stderr.write(`${t('cli.note.ownerHint', { ref: refOf(next), id: next.id })}\n`)
+  }
   const revived = d.archived && !next.archived
   const kind = next.notes[next.notes.length - 1]?.kind ?? ''
   console.log(

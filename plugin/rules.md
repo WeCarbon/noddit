@@ -20,6 +20,11 @@ how? `nod <command> --help`; for the details, load the nod skill.
   why. Keep the `-o` label short and write the rest in the piped body,
   one `### 1 · <label>` section per option:
   `nod ask 7 -o 1="Keep" -o 2="Switch" <<'EOF'` … `EOF`.
+- **Need the owner to do something** (add a DNS record, log in, open a
+  session, send a file): `nod add --for me "<what>" --parent <id>`, then
+  `nod after <id> <that>`. A chat message, HANDOFF.md or a note alone is
+  invisible to them. Work you set aside isn't 「in progress」 — close it or
+  ask.
 - **Whoever finishes a node closes it**: once merged and the gate passes,
   `nod done <id> --note "<result, commit>"` right away. When delegating,
   never tell a sub-agent "don't mark it done". Before merging, the lead
@@ -27,7 +32,7 @@ how? `nod <command> --help`; for the details, load the nod skill.
   sub-agents created.
 - **Hands off what the owner kept or paused**: never work on the owner's
   own to-dos (in Human work); a node the owner deferred waits until it comes
-  back.
+  back. Never defer anything yourself: to put work off, `nod ask` the owner.
 - **Relay what the owner says in chat** about a node before replying:
   `nod note <id> --human --by "owner (said in chat, relayed by <you>)"
   "<their words>"`, then `nod read <id>`. New work they describe in chat:
