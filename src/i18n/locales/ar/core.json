@@ -195,5 +195,9 @@
     "badValue": "{{key}}: «{{value}}» — أحد {{values}}",
     "lastOne": "تحتاج اللوحة إلى عرض واحد على الأقل",
     "notBuiltin": "{{id}} ليس عرضًا مدمجًا ({{ids}})؛ ‎nod view rm يحذف عروضك"
+  },
+  "sourceSync": {
+    "failed": "فشل أمر المزامنة للمصدر \"{{name}}\": {{detail}}",
+    "exitCode": "رمز الخروج {{code}}"
   }
 }

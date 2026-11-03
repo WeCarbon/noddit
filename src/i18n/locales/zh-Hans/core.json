@@ -175,5 +175,9 @@
     "badValue": "{{key}}：「{{value}}」——可以是 {{values}}",
     "lastOne": "看板至少要留一个视图",
     "notBuiltin": "{{id}} 不是内置视图（{{ids}}）；自己的视图用 nod view rm 删"
+  },
+  "sourceSync": {
+    "failed": "来源「{{name}}」的同步命令失败：{{detail}}",
+    "exitCode": "退出码 {{code}}"
   }
 }

@@ -12,6 +12,7 @@ import { parseDuration, parseSince } from '../../core/duration.ts'
 import { currentIdentity } from '../../core/identity.ts'
 import { findLayout } from '../../core/paths.ts'
 import { listSources, sourceEventsSince } from '../../core/sources.ts'
+import { createSourceSyncRunner } from '../../core/source-sync.ts'
 import { DEFERRAL_CLOCK, isLatestNoteOwnerFacing, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
 import { isUnclaimedBrief, originalWords } from '../../core/intake.ts'
 import { HEARTBEAT_MS, harnessOf, removeHeartbeat, writeHeartbeat } from '../../core/listeners.ts'
@@ -581,7 +582,21 @@ export async function run(args: Args): Promise<number> {
     process.on('exit', () => removeHeartbeat(listenerKey))
   }
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(sig, () => process.exit(0))
+  // Sources' sync commands are run by a lead's monitor only — never a lane's, nor a window redrawing.
+  const syncRunner =
+    !author && !updates && !bool(args, 'no-sync')
+      ? createSourceSyncRunner({ layouts: store.layouts, onError: (message) => process.stdout.write(`DECS-ERROR ${flat(message)}\n`) })
+      : undefined
+  if (syncRunner) process.on('exit', () => syncRunner.stop())
+  const runSyncs = () => {
+    try {
+      syncRunner?.tick()
+    } catch (err) {
+      process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
+    }
+  }
   let lastBeat = Date.now()
+  runSyncs()
   pass(true)
   const parent = Number(one(args, 'with-parent') ?? 0)
   setInterval(() => {
@@ -591,6 +606,7 @@ export async function run(args: Args): Promise<number> {
     }
     // A window that started this monitor and then died (or was killed) takes it along.
     if (parent > 0 && !alive(parent)) process.exit(0)
+    runSyncs()
     pass()
     if (idleExitMs > 0 && Date.now() - lastEventAt >= idleExitMs) {
       process.stdout.write(`DECS-IDLE ${t('cli.monitor.idle', { duration: durationText(idleExitMs) })}\n`)

@@ -183,5 +183,9 @@
     "badValue": "{{key}} : « {{value}} » — au choix {{values}}",
     "lastOne": "Le tableau a besoin d’au moins une vue",
     "notBuiltin": "{{id}} n’est pas une vue d’origine ({{ids}}) ; nod view rm supprime les vôtres"
+  },
+  "sourceSync": {
+    "failed": "la commande de synchronisation de la source « {{name}} » a échoué : {{detail}}",
+    "exitCode": "code de sortie {{code}}"
   }
 }

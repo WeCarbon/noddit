@@ -179,5 +179,9 @@
     "badValue": "{{key}}: \"{{value}}\" — one of {{values}}",
     "lastOne": "The bench needs at least one view",
     "notBuiltin": "{{id}} is not a built-in view ({{ids}}); nod view rm removes your own"
+  },
+  "sourceSync": {
+    "failed": "source \"{{name}}\" sync command failed: {{detail}}",
+    "exitCode": "exit code {{code}}"
   }
 }

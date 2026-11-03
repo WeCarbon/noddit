@@ -29,7 +29,7 @@ const BOOLEAN = new Set([
   'seen', 'undo', 'peek', 'mine', 'link', 'fix', 'no-register', 'no-images', 'inline',
   'human', 'agent', 'fyi', 'defaults', 'done', 'notify', 'task', 'tree', 'root', 'upgrade', 'strip-prefix', 'attachments',
   // Not `stale`: `decs queue --stale 1h` takes a value; a bare `--stale` still reads as set.
-  'unhandled', 'no-sources', 'here',
+  'unhandled', 'no-sources', 'here', 'no-sync', 'no-sync-cmd',
   'replace', 'approval-content', 'off', 'brief', 'no-brief', 'no-heartbeat', 'clear',
 ])
 

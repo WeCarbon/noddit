@@ -22,6 +22,7 @@ import {
   type SourceItem,
   type SourceSummary,
 } from '../../core/sources.ts'
+import { setSourceSync, sourceSyncOf, syncRunStateOf } from '../../core/source-sync.ts'
 
 const help = () => t('cli.help.source')
 
@@ -101,10 +102,21 @@ function register(args: Args): number {
     staleAfter: one(args, 'stale-after'),
     notes: one(args, 'notes'),
   })
+  const syncCmd = one(args, 'sync-cmd')
+  const every = one(args, 'every')
+  let sync = sourceSyncOf(layout, name) ?? null
+  if (bool(args, 'no-sync-cmd')) sync = setSourceSync(layout, name, null)
+  else if (syncCmd !== undefined) sync = setSourceSync(layout, name, { cmd: syncCmd, every })
+  else if (every !== undefined) {
+    if (!sync) throw new Error(t('cli.source.everyNeedsSyncCmd'))
+    sync = setSourceSync(layout, name, { cmd: sync.cmd, every })
+  }
   if (bool(args, 'json')) {
-    console.log(JSON.stringify(cfg))
+    console.log(JSON.stringify({ ...cfg, sync: sync ?? undefined }))
   } else {
     console.log(t('cli.source.registered', { name: cfg.name, title: cfg.title, adapter: cfg.adapter ? t('cli.source.adapterSuffix', { adapter: cfg.adapter }) : '' }))
+    if (bool(args, 'no-sync-cmd')) console.log(t('cli.source.syncRemoved', { name }))
+    else if (sync && (syncCmd !== undefined || every !== undefined)) console.log(t('cli.source.syncSaved', { cmd: sync.cmd, every: sync.every }))
   }
   return 0
 }
@@ -173,7 +185,9 @@ function heartbeat(args: Args): number {
 // list
 // ---------------------------------------------------------------------------
 
-function summaryLine(s: SourceSummary, multi: boolean): string {
+type ListedSource = SourceSummary & { sync?: { cmd: string; every: string; lastError?: string } }
+
+function summaryLine(s: ListedSource, multi: boolean): string {
   const bits = [cyan(label(s, multi)), s.title]
   const tail: string[] = []
   if (s.cleared) tail.push(green(t('cli.source.cleared')))
@@ -184,6 +198,7 @@ function summaryLine(s: SourceSummary, multi: boolean): string {
       tail.push(t('cli.source.waitingOnBucket', { bucket, n }))
     }
   }
+  if (s.sync) tail.push(s.sync.lastError ? yellow(t('cli.source.autoSyncFailed', { every: s.sync.every, error: s.sync.lastError })) : dim(t('cli.source.autoSync', { every: s.sync.every })))
   if (s.stale) tail.push(yellow(t('cli.check.adapterMaybeDown', { heartbeat: s.heartbeatAt ? ` ${fromNow(s.heartbeatAt)}` : t('cli.check.neverHeartbeat') })))
   else if (s.heartbeatAt) tail.push(dim(t('cli.source.heartbeatAgo', { ago: fromNow(s.heartbeatAt) })))
   return `${bits.join('  ')}${tail.length ? dim('  — ') + tail.join(' · ') : ''}`
@@ -191,7 +206,14 @@ function summaryLine(s: SourceSummary, multi: boolean): string {
 
 function list(args: Args): number {
   const store = resolveStore(args, { allowRegistry: true })
-  let summaries = listSources(store)
+  const layoutByProject = new Map(store.layouts.map((l) => [store.projectName(l), l]))
+  let summaries: ListedSource[] = listSources(store).map((s) => {
+    const layout = layoutByProject.get(s.project)
+    const sync = layout ? sourceSyncOf(layout, s.name) : undefined
+    if (!sync || !layout) return s
+    const lastError = syncRunStateOf(layout, s.name).lastError
+    return { ...s, sync: { ...sync, ...(lastError ? { lastError } : {}) } }
+  })
   if (bool(args, 'stale')) summaries = summaries.filter((s) => s.stale)
   const multi = store.layouts.length > 1
 

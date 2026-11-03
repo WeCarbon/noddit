@@ -200,7 +200,18 @@ nod source register <name> --title "..." --kind github \
 
 适配器只同步**引用**——id + title（可选 url/state/from）——绝不同步正文，
 凭证留在项目自己的代码/环境变量里，nod 从不直接访问外部系统。模板和规矩在
-`adapters/README.md` + `adapters/example_sync.py`。
+`adapters/README.md` + `adapters/example_sync.py`。Azure DevOps 工作项有现成的
+`adapters/azure_devops_sync.py`。
+
+- **只在有会话开着时同步**：适配器支持单次同步（如 `--once`）时，登记成来源的同步命令，
+  主控的 `nod monitor` 活着时按间隔跑它，失败报成 `DECS-ERROR`，不中断监听：
+
+  ```sh
+  nod source register <name> --sync-cmd "python3 adapters/xxx_sync.py --once" --every 10m
+  ```
+
+  这条命令只存在本机（`~/.decs/source-sync.json`，按项目路径），不进 `decisions/`——
+  克隆来的仓库不会让任何人的 monitor 执行命令；换一台机器要在那台机器上重新登记一次。
 
 - **新条目从 `nod monitor` 来**（见上）。没有 Monitor 的环境用 `nod source wait <name>`：
   阻塞到有未处理的新/变化条目，打印后退出；去看 `nod source items <name> --unhandled`，
