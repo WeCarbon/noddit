@@ -1,11 +1,28 @@
-import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, GitFork, Link2, PenLine, Radio, Star, Timer, User } from 'lucide-preact'
+import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, GitFork, Link2, Paperclip, PenLine, Radio, Star, Timer, User } from 'lucide-preact'
 import { limitInput } from './limit-input.ts'
 import type { ComponentChildren } from 'preact'
 import { useRef } from 'preact/hooks'
 import { useDialogFocus } from './focus.ts'
 import { Bar, Glyph, segClass } from './segs.tsx'
 import { s } from './strings.ts'
-import type { Node, NodePill, Seg } from './types.ts'
+import type { Approval, Node, NodePill, Seg } from './types.ts'
+
+/**
+ * The phrase for where one outbound attachment stands — `nod get`'s and the TUI's own wording,
+ * ported to the app's strings so the owner reads the same state in both (core/render.ts:approvalLabel).
+ */
+export function approvalLabel(ap: Approval): string {
+  const on = ap.approve_on?.length ? s('approvalOnHint', { approveOn: ap.approve_on.join(' / ') }) : ''
+  if (!ap.approved_hash) return ap.declined ? `${s('approvalDeclined', { answer: ap.declined })}${on}` : `${s('approvalPending')}${on}`
+  if (ap.approved_hash !== ap.hash) return s('approvalChanged')
+  return s('approvalApproved', { by: ap.approved_by ?? 'owner' })
+}
+
+/** ✓ approved / pending / declined / needs re-approval, same colours as the TUI's. */
+function approvalTone(ap: Approval): string {
+  if (ap.approved_hash && ap.approved_hash === ap.hash) return 'c-green'
+  return ap.declined ? 'c-red' : 'c-yellow'
+}
 
 const ICON = { size: 13, strokeWidth: 1.75 } as const
 
@@ -202,6 +219,18 @@ export function NodeHeader({
         <Pills icon={<GitFork {...ICON} />} label={s('afterLabel')} nodes={n.after_nodes ?? []} onJump={onJump} />
         <Pills icon={<Link2 {...ICON} />} label={s('blockingLabel')} nodes={n.blocking_nodes ?? []} onJump={onJump} />
       </div>
+      {(n.approvals ?? []).length > 0 && (
+        <div class="mchips approvals">
+          {(n.approvals ?? []).map((ap, i) => {
+            const name = ap.target.split('/').pop() || ap.target
+            return (
+              <Chip key={i} icon={<Paperclip {...ICON} />} tone={approvalTone(ap)} title={`${name} — ${approvalLabel(ap)}`}>
+                {name} · {approvalLabel(ap)}
+              </Chip>
+            )
+          })}
+        </div>
+      )}
       {(n.progress ?? 0) > 0 && (
         <div class="nprogress" title={n.progress_msg ?? undefined}>
           <Bar pct={n.progress!} color={stale ? 'red' : undefined} />

@@ -119,6 +119,22 @@ export interface Attachment {
   caption: string | null
 }
 
+/** `nod attach --approval-content`: outbound content the owner must sign off before it's sent.
+ *  `target` is the matching `Attachment.target` — the join key. */
+export interface Approval {
+  target: string
+  /** `sha256:<hex>` of the file's current content. */
+  hash: string
+  /** Answers that count as approving it (option keys or `Q2:1`); null on records from before the flag existed. */
+  approve_on: string[] | null
+  /** `sha256:<hex>` last approved, if ever. */
+  approved_hash: string | null
+  approved_by: string | null
+  approved_at: string | null
+  /** The answer that declined it (did not match `approve_on`), if any. */
+  declined: string | null
+}
+
 export interface Node {
   /** Only from a one-node reload (`bench --json --node`): how its list row looks now. */
   row?: Partial<Row>
@@ -198,6 +214,8 @@ export interface Node {
   after_nodes: NodePill[]
   blocking_nodes: NodePill[]
   archived: boolean
+  /** Outbound attachments pending the owner's approval, or already ruled on. */
+  approvals: Approval[]
 }
 
 export interface NodePill {
