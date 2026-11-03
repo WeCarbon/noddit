@@ -1,4 +1,5 @@
 import { Bot, FolderGit2, Play, Star, User, WandSparkles } from 'lucide-preact'
+import { cols, limitInput } from './cols.ts'
 import { useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { DateField } from './datefield.tsx'
@@ -150,7 +151,6 @@ export function NewNode(p: {
  */
 /** 「等」 is a few words — the limit `nod defer --on` holds to, in display columns (CJK counts two). */
 const WAIT_ON_MAX_COLS = 30
-const cols = (s: string) => [...s].reduce((n, c) => n + (/[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|[\u{1f300}-\u{1faff}\u{20000}-\u{3fffd}]/u.test(c) ? 2 : 1), 0)
 
 export function DelayDialog(p: { node: import('./types.ts').Node; busy: boolean; onClose: () => void; onDelay: (on: string | null, date: string | null, passive: boolean) => void }) {
   const waiting = p.node.status === 'waiting'
@@ -175,7 +175,8 @@ export function DelayDialog(p: { node: import('./types.ts').Node; busy: boolean;
           class="hold-on"
           value={on}
           placeholder={s('delayOnPlaceholder')}
-          onInput={(e) => setOn((e.target as HTMLInputElement).value)}
+          onInput={limitInput(WAIT_ON_MAX_COLS, setOn)}
+          onCompositionEnd={limitInput(WAIT_ON_MAX_COLS, setOn)}
           onKeyDown={(e) => {
             e.stopPropagation()
             if (e.key === 'Escape') p.onClose()

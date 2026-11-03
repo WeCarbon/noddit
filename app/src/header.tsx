@@ -1,4 +1,5 @@
 import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, GitFork, Link2, PenLine, Radio, Star, Timer, User } from 'lucide-preact'
+import { limitInput } from './cols.ts'
 import type { ComponentChildren } from 'preact'
 import { useRef } from 'preact/hooks'
 import { useDialogFocus } from './focus.ts'
@@ -84,6 +85,9 @@ function StatusPill({ segs }: { segs: Seg[] }) {
   )
 }
 
+/** The same limit `nod add` / `nod retitle` hold a title to. */
+const TITLE_MAX_COLS = 32
+
 /** The title, in place: Enter saves (`nod retitle`), Esc cancels, a click outside saves too. */
 function TitleField({ title, onSave, onCancel }: { title: string; onSave: (title: string) => void; onCancel: () => void }) {
   const ref = useRef<HTMLInputElement>(null)
@@ -95,6 +99,8 @@ function TitleField({ title, onSave, onCancel }: { title: string; onSave: (title
       defaultValue={title}
       dir="auto"
       aria-label={s('titleEdit')}
+      onInput={limitInput(TITLE_MAX_COLS)}
+      onCompositionEnd={limitInput(TITLE_MAX_COLS)}
       onKeyDown={(e) => {
         e.stopPropagation()
         if (e.key === 'Enter') onSave((e.currentTarget as HTMLInputElement).value)
