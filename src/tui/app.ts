@@ -55,9 +55,13 @@ import {
   stepIndex,
   viewCount,
   viewDueCount,
+  viewLabel,
   type Row,
   type View,
 } from './views.ts'
+import {
+  BUILTIN_IDS, GROUPS, LAYOUTS, SHOW, SORT_FIELDS, builtinView, filterText, isPristine, saveViews, validateView, type ViewDef,
+} from '../core/view-defs.ts'
 import { summaryLines } from './summary.ts'
 import { loadViews } from '../core/view-defs.ts'
 import { readPreview, TEXT_PREVIEW } from './preview.ts'
@@ -101,8 +105,18 @@ type Line = Segment[]
 export type Mode =
   | 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother'
   | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project' | 'projects' | 'projectName' | 'projectAdd' | 'attachPaths' | 'editConflict'
+  | 'views' | 'viewsMove' | 'viewEdit' | 'viewFieldText' | 'viewAddId'
 /** Modes where keystrokes go into the prompt-line draft. */
-const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay', 'projectName', 'projectAdd', 'attachPaths']
+const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay', 'projectName', 'projectAdd', 'attachPaths', 'viewFieldText', 'viewAddId']
+
+/** The views editor's fields, in the order the field list shows them. Layout decides which of
+ *  group/sort are shown at all (list only) — `viewFields` is always what's actually on screen,
+ *  so `viewFieldIndex` only ever has to mean "this row of what's showing". */
+const VIEW_FIELDS = ['name', 'filter', 'layout', 'group', 'sort', 'finished', 'deferred'] as const
+type ViewField = (typeof VIEW_FIELDS)[number]
+/** `name` / `filter` / `sort` are typed in; the rest cycle through a fixed list of values. */
+const VIEW_TEXT_FIELDS: ViewField[] = ['name', 'filter', 'sort']
+const viewFields = (v: ViewDef): ViewField[] => VIEW_FIELDS.filter((f) => f !== 'group' && f !== 'sort' ? true : v.layout === 'list')
 
 /** What `p` / `P` files: a brief for an AI to expand and confirm, a to-do for the owner, or a
  *  task an AI can just do — ⇥ cycles through them in this order. */
@@ -226,6 +240,9 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const [composeStash, setComposeStash] = useState<{ mode: Mode; draft: string; caret: number } | null>(null)
   /** E / e: the editor closed with a change, but the node moved since it opened — asks overwrite or drop. */
   const [editConflict, setEditConflict] = useState<{ d: Decision; text: string; note?: number } | null>(null)
+  /** `v`: which row of the views editor's list is selected, and which field within it once ⏎ opens one. */
+  const [viewsIndex, setViewsIndex] = useState(0)
+  const [viewFieldIndex, setViewFieldIndex] = useState(0)
   /** 派活 (`p` / `P`): where the new brief goes, and — once filed with nobody listening — which project to offer a session for. */
   const [briefAt, setBriefAt] = useState<{ parent?: Decision; layout: Layout; kind: BriefKind } | null>(null)
   const [sessionFor, setSessionFor] = useState<{ layout: Layout; project: string } | null>(null)
@@ -251,6 +268,9 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   /** Settings live outside React state (config.json / env); bump this to
    *  force geometry/frame to recompute after one changes. */
   const [settingsVersion, setSettingsVersion] = useState(0)
+  /** views.json lives outside React state too; bump this on every write the
+   *  views editor makes (`saveViewsList`), same idea as `settingsVersion`. */
+  const [viewsVersion, setViewsVersion] = useState(0)
   /** The frame Ink last got — what the image draw repaints under a picture. */
   const frameRef = useRef<Line[]>([])
 
@@ -658,6 +678,112 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (idx === -1) return say(t('bench.toast.noOwnNote', { ref: refOf(current) }))
     const text = runInEditor(current.notes[idx].text)
     if (text !== null) saveEdited(current, text, idx + 1, current.updatedAt)
+  }
+
+  /** `v`: opens the views editor on the tab currently showing. */
+  const openViewsEditor = () => {
+    const ids = viewIds()
+    setViewsIndex(Math.max(0, ids.indexOf(view)))
+    setMode('views')
+  }
+
+  /** Writes the whole list back — the same validation `nod view edit` runs — reporting any bad
+   *  value instead of leaving a half-applied change on disk. */
+  const saveViewsList = (next: ViewDef[]): boolean => {
+    try {
+      saveViews(next)
+      setViewsVersion((v) => v + 1)
+      return true
+    } catch (e) {
+      say((e as Error).message)
+      return false
+    }
+  }
+
+  /** `x` on a view row: the last one left is refused, same as `nod view rm`. */
+  const deleteSelectedView = () => {
+    const views = loadViews()
+    const target = views[viewsIndex]
+    if (!target) return
+    if (views.length <= 1) return say(t('core.views.lastOne'))
+    if (!saveViewsList(views.filter((v) => v.id !== target.id))) return
+    setViewsIndex((i) => Math.min(i, views.length - 2))
+    say(t('cli.view.removed', { ids: target.id }))
+  }
+
+  /** `m`, on a view row: swaps it with its neighbour, same ↑/↓-until-Enter idiom as a node's own `M`. */
+  const moveSelectedView = (delta: -1 | 1) => {
+    const views = loadViews()
+    const to = viewsIndex + delta
+    if (to < 0 || to >= views.length) return
+    const next = [...views]
+    ;[next[viewsIndex], next[to]] = [next[to], next[viewsIndex]]
+    if (saveViewsList(next)) setViewsIndex(to)
+  }
+
+  /** `a`, in the views editor: a new view, minimal and ready to fill in — straight into its own editor. */
+  const commitViewAddId = () => {
+    const id = draft.trim().toLowerCase()
+    setDraft('')
+    setMode('views')
+    if (!id) return
+    const views = loadViews()
+    if (views.some((v) => v.id === id)) return say(t('cli.view.exists', { id }))
+    try {
+      const def = validateView({ id, layout: 'list', sort: ['bench'] })
+      if (!saveViewsList([...views, def])) return
+      setViewsIndex(views.length)
+      setViewFieldIndex(0)
+      setMode('viewEdit')
+      say(t('cli.view.added', { id, label: viewLabel(def) }))
+    } catch (e) {
+      say((e as Error).message)
+    }
+  }
+
+  /** ←/→ on an enum field in the views editor: the next/previous value in its fixed list, wrapping. */
+  const cycleViewField = (field: ViewField, delta: 1 | -1) => {
+    const views = loadViews()
+    const v = views[viewsIndex]
+    if (!v) return
+    const options: readonly string[] = field === 'layout' ? LAYOUTS : field === 'group' ? GROUPS : SHOW
+    const value = (v[field] as string | undefined) ?? (field === 'layout' ? 'list' : field === 'group' ? 'none' : 'hide')
+    const at = Math.max(0, options.indexOf(value))
+    const nextValue = options[(at + delta + options.length) % options.length]
+    try {
+      const def = validateView({ ...v, [field]: nextValue })
+      saveViewsList(views.map((x, i) => (i === viewsIndex ? def : x)))
+    } catch (e) {
+      say((e as Error).message)
+    }
+  }
+
+  /** ⏎ on a text field (name / filter / sort) in the views editor. */
+  const startViewFieldText = () => {
+    const v = loadViews()[viewsIndex]
+    const field = viewFields(v ?? { id: '', layout: 'list' })[viewFieldIndex]
+    if (!v || !field || !VIEW_TEXT_FIELDS.includes(field)) return
+    const initial = field === 'filter' ? filterText(v.filter) : field === 'sort' ? (v.sort ?? []).join(',') : typeof v.name === 'string' ? v.name : ''
+    startText('viewFieldText', initial)
+  }
+
+  const commitViewFieldText = () => {
+    const text = draft.trim()
+    setDraft('')
+    setMode('viewEdit')
+    const views = loadViews()
+    const v = views[viewsIndex]
+    if (!v) return
+    const field = viewFields(v)[viewFieldIndex]
+    if (!field) return
+    const patch: Record<string, unknown> =
+      field === 'name' ? { name: text || undefined } : field === 'filter' ? { filter: text || undefined } : { sort: text ? text.split(/[,\s]+/).filter(Boolean) : undefined }
+    try {
+      const def = validateView({ ...v, ...patch })
+      saveViewsList(views.map((x, i) => (i === viewsIndex ? def : x)))
+    } catch (e) {
+      say((e as Error).message)
+    }
   }
 
   /** `;`, on a project row: another registered project already showing `letter`, by its display name. */
@@ -1190,12 +1316,13 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     projectIndex,
     attachCount: attachPaths.length || undefined,
     editConflictRef: editConflict ? refOf(editConflict.d) : undefined,
+    viewsIndex, viewFieldIndex,
   }
   const geom = useMemo(
     () => geometry(frameInput),
-    // settingsVersion isn't read directly — it's how a changed setting (lang,
-    // bidi, ...) earns a recompute, since geometry reads them live, not from props.
-    [list, index, current, view, rows, width, listTop, offset, condensed, mode, overview, items, now, backlinks, pendingKey, settingIndex, settingsVersion],
+    // settingsVersion/viewsVersion aren't read directly — they're how a changed setting (lang,
+    // bidi, ...) or a views.json write earns a recompute, since geometry reads both live, not from props.
+    [list, index, current, view, rows, width, listTop, offset, condensed, mode, overview, items, now, backlinks, pendingKey, settingIndex, settingsVersion, viewsIndex, viewFieldIndex, viewsVersion],
   )
 
   // The list scrolls just enough to show wherever the cursor landed, keyed
@@ -1223,7 +1350,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
 
     // One row per event: a trackpad sends many small events per flick, a wheel one per notch.
     if (e.kind === 'wheel-up' || e.kind === 'wheel-down') {
-      if (mode === 'settings') return // the dialog doesn't scroll; the bench behind it shouldn't either
+      if (mode === 'settings' || mode === 'views' || mode === 'viewsMove' || mode === 'viewEdit') return // the dialog doesn't scroll; the bench behind it shouldn't either
       const delta = e.kind === 'wheel-down' ? 1 : -1
       if (e.x <= geom.lw) return setListTop((t) => scrollList(t, delta, geom.paneRows, list.length))
       const max = Math.max(0, geom.body.length - geom.bodyRows)
@@ -1303,6 +1430,53 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       return
     }
 
+    if (mode === 'views') {
+      const views = loadViews()
+      if (input === 'v' || key.escape) return setMode('browse')
+      if (key.upArrow) return setViewsIndex((i) => Math.max(0, i - 1))
+      if (key.downArrow) return setViewsIndex((i) => Math.min(views.length - 1, i + 1))
+      if (key.return) {
+        setViewFieldIndex(0)
+        return setMode('viewEdit')
+      }
+      if (input === 'a') return startText('viewAddId')
+      if (input === 'x') return deleteSelectedView()
+      if (input === 'm' || input === 'M') {
+        const v = views[viewsIndex]
+        if (!v) return
+        say(t('bench.toast.viewMoveMode', { id: v.id }))
+        return setMode('viewsMove')
+      }
+      return
+    }
+
+    if (mode === 'viewsMove') {
+      if (key.escape || key.return || input === 'm' || input === 'M') {
+        setMode('views')
+        const v = loadViews()[viewsIndex]
+        return v ? say(t('cli.view.moved', { id: v.id, position: viewsIndex + 1 })) : undefined
+      }
+      if (key.upArrow) return moveSelectedView(-1)
+      if (key.downArrow) return moveSelectedView(1)
+      return
+    }
+
+    if (mode === 'viewEdit') {
+      const v = loadViews()[viewsIndex]
+      if (!v) return setMode('views')
+      const fields = viewFields(v)
+      if (key.escape || input === 'v') return setMode('views')
+      if (key.upArrow) return setViewFieldIndex((i) => Math.max(0, i - 1))
+      if (key.downArrow) return setViewFieldIndex((i) => Math.min(fields.length - 1, i + 1))
+      const field = fields[viewFieldIndex] ?? fields[0]
+      if (key.leftArrow || key.rightArrow) {
+        if (VIEW_TEXT_FIELDS.includes(field)) return
+        return cycleViewField(field as 'layout' | 'group' | 'finished' | 'deferred', key.leftArrow ? -1 : 1)
+      }
+      if (key.return && VIEW_TEXT_FIELDS.includes(field)) return startViewFieldText()
+      return
+    }
+
     if (mode === 'move') {
       if (key.escape || key.return || input === 'M') {
         setMode('browse')
@@ -1338,6 +1512,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         if (mode === 'qnote' || mode === 'qother') return setMode('questions')
         if (mode === 'confirm' && current?.questions?.length && pendingKey === '2') return setMode('questions')
         if (mode === 'projectName' || mode === 'projectAdd') return setMode('projects')
+        if (mode === 'viewFieldText') return setMode('viewEdit')
+        if (mode === 'viewAddId') return setMode('views')
         setMode('browse')
         setPendingKey(null)
         return
@@ -1354,6 +1530,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         if (mode === 'projectName') return commitProjectName()
         if (mode === 'projectAdd') return commitProjectAdd()
         if (mode === 'attachPaths') return commitAttachPaths()
+        if (mode === 'viewFieldText') return commitViewFieldText()
+        if (mode === 'viewAddId') return commitViewAddId()
         return commitGoto()
       }
       // Ctrl-A while writing a reply/answer: stage files to land in the same section.
@@ -1527,6 +1705,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       return setMode('projects')
     }
 
+    if (input === 'v') return openViewsEditor()
+
     if (!current) return
     if (input === 'o') {
       if (!current.attachments.length) return say(t('bench.toast.noAttachments'))
@@ -1591,7 +1771,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     [
       list, index, current, view, items, overview, now, backlinks, rows, width, listTop, offset, condensed, mode, draft, caret,
       imageSel, pendingKey, banner, geom, zoom, imgMeta, detailFocus, pickToOpen, qIndex, qPicks, qNotes, settingIndex, settingsVersion,
-      briefAt, sessionFor, textView, projectIndex, attachPaths, editConflict,
+      briefAt, sessionFor, textView, projectIndex, attachPaths, editConflict, viewsIndex, viewFieldIndex, viewsVersion,
     ],
   )
   frameRef.current = frame
@@ -1671,6 +1851,10 @@ export interface FrameInput {
   attachCount?: number
   /** `editConflict` mode: the node the editor's text is waiting to land on. */
   editConflictRef?: string
+  /** `views`/`viewsMove`/`viewEdit` modes: which row of the user's view list is selected. */
+  viewsIndex?: number
+  /** `viewEdit` mode: which row of the selected view's own field list is selected. */
+  viewFieldIndex?: number
 }
 
 /** Below this, the full hint line (natural truncation aside) crowds out too
@@ -1752,6 +1936,7 @@ export interface Geometry {
   tabSpans: { view: View; from: number; to: number }[]
   promptRow: number
   settingsModal: SettingsModal
+  viewsModal: ViewsModal
 }
 
 /** One option or attachment entry, built and (for a right-to-left language)
@@ -2005,6 +2190,94 @@ export function buildSettingsModal(frameWidth: number, frameHeight: number, sele
   return { top, left, width, height, lines, rows }
 }
 
+/** The `v` views editor: a centred box, same idea as `SettingsModal` — `views`/`viewsMove`
+ *  draw the user's own view list, `viewEdit` the selected one's own fields. No hit-testing
+ *  (keyboard only), same as the `project`/`projects` dialogs. */
+export interface ViewsModal {
+  top: number
+  left: number
+  width: number
+  height: number
+  lines: Line[]
+}
+
+const VIEWS_MODAL_WIDTH = 60
+
+/** One field's value, as the editor shows it — a bare "—" for an unset text field, same
+ *  convention as `d.answer?.choice ?? '—'` elsewhere in this file. */
+function viewFieldValue(v: ViewDef, field: ViewField): string {
+  switch (field) {
+    case 'name':
+      return typeof v.name === 'string' ? v.name : v.name ? viewLabel(v) : '—'
+    case 'filter':
+      return v.filter ? filterText(v.filter) : '—'
+    case 'layout':
+      return v.layout
+    case 'group':
+      return v.group ?? 'none'
+    case 'sort':
+      return (v.sort ?? ['bench']).join(',')
+    case 'finished':
+      return v.finished ?? 'hide'
+    case 'deferred':
+      return v.deferred ?? 'hide'
+  }
+}
+
+export function buildViewsModal(frameWidth: number, frameHeight: number, mode: Mode, viewsIndex: number, viewFieldIndex: number, items: Decision[]): ViewsModal {
+  const rtl = isRtl()
+  const bidi = bidiMode()
+  const width = Math.max(30, Math.min(VIEWS_MODAL_WIDTH, frameWidth - 2))
+  const inner = width - 4
+  const left = Math.max(0, Math.floor((frameWidth - width) / 2))
+
+  const rule = (l: string, r: string): Line => [{ text: `${l}${'─'.repeat(width - 2)}${r}`, dim: true }]
+  const wrap = (content: Line): Line => [{ text: '│ ', dim: true }, ...padLine(content, inner), { text: ' │', dim: true }]
+  const centered = (text: string): Line => {
+    const pad = Math.max(0, Math.floor((inner - stringWidth(text)) / 2))
+    const line: Line = [{ text: ' '.repeat(pad) }, { text }]
+    return wrap(rtl ? mirrorLine(line, bidi) : line)
+  }
+  const row = (logical: Line, selected: boolean): Line => {
+    const finalRow = rtl ? mirrorLine(logical, bidi) : logical
+    const padded = padLine(finalRow, inner)
+    return wrap(selected ? padded.map((seg) => ({ ...seg, inverse: true })) : padded)
+  }
+
+  const views = loadViews()
+  const lines: Line[] = [rule('┌', '┐'), centered(t('bench.viewsModal.title')), wrap([])]
+  const maxRows = Math.max(0, frameHeight - 6)
+
+  if (mode === 'viewEdit') {
+    const v = views[viewsIndex]
+    const fields = v ? viewFields(v) : []
+    for (const [i, field] of fields.entries()) {
+      if (i >= maxRows) break
+      const selected = i === viewFieldIndex
+      const label = t(`bench.viewsModal.field.${field}`)
+      const value = viewFieldValue(v!, field)
+      const valueSeg: Segment = { text: VIEW_TEXT_FIELDS.includes(field) ? value : `‹ ${value} ›`, color: selected ? 'cyan' : undefined, bold: selected }
+      const gap = Math.max(1, inner - stringWidth(label) - stringWidth(valueSeg.text))
+      lines.push(row([{ text: label, bold: selected }, { text: ' '.repeat(gap) }, valueSeg], selected))
+    }
+    lines.push(wrap([]), centered(t('bench.viewsModal.editHint')))
+  } else {
+    for (const [i, v] of views.entries()) {
+      if (i >= maxRows) break
+      const selected = i === viewsIndex
+      const count = viewCount(v, items)
+      const text = `${viewLabel(v)} · ${v.layout}${count !== undefined ? ` · ${count}` : ''}`
+      lines.push(row([{ text }], selected))
+    }
+    lines.push(wrap([]), centered(mode === 'viewsMove' ? t('bench.viewsModal.moveHint') : t('bench.viewsModal.hint')))
+  }
+
+  lines.push(rule('└', '┘'))
+  const height = Math.min(lines.length, frameHeight)
+  const top = Math.max(0, Math.floor((frameHeight - height) / 2))
+  return { top, left, width, height, lines }
+}
+
 export function geometry(s: FrameInput): Geometry {
   const height = Math.max(1, s.rows - 1)
   const summary = summaryLines(s.overview, s.items, s.width, height, s.now)
@@ -2079,6 +2352,7 @@ export function geometry(s: FrameInput): Geometry {
     tabSpans,
     promptRow: height - 1,
     settingsModal: buildSettingsModal(s.width, height, s.settingIndex ?? 0),
+    viewsModal: buildViewsModal(s.width, height, s.mode, s.viewsIndex ?? 0, s.viewFieldIndex ?? 0, s.items),
   }
 }
 
@@ -2147,7 +2421,7 @@ export function hitTest(s: FrameInput, g: Geometry, x: number, y: number): Hit {
 /** Replaces the modal's rows wholesale — margins either side of the box are
  *  blank, not a peek at the bench underneath, the way a solid dialog box
  *  would draw over a terminal UI that has no transparency to speak of. */
-function overlaySettingsModal(lines: Line[], m: SettingsModal, frameWidth: number): void {
+function overlayModal(lines: Line[], m: Pick<SettingsModal | ViewsModal, 'top' | 'left' | 'width' | 'lines'>, frameWidth: number): void {
   const right = Math.max(0, frameWidth - m.left - m.width)
   for (let i = 0; i < m.lines.length; i++) {
     const row = m.top + i
@@ -2267,7 +2541,8 @@ export function buildFrame(s: FrameInput, g: Geometry = geometry(s)): Line[] {
     }
   }
   lines.push(rtl ? mirrorLine(promptLine(s), mode) : promptLine(s))
-  if (s.mode === 'settings') overlaySettingsModal(lines, g.settingsModal, s.width)
+  if (s.mode === 'settings') overlayModal(lines, g.settingsModal, s.width)
+  if (s.mode === 'views' || s.mode === 'viewsMove' || s.mode === 'viewEdit') overlayModal(lines, g.viewsModal, s.width)
   return clampFrame(lines)
 }
 
@@ -2441,6 +2716,12 @@ function promptPrefix(s: FrameInput): Line | null {
   if (s.mode === 'projectName') return [{ text: t('bench.prompt.projectName', { project: (s.projects ?? [])[s.projectIndex ?? -1]?.name ?? '' }), color: 'blue', bold: true }]
   if (s.mode === 'projectAdd') return [{ text: t('bench.prompt.projectAdd'), color: 'blue', bold: true }]
   if (s.mode === 'attachPaths') return [{ text: t('bench.prompt.attachPaths'), color: 'blue', bold: true }]
+  if (s.mode === 'viewAddId') return [{ text: t('bench.prompt.viewAddId'), color: 'blue', bold: true }]
+  if (s.mode === 'viewFieldText') {
+    const v = loadViews()[s.viewsIndex ?? 0]
+    const field = v ? viewFields(v)[s.viewFieldIndex ?? 0] : undefined
+    return [{ text: t('bench.prompt.viewFieldText', { id: v?.id ?? '', field: field ? t(`bench.viewsModal.field.${field}`) : '' }), color: 'blue', bold: true }]
+  }
   if (!d) return null
   // Ctrl-A staged at least one file: shown on the reply/answer prompt it will land with.
   const staged: Segment[] = s.attachCount ? [{ text: ` ${t('bench.prompt.attachStaged', { count: s.attachCount })}`, dim: true }] : []
@@ -2520,6 +2801,8 @@ const PLACEHOLDER: Partial<Record<Mode, () => string>> = {
   projectName: () => t('bench.placeholder.projectName'),
   projectAdd: () => t('bench.placeholder.projectAdd'),
   attachPaths: () => t('bench.placeholder.attachPaths'),
+  viewAddId: () => t('bench.placeholder.viewAddId'),
+  viewFieldText: () => t('bench.placeholder.typeHere'),
 }
 
 function promptLine(s: FrameInput): Line {
