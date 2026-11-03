@@ -63,23 +63,23 @@ test('fixture: every state is there', (t) => {
   )
 })
 
-test('Available: running, waiting, startable, needing a decision and answered-for-AI, with non-matching ancestors kept as dim context', (t) => {
+test('Available: running, waiting, not started (blocked ones too), needing a decision and answered-for-AI, with non-matching ancestors kept as dim context', (t) => {
   const { store } = fixture(t)
   const items = store.all()
   const rows = rowsFor('available', items)
-  assert.deepEqual(named(rows).sort(), ['P', 'Q', 'U', 'a', 'c', 'd', 'e', 'f', 'r', 'v'].sort())
+  assert.deepEqual(named(rows).sort(), ['P', 'Q', 'U', 'a', 'b', 'c', 'd', 'e', 'f', 'r', 'v'].sort())
   const ctx = rows.filter((r) => r.context).map((r) => r.node!.title.split(' ')[0])
-  assert.deepEqual(ctx.sort(), ['Q', 'U'], 'Q (finished) and U (not startable) are only there for what hangs below')
+  assert.deepEqual(ctx.sort(), ['Q'], 'Q (finished) is only there for what hangs below; U, blocked, is listed in its own right')
   // Children sit under their parent, as the tree.
   const at = (n: string) => rows.findIndex((r) => r.node?.title.startsWith(`${n} `))
   assert.ok(at('Q') < at('r') && rows[at('r')].depth === 1)
   // A context row is drawn dim, all but the ◆ gutter.
-  const drawn = nodeRowSegments(rows[at('U')], items, 70, Date.now(), { tree: true })
+  const drawn = nodeRowSegments(rows[at('Q')], items, 70, Date.now(), { tree: true })
   assert.ok(drawn.slice(1).every((s) => s.dim && !s.color && !s.bold), 'dim, no colour')
   assert.ok(!nodeRowSegments(rows[at('a')], items, 70, Date.now(), { tree: true }).slice(1).every((s) => s.dim))
 })
 
-test('Active: Available minus what the AIs are waiting on', (t) => {
+test('Active: Available minus what waits and what is blocked', (t) => {
   const { store } = fixture(t)
   const rows = rowsFor('active', store.all())
   assert.deepEqual(named(rows).sort(), ['P', 'Q', 'U', 'a', 'c', 'd', 'e', 'r', 'v'].sort())
@@ -125,7 +125,7 @@ test('tab counts: Available / Active / Decide / Waiting count what each lists; A
   const { store } = fixture(t)
   const items = store.all()
   const counts = Object.fromEntries(VIEWS.map((v) => [v, viewCount(v, items)]))
-  assert.deepEqual(counts, { available: 8, active: 7, decide: 2, all: undefined, waiting: 1, live: undefined })
+  assert.deepEqual(counts, { available: 10, active: 7, decide: 2, all: undefined, waiting: 1, live: undefined })
   for (const v of VIEWS) {
     if (v === 'all' || v === 'live') continue
     const listed = rowsFor(v, items).filter((r) => r.kind === 'node' && !r.context).length
@@ -139,7 +139,8 @@ test('a jump lands in the current view when it lists the node, else Available, e
   const get = (k: keyof typeof ids) => items.find((d) => d.id === ids[k])!
   assert.equal(homeView(get('c'), items, 'decide'), 'decide')
   assert.equal(homeView(get('e'), items, 'decide'), 'available')
-  assert.equal(homeView(get('b'), items, 'available'), 'all', 'a blocked "to do" node is only in All')
+  assert.equal(homeView(get('b'), items, 'available'), 'available', 'a blocked "to do" node is in Available')
+  assert.equal(homeView(get('b'), items, 'active'), 'available', 'but not in Active')
   assert.equal(homeView(get('S'), items, 'waiting'), 'all')
   assert.ok(inView('all', get('T'), items))
 })
@@ -153,7 +154,7 @@ test('App: opens in Available, Tab walks Available Active Decide Waiting Live Al
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a startable/))
   const header = () => b.frame()[0]
-  assert.match(header(), /^decs +Available 8 +Active 7 +Human work 2 +Waiting 1/)
+  assert.match(header(), /^decs +Available 10 +Active 7 +Human work 2 +Waiting 1/)
   const before = b.frame().join('\n')
   await b.press('b')
   await b.quiet()

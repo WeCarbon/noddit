@@ -71,9 +71,10 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     deferred: 'show',
     // A milestone never matches on its own — never started or finished by itself — so it
     // only shows (dim, as the tree's ancestor-context) when something under it does.
-    filter: parseFilter('state:in_progress,waiting,needs_decision,decided -is:milestone or state:not_started is:startable -is:milestone'),
+    // Not started includes what is still blocked (queued after another node): it is coming, so it is in sight here, not in 活动.
+    filter: parseFilter('state:in_progress,waiting,needs_decision,decided,not_started -is:milestone'),
   },
-  // 活动 = 可用 minus everything waiting or put off, the owner's own included; a waiting parent still shows, dim, above what moves under it.
+  // 活动 = 可用 minus everything waiting, blocked or put off, the owner's own included; a waiting parent still shows, dim, above what moves under it.
   {
     id: 'active',
     icon: 'activity',
