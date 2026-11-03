@@ -263,6 +263,28 @@ export interface CycleNode {
   title: string
 }
 
+/** `nod source register`: one issue tracker / inbox / feedback form the project reads from. */
+export interface Source {
+  project: string
+  project_letter: string
+  name: string
+  title: string
+  kind: string
+  owner_agent: string | null
+  adapter: string | null
+  /** Non-deleted items known about. */
+  total: number
+  unhandled: number
+  /** Among undone items, grouped by where the ball is: `unhandled`, `owner`, `us`, or a name. */
+  buckets: Record<string, number>
+  heartbeat_at: string | null
+  heartbeat_age_ms: number | null
+  /** No heartbeat within the source's staleAfter — the adapter is probably dead. */
+  stale: boolean
+  /** No unhandled items, and nothing parked on owner/us/an open node ref. */
+  cleared: boolean
+}
+
 export interface Bench {
   now: string
   lang: string
@@ -277,6 +299,8 @@ export interface Bench {
   back_from_deferral?: { key: string; ref: string; title: string; text: string }[]
   /** `after` forming a loop: every node in each chain is permanently unstartable. */
   cycles?: CycleNode[][]
+  /** Registered external sources (issues/mail/feedback), cleared or not. */
+  sources?: Source[]
 }
 
 /**

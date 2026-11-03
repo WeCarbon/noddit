@@ -6,6 +6,7 @@ import { toJSON } from '../core/render.ts'
 import { descriptionOf } from '../core/edit.ts'
 import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf, findCycles } from '../core/sequence.ts'
+import { listSources } from '../core/sources.ts'
 import { isHumanTask } from '../core/assignee.ts'
 import { builtinView, filterText, isPristine, loadViews, type ViewDef } from '../core/view-defs.ts'
 import { estimateTotal } from '../core/estimate.ts'
@@ -299,6 +300,25 @@ export function benchJson(store: Store, opts: { project?: string; now?: number; 
   const byKey = new Map(items.map((i) => [keyOf(i), i]))
   // `after` forming a loop (summary.ts:cyclesLine reports the same list in the TUI's strip).
   const cycles = findCycles(items).map((cycle) => cycle.map((c) => ({ key: `${c.project}#${c.id}`, ref: c.ref, id: c.id, project: c.project, title: byKey.get(`${c.project}#${c.id}`)?.title ?? '' })))
+  // `nod source register`: cleared/stale per registered source (summary.ts:sourcesLine).
+  const sources = listSources(store, now)
+    .filter((src) => !key || src.project === key)
+    .map((src) => ({
+      project: src.project,
+      project_letter: src.projectLetter,
+      name: src.name,
+      title: src.title,
+      kind: src.kind,
+      owner_agent: src.ownerAgent ?? null,
+      adapter: src.adapter ?? null,
+      total: src.total,
+      unhandled: src.unhandled,
+      buckets: src.buckets,
+      heartbeat_at: src.heartbeatAt ?? null,
+      heartbeat_age_ms: src.heartbeatAgeMs ?? null,
+      stale: src.stale,
+      cleared: src.cleared,
+    }))
   return {
     now: new Date(now).toISOString(),
     lang: lang(),
@@ -322,6 +342,7 @@ export function benchJson(store: Store, opts: { project?: string; now?: number; 
     // Deferred `--until` a day that has come: brought back by this read (or one just before it).
     back_from_deferral: (opts.back ?? []).map((d) => ({ key: keyOf(d), ref: refOf(d), title: d.title, text: t('bench.toast.backFromDeferral', { refs: refOf(d) }) })),
     cycles,
+    sources,
     nodes,
   }
 }

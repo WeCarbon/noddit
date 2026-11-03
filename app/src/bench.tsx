@@ -27,6 +27,7 @@ import { useDialogFocus } from './focus.ts'
 import { useLiveMotion } from './motion.ts'
 import { NoticeStack, noticeWhat, useNoticeQueue, type Notice } from './notices.tsx'
 import { CycleBanner } from './cycles.tsx'
+import { SourcesPanel } from './sources.tsx'
 import { noticeTitle, plainReply } from './plain-reply.ts'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, heldAt, keepHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, type Held, type PendingOp } from './optimistic.ts'
@@ -1140,6 +1141,7 @@ export function Bench(props: {
             <span class="label">{s('addProject')}</span>
           </button>
         </nav>
+        <SourcesPanel sources={bench.sources ?? []} />
         <footer>
           <span class={`live ${props.refreshing ? 'busy' : ''}`}>
             <span class="pulse" />

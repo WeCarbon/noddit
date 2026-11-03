@@ -566,3 +566,23 @@ test('integration: buildOverview carries listSources, and decs changes lists sou
   const later = JSON.parse(decs(root, ['changes', '--since', new Date(Date.now() + 2000).toISOString(), '--json']))
   assert.deepEqual(later.source_events, [])
 })
+
+test('bench --json carries listSources too, for a window with no summary strip to read it from', async (t) => {
+  const { benchJson } = await import('../src/tui/json.ts')
+  const root = mkdtempSync(join(tmpdir(), 'decs-bench-sources-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const layout = initLayout(root)
+  const store = new Store([layout])
+  registerSource(layout, { name: 'github-issues', title: 'github-issues v2', kind: 'github' })
+  registerSource(layout, { name: 'support-inbox', title: 'support-inbox', kind: 'email' })
+  syncSourceItems(layout, 'github-issues', [{ id: '1', title: 'blank page' }])
+
+  const out = benchJson(store) as {
+    sources: { project: string; name: string; title: string; total: number; unhandled: number; cleared: boolean; stale: boolean }[]
+  }
+  const byName = new Map(out.sources.map((s) => [s.name, s]))
+  assert.equal(byName.get('github-issues')!.title, 'github-issues v2')
+  assert.equal(byName.get('github-issues')!.unhandled, 1)
+  assert.equal(byName.get('github-issues')!.cleared, false)
+  assert.equal(byName.get('support-inbox')!.cleared, true, 'nothing pushed yet — nothing to clear')
+})

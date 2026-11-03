@@ -292,6 +292,51 @@ svg.lucide.ico {
   color: var(--text-3);
 }
 
+/* `nod source register`: a strip of issue/mail/feedback sources above the footer, every one clear or not. */
+.sources-panel {
+  flex: none;
+  padding: 0 10px 8px;
+  border-top: 1px solid var(--line);
+}
+
+.sources-panel .section-label {
+  padding: 10px 0 4px;
+}
+
+.source-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.source-ico {
+  flex: none;
+  opacity: 1;
+}
+
+.source-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.source-stale {
+  flex: none;
+  font-weight: 600;
+}
+
 .sidebar footer {
   display: flex;
   align-items: center;
