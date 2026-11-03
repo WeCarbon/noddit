@@ -96,3 +96,29 @@ export const moveRow =
     views: b.views.map((v) => ({ ...v, rows: movedRows(v.rows, key, target, after) })),
     project_views: b.project_views?.map((p) => ({ ...p, rows: movedRows(p.rows, key, target, after) })),
   })
+
+/** The row of the node the owner just acted on, kept in `where` (a list) until they pick another. */
+export interface Held {
+  row: Row
+  /** Its neighbours when it was acted on, and its index should both have gone too. */
+  above: string | null
+  below: string | null
+  index: number
+  where: string
+}
+
+export function heldAt(rows: Row[], i: number, where: string): Held {
+  return { row: rows[i], above: rows[i - 1]?.key ?? null, below: rows[i + 1]?.key ?? null, index: i, where }
+}
+
+/** `rows` with `held` back in its place if it has left them: dimmed, with the look its node has in the other lists now. */
+export function keepHeld(rows: Row[], held: Held | null, where: string, b: Bench): Row[] {
+  if (!held || held.where !== where || rows.some((r) => r.key === held.row.key)) return rows
+  const now = b.views.flatMap((v) => v.rows).find((r) => r.kind === 'node' && r.node === held.row.node)
+  const look = now ? { state: now.state, glyph: now.glyph, badge: now.badge, badge_short: now.badge_short, deferred: now.deferred } : {}
+  const row: Row = { ...held.row, ...look, context: true, scope: null }
+  const below = rows.findIndex((r) => r.key === held.below)
+  const above = rows.findIndex((r) => r.key === held.above)
+  const at = below >= 0 ? below : above >= 0 ? above + 1 : Math.min(held.index, rows.length)
+  return [...rows.slice(0, at), row, ...rows.slice(at)]
+}

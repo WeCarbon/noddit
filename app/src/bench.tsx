@@ -25,7 +25,7 @@ import { useDialogFocus } from './focus.ts'
 import { useLiveMotion } from './motion.ts'
 import { NoticeStack, noticeWhat, useNoticeQueue, type Notice } from './notices.tsx'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
-import { applyOps, both, dropRows, moveRow, nextStamp, patchNode, patchRows, pendingOver, type PendingOp } from './optimistic.ts'
+import { applyOps, both, dropRows, heldAt, keepHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, type Held, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
 import type { Attachment, Bench as BenchData, Node, PreviousRound, Project, Row, View, ViewName } from './types.ts'
@@ -112,7 +112,11 @@ export function Bench(props: {
     return { ...tree, label: scopeName ?? scope, count: live, empty: s('projectEmpty') }
   }, [views, scope, scopeName, prefs.view, bench.project_views])
   const setScope = (project: string | null) => props.setPrefs({ project })
-  const rows = useMemo(() => visibleRows(view, prefs.folds), [view, prefs.folds])
+  // The node the owner just answered, closed, finished or put off stays where it was, detail and
+  // all, until they pick another node or list; only then does it leave by the list's own rules.
+  const [held, setHeld] = useState<Held | null>(null)
+  const where = `${scope ?? ''}|${view.view}`
+  const rows = useMemo(() => keepHeld(visibleRows(view, prefs.folds), held, where, bench), [view, prefs.folds, held, where, bench])
   const liveList = !scope && view.view === 'live'
   // The composer belongs to the node it was opened on, so moving to another node closes it in the
   // same render — not in an effect that might land after the next keypress.
@@ -233,6 +237,15 @@ export function Bench(props: {
   useEffect(() => {
     if (current && current.key !== prefs.selected) setPrefs({ selected: current.key })
   }, [current?.key])
+  useEffect(() => {
+    if (held && (held.where !== where || held.row.key !== prefs.selected)) setHeld(null)
+  }, [where, prefs.selected])
+  const holdShown = (key: string) => {
+    if (current?.kind !== 'node' || current.node !== key) return
+    const i = rows.findIndex((r) => r.key === current.key)
+    if (i >= 0) setHeld(heldAt(rows, i, where))
+    if (prefs.selected !== current.key) setPrefs({ selected: current.key })
+  }
 
   useEffect(() => {
     detailRef.current?.scrollTo({ top: 0 })
@@ -326,7 +339,10 @@ export function Bench(props: {
     if (!node || !canAnswer(node)) return
     if (answerLocked(node) && node.options.length) return showToast(s('answerLockedHint', { key: node.answer?.choice ?? '' }))
     if (node.questions.length) {
-      if (key === '1') return act(() => api.answerDefaults(rootOf(node), node.id), s('sent'))
+      if (key === '1') {
+        holdShown(node.key)
+        return act(() => api.answerDefaults(rootOf(node), node.id), s('sent'))
+      }
       return detailRef.current?.querySelector<HTMLButtonElement>('.question .pick')?.focus()
     }
     if (!node.options.some((o) => o.key === key)) return
@@ -343,9 +359,13 @@ export function Bench(props: {
     const reopen = (c: Composer) => () => (setComposerOn({ c, key }), setDraftText(typed), setDraftFiles(files))
     if (composer.kind === 'answer') {
       setUnlocked(null)
+      holdShown(key)
       return optimistic(answered(key, composer.key), () => api.answer(root, node.id, composer.key, text || undefined, files), s('sent'), reopen(composer))
     }
-    if (composer.kind === 'free' && text) return optimistic(answered(key), () => api.answerFreeText(root, node.id, text, files), s('sent'), reopen(composer))
+    if (composer.kind === 'free' && text) {
+      holdShown(key)
+      return optimistic(answered(key), () => api.answerFreeText(root, node.id, text, files), s('sent'), reopen(composer))
+    }
     if (composer.kind === 'reply' && text)
       return optimistic(
         patchNode(key, (n) => ({
@@ -363,7 +383,10 @@ export function Bench(props: {
         s('replied'),
         reopen(composer),
       )
-    if (composer.kind === 'close') return optimistic(finished(key, 'closed'), () => api.close(root, node.id, text || 'obsolete'), s('closed'), reopen(composer))
+    if (composer.kind === 'close') {
+      holdShown(key)
+      return optimistic(finished(key, 'closed'), () => api.close(root, node.id, text || 'obsolete'), s('closed'), reopen(composer))
+    }
   }
   /**
    * Puts `key`'s row before or after `target`'s among the rows sharing its scope (siblings in a
@@ -394,6 +417,7 @@ export function Bench(props: {
   }
   const seen = () => {
     if (!node || node.terminal) return
+    holdShown(node.key)
     optimistic(finished(node.key, 'completed'), () => api.seen(rootOf(node), node.id), s('dismissed'))
   }
   const startClose = () => {
@@ -404,6 +428,7 @@ export function Bench(props: {
   /** 等待 on `on` (null: only the day moves) until `date`. */
   const holdNode = (n: Node, on: string | null, date: string) => {
     setHoldFor(null)
+    holdShown(n.key)
     optimistic(
       both(
         patchNode(n.key, (x) => ({ ...x, status: 'waiting', waiting_on: on ?? x.waiting_on, waiting_until: `${date}T00:00:00` })),
@@ -416,6 +441,7 @@ export function Bench(props: {
   /** Put off until `date` (YYYY-MM-DD), or indefinitely with null. */
   const deferNode = (n: Node, date: string | null) => {
     setDeferFor(null)
+    holdShown(n.key)
     optimistic(
       both(patchNode(n.key, (x) => ({ ...x, deferred_at: now(), deferred_until: date })), dropRows(n.key, ['all', 'waiting', 'live']), patchRows(n.key, (r) => ({ ...r, deferred: true }))),
       () => api.deferUntil(rootOf(n), n.id, date),
@@ -553,7 +579,11 @@ export function Bench(props: {
       () => api.start(rootOf(node), node.id),
       s('started'),
     )
-  const markDone = () => node && optimistic(finished(node.key, 'completed'), () => api.done(rootOf(node), node.id), s('markedDone'))
+  const markDone = () => {
+    if (!node) return
+    holdShown(node.key)
+    optimistic(finished(node.key, 'completed'), () => api.done(rootOf(node), node.id), s('markedDone'))
+  }
   const goParent = () => {
     if (node?.parent != null) jump(`${node.project}#${node.parent}`)
   }
