@@ -141,7 +141,28 @@ export function metaLines(d: Item, items: Item[], now: number, width: number, ba
   out.push(...refRow(t('bench.detail.blocking'), dependentsOf(d, items).map((b) => refSeg(b, items, now)), width))
   out.push(...refRow(t('bench.detail.referencedBy'), backlinks.map((b) => refSeg(b, items, now)), width))
   if (d.supersededBy !== undefined) out.push([{ text: ` ${t('bench.detail.supersededBy', { ref: `${d.letter ?? 'X'}${d.supersededBy}` })}`, dim: true }])
+  out.push(...previousRoundLines(d, now))
   out.push([{ text: ' ┄'.repeat(Math.max(1, Math.floor((width - 2) / 2))), dim: true }])
+  return out
+}
+
+/** N219: every round before the node's live one — options it asked and the
+ *  answer it got (or didn't), newest first. History, never the node's
+ *  current `options`/`answer` — those still drive the footer below. */
+export function previousRoundLines(d: Item, now: number): Line[] {
+  const rounds = d.previousRounds ?? []
+  if (!rounds.length) return []
+  const out: Line[] = [[{ text: ` ${t('bench.detail.previousRounds', { count: rounds.length })}`, bold: true, dim: true }]]
+  for (const r of [...rounds].sort((a, b) => b.round - a.round)) {
+    const chosen = r.answer?.split(/\s*——\s*/)[0]?.trim()
+    const when = r.answer
+      ? t('bench.detail.previousRoundAnswered', { round: r.round, choice: chosen ?? '', by: r.by ?? 'owner', since: r.at ? ago(minutesSince({ created: r.at, updatedAt: r.at }, now)) : '' })
+      : t('bench.detail.previousRoundUnanswered', { round: r.round })
+    out.push([{ text: `  ${when}`, dim: true }])
+    const opts = r.options.map((o) => `${o.key} ${o.label}${o.key === chosen ? ` ✓ ${t('bench.badge.answered')}` : ''}`).join('   ')
+    if (opts) out.push([{ text: `    ${opts}`, dim: true }])
+    if (r.questions.length && r.subAnswers) out.push([{ text: `    ${picksSummary(r.questions, r.subAnswers)}`, dim: true }])
+  }
   return out
 }
 
