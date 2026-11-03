@@ -526,6 +526,16 @@ test('parseWinProcessLine reads the `ppid|command line` a Windows CIM query prin
   assert.equal(parseWinProcessLine('notanumber|node.exe'), null)
 })
 
+test('parseWinAncestors reads the `pid|ppid|command line` lines of one PowerShell walk up the tree, nearest first', async () => {
+  const { parseWinAncestors } = await import('../src/core/session-process.ts')
+  const out = '200|150|C:\\nodejs\\node.exe bin\\nod.js monitor\r\n150|90|"C:\\Tools\\claude.exe" --agent-name lane-a\r\n\r\nnoise\r\n'
+  assert.deepEqual(parseWinAncestors(out), [
+    { pid: 200, ppid: 150, comm: 'C:\\nodejs\\node.exe bin\\nod.js monitor' },
+    { pid: 150, ppid: 90, comm: '"C:\\Tools\\claude.exe" --agent-name lane-a' },
+  ])
+  assert.deepEqual(parseWinAncestors(''), [])
+})
+
 test('imageName strips the path and arguments off a command line, quoted or not', async () => {
   const { imageName } = await import('../src/cli/commands/monitor.ts')
   assert.equal(imageName('"C:\\Program Files\\Claude\\claude.exe" --agent-name lane-a'), 'C:\\Program Files\\Claude\\claude.exe')

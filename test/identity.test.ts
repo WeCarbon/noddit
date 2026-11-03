@@ -211,9 +211,14 @@ test('parentIsGone: --with-parent names our own ppid — a changed ppid alone is
   // unrelated process, so a plain alive(parent) still reports true. With the
   // ppid comparison this is never even consulted for the direct-parent case.
   const aliveSaysYesToAnImpostor = () => true
-  assert.equal(parentIsGone(111, 111, 111, aliveSaysYesToAnImpostor), false, 'ppid unchanged: still our real parent, no ambiguity')
-  assert.equal(parentIsGone(111, 111, 1, aliveSaysYesToAnImpostor), true, 'reparented to init — gone, however alive() answers')
-  assert.equal(parentIsGone(111, 111, 222, aliveSaysYesToAnImpostor), true, 'reparented to a subreaper — gone')
+  assert.equal(parentIsGone(111, 111, 111, aliveSaysYesToAnImpostor, 'linux'), false, 'ppid unchanged: still our real parent, no ambiguity')
+  assert.equal(parentIsGone(111, 111, 1, aliveSaysYesToAnImpostor, 'linux'), true, 'reparented to init — gone, however alive() answers')
+  assert.equal(parentIsGone(111, 111, 222, aliveSaysYesToAnImpostor, 'darwin'), true, 'reparented to a subreaper — gone')
+})
+
+test('parentIsGone: on Windows, where ppid never changes after the parent dies, the direct parent is checked by alive() too', () => {
+  assert.equal(parentIsGone(111, 111, 111, () => false, 'win32'), true, 'same ppid, but the parent is gone')
+  assert.equal(parentIsGone(111, 111, 111, () => true, 'win32'), false)
 })
 
 test('parentIsGone: --with-parent names an indirect ancestor (not our own ppid) — falls back to alive()', () => {

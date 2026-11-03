@@ -199,10 +199,20 @@ function alive(pid: number): boolean {
  * pid number onto an unrelated new process in the meantime — `aliveFn` then
  * says "yes" about an impostor, and the window never closes (N260: a
  * 31-minute orphan from exactly this; see identity.test.ts's parentIsGone tests).
+ *
+ * Windows never reparents: `process.ppid` keeps naming the parent it was
+ * created by, alive or not, so there only the liveness check can tell.
  */
-export function parentIsGone(parent: number, startPpid: number, currentPpid: number, aliveFn: (pid: number) => boolean = alive): boolean {
+export function parentIsGone(
+  parent: number,
+  startPpid: number,
+  currentPpid: number,
+  aliveFn: (pid: number) => boolean = alive,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
   if (parent <= 0) return false
-  return parent === startPpid ? currentPpid !== startPpid : !aliveFn(parent)
+  if (parent === startPpid && platform !== 'win32') return currentPpid !== startPpid
+  return !aliveFn(parent)
 }
 
 /** The backstop poll, when nothing nudges a pass sooner (N257). */
