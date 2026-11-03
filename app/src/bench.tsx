@@ -86,6 +86,11 @@ export function Bench(props: {
   refreshing: boolean
   onAddProject: () => void
   onNoProjects: () => void
+  /** Single-node reloads the caller already fetched off a monitor event
+   *  (N258), laid over `props.bench` the same way `ops` are — each one is
+   *  its own moment's truth for that node, dropped once a later full
+   *  `props.bench` catches up to it. */
+  patches?: PendingOp[]
 }) {
   const { prefs, setPrefs, refresh } = props
   // Actions show at once; the CLI catches up behind them (see optimistic.ts).
@@ -99,7 +104,7 @@ export function Bench(props: {
       }),
     [readAt],
   )
-  const bench = useMemo(() => applyOps(props.bench, ops, readAt), [props.bench, ops, readAt])
+  const bench = useMemo(() => applyOps(props.bench, [...ops, ...(props.patches ?? [])], readAt), [props.bench, ops, props.patches, readAt])
   // The sidebar picks one thing to show: a view across every project, or one project's
   // whole tree (live work, finished folded) — never the two combined. A project that is
   // gone (unlinked) falls back to the view.

@@ -418,13 +418,17 @@ fn notice(app: &AppHandle, item: Value) {
 // ---------------------------------------------------------------------------
 
 /// `decs monitor --updates --json`, restarted whenever it exits; every line re-reads what waits.
+///
+/// `--interval 30000`: the CLI now watches each project's `decisions/active/` with the
+/// platform's own file-system events and reacts within ~100ms on its own (N255/N257) — this
+/// is only the backstop for whatever that watch misses, so it no longer needs to be short.
 pub fn start_monitor(app: &AppHandle) {
     if app.state::<Watch>().monitor_started.swap(true, Ordering::SeqCst) {
         return;
     }
     start_clock(app);
     let app = app.clone();
-    let mut args: Vec<String> = ["monitor", "--updates", "--json", "--idle-exit", "0", "--interval", "800", "--all", "--all-projects", "--unclaimed-after", "10m", "--with-parent"]
+    let mut args: Vec<String> = ["monitor", "--updates", "--json", "--idle-exit", "0", "--interval", "30000", "--all", "--all-projects", "--unclaimed-after", "10m", "--with-parent"]
         .iter()
         .map(|s| s.to_string())
         .collect();

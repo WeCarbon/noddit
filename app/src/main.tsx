@@ -5,9 +5,9 @@ import { Bench, type Prefs } from './bench.tsx'
 import { ResizeEdges } from './resize.tsx'
 import { Onboarding, envReady } from './onboarding.tsx'
 import { Banner } from './banner.tsx'
-import { newer, readBench, type Read } from './optimistic.ts'
+import { newer, nextStamp, patchNode, readBench, type PendingOp, type Read } from './optimistic.ts'
 import { s, setLanguage, whenLanguageSet } from './strings.ts'
-import type { Bench as BenchData, ShellEnv } from './types.ts'
+import type { Bench as BenchData, MonitorUpdated, ShellEnv } from './types.ts'
 import './style.css'
 import './panels.css'
 import './header.css'
@@ -29,6 +29,23 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
   const [prefs, setPrefsState] = useState<Prefs>(prefs0)
   const [read, setRead] = useState<Read | null>(snapshot && { bench: snapshot, startedAt: 0 })
   const bench = read?.bench ?? null
+  // A monitor "updated" event names exactly which nodes changed; these hold
+  // the ones reloaded one at a time off that (N258), on top of `bench` until
+  // a later full reload catches up (see optimistic.ts, and the matching prop
+  // on Bench) — instead of a full `loadBench()` on every single event. Their
+  // `doneAt` is a `nextStamp()`, the same clock `read.startedAt` uses, so a
+  // read that began after a patch was made drops it exactly like `Bench`'s
+  // own `ops` (never by wall-clock time, which a slow read could cross either way).
+  const [patches, setPatches] = useState<PendingOp[]>([])
+  const patchId = useRef(0)
+  const knownKeys = useRef<Set<string>>(new Set(Object.keys(snapshot?.nodes ?? {})))
+  useEffect(() => {
+    if (bench) knownKeys.current = new Set(Object.keys(bench.nodes))
+  }, [bench])
+  useEffect(() => {
+    if (!read) return
+    setPatches((ps) => (ps.some((p) => p.doneAt && p.doneAt <= read.startedAt) ? ps.filter((p) => !p.doneAt || p.doneAt > read.startedAt) : ps))
+  }, [read?.startedAt])
   const [env, setEnv] = useState<ShellEnv | null>(null)
   const [phase, setPhase] = useState<Phase>(snapshot && prefs0.onboarded ? { kind: 'bench' } : { kind: 'boot' })
   const [adding, setAdding] = useState(false)
@@ -68,6 +85,60 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
     setRefreshing(false)
   }, [])
 
+  const refreshTimer = useRef(0)
+  const scheduleRefresh = useCallback(() => {
+    clearTimeout(refreshTimer.current)
+    refreshTimer.current = window.setTimeout(() => void refresh(), 250)
+  }, [refresh])
+
+  /**
+   * One line from `decs monitor --updates --json`. `event: 'updated'` carries
+   * exactly which nodes changed (N258) — known ones are reloaded individually
+   * (`api.loadNode`) and laid over the bench instead of reloading the whole
+   * thing (~2.5s, megabytes of JSON, for what is usually a one-line edit).
+   * Anything this can't resolve structurally — a brand-new node (inserting
+   * its row needs the server's own sort), one that left scope, a node whose
+   * root can't be read back out of its file path, an older `nod` build
+   * without the `changed` field, or any other kind of monitor line (brief,
+   * unclaimed, checkin, stale, warn) — falls back to the same debounced full
+   * reload this always did before.
+   */
+  const onMonitorLine = useCallback(
+    (line: string) => {
+      let evt: { event?: string; changed?: unknown; gone?: unknown } = {}
+      try {
+        evt = JSON.parse(line)
+      } catch {
+        /* a plain-text line never reaches here — the app always passes --json */
+      }
+      const changed = evt.event === 'updated' && Array.isArray(evt.changed) ? (evt.changed as MonitorUpdated['changed']) : null
+      if (!changed) {
+        scheduleRefresh()
+        return
+      }
+      if (Array.isArray(evt.gone) && evt.gone.length) scheduleRefresh()
+      for (const c of changed) {
+        if (!knownKeys.current.has(c.key) || !c.file) {
+          scheduleRefresh() // a node we've never shown: the full reload places its row
+          continue
+        }
+        const root = api.rootFromFile(c.file)
+        if (!root) {
+          scheduleRefresh()
+          continue
+        }
+        void api
+          .loadNode(root, c.id)
+          .then((node) => {
+            const id = ++patchId.current
+            setPatches((ps) => [...ps, { id, patch: patchNode(c.key, () => node), doneAt: nextStamp() }])
+          })
+          .catch(() => scheduleRefresh())
+      }
+    },
+    [scheduleRefresh],
+  )
+
   useEffect(() => {
     if (bench) setLanguage(bench.lang, bench.rtl)
     void api.prepareImages()
@@ -81,11 +152,7 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
       setPhase({ kind: 'bench' })
       setTimeout(() => void api.ready('live bench'), 0)
       if (!prefs0.onboarded) setPrefs({ onboarded: true })
-      let timer = 0
-      await api.startMonitor(() => {
-        clearTimeout(timer)
-        timer = window.setTimeout(() => void refresh(), 250)
-      })
+      await api.startMonitor(onMonitorLine)
     })()
     const tick = window.setInterval(() => void refresh(), 60_000)
     const onFocus = () => void refresh()
@@ -101,11 +168,7 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
     setPrefs({ onboarded: true })
     await refresh()
     setPhase({ kind: 'bench' })
-    let timer = 0
-    await api.startMonitor(() => {
-      clearTimeout(timer)
-      timer = window.setTimeout(() => void refresh(), 250)
-    })
+    await api.startMonitor(onMonitorLine)
   }
 
   if (adding || phase.kind === 'onboarding')
@@ -119,7 +182,19 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
       />
     )
   if (phase.kind === 'bench' && read)
-    return <Bench bench={read.bench} readAt={read.startedAt} prefs={prefs} setPrefs={setPrefs} refresh={refresh} refreshing={refreshing} onAddProject={() => setAdding(true)} onNoProjects={() => setPhase({ kind: 'onboarding', startAt: 'add' })} />
+    return (
+      <Bench
+        bench={read.bench}
+        readAt={read.startedAt}
+        patches={patches}
+        prefs={prefs}
+        setPrefs={setPrefs}
+        refresh={refresh}
+        refreshing={refreshing}
+        onAddProject={() => setAdding(true)}
+        onNoProjects={() => setPhase({ kind: 'onboarding', startAt: 'add' })}
+      />
+    )
   return <div class="boot" data-tauri-drag-region />
 }
 

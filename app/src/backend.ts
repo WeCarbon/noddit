@@ -41,6 +41,17 @@ export const loadBench = async (): Promise<Bench> => JSON.parse(await ok(['bench
 
 export const loadNode = async (root: string, id: number): Promise<Node> => JSON.parse(await ok(['bench', '--json', '--node', String(id), '--dir', root]))
 
+/** The project root a `file` path (as `decs bench --json` writes it) sits
+ *  under — everything before `/decisions/`. Windows paths from the CLI use
+ *  `\`; tried second since a path can't contain both. */
+export function rootFromFile(file: string): string | null {
+  for (const marker of ['/decisions/', '\\decisions\\']) {
+    const i = file.indexOf(marker)
+    if (i !== -1) return file.slice(0, i)
+  }
+  return null
+}
+
 export const listProjects = async (): Promise<Project[]> =>
   (JSON.parse(await ok(['projects', '--json'])) as { name: string; display_name?: string; root: string; letter?: string }[]).map((p) => ({ project: p.name, name: p.display_name ?? p.name, root: p.root, letter: p.letter ?? '' }))
 
@@ -300,9 +311,11 @@ function demoSetup(agents: Agent[], dryRun: boolean): SetupResult {
   return { dir: '/Users/alice/Code/api', dryRun, agents: result }
 }
 
-export async function startMonitor(onChange: () => void): Promise<void> {
+/** `onLine` gets every `decs monitor` line as it arrives (N258: the caller
+ *  decides whether it can patch just the named nodes or needs a full reload). */
+export async function startMonitor(onLine: (line: string) => void): Promise<void> {
   if (!inDesktop) return
-  await on<string>('decs-event', () => onChange())
+  await on<string>('decs-event', onLine)
   await invoke('monitor_start').catch(() => {})
 }
 

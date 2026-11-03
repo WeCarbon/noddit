@@ -233,6 +233,22 @@ export interface Bench {
   back_from_deferral?: { key: string; ref: string; title: string; text: string }[]
 }
 
+/**
+ * One line of `decs monitor --updates --json`. `event: 'updated'` is the only
+ * kind the app reads structurally (N258) — `changed` names exactly which
+ * nodes to reload, `key` matching `Bench.nodes`; everything else (brief,
+ * unclaimed, checkin, stale, warn, …) is handled as a reason to do a full
+ * `loadBench()` instead.
+ */
+export interface MonitorUpdated {
+  event: 'updated'
+  refs: string[]
+  changed: { key: string; ref: string; id: number; project: string; file: string }[]
+  gone: string[]
+  owner_facing: string[]
+  at: string
+}
+
 export interface ShellEnv {
   path: string
   node: string | null
