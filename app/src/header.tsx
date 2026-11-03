@@ -1,4 +1,4 @@
-import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, Flag, GitFork, Link2, PenLine, Radio, Star, Timer, User } from 'lucide-preact'
+import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, GitFork, Link2, PenLine, Radio, Star, Timer, User } from 'lucide-preact'
 import type { ComponentChildren } from 'preact'
 import { useRef } from 'preact/hooks'
 import { useDialogFocus } from './focus.ts'
@@ -139,11 +139,6 @@ export function NodeHeader({
         {n.checkin && n.checkin.asked > 0 && !n.terminal && (
           <Chip icon={<MessageCircleQuestion {...ICON} />} tone={n.checkin.unanswered ? 'c-red' : ''} title={fullTime(n.checkin.last_asked_at)}>
             {n.checkin.unanswered ? s('checkinUnanswered', { count: n.checkin.asked }) : s('checkinAsked', { count: n.checkin.asked })}
-          </Chip>
-        )}
-        {n.milestone && n.due && !n.terminal && (
-          <Chip icon={<Flag {...ICON} />} title={fullTime(n.due)} tone={Date.parse(n.due) - Date.now() < 86_400_000 ? 'c-red' : 'c-magenta'}>
-            {`${s('milestone')} · ${ago(n.due)}`}
           </Chip>
         )}
         {n.deferred_at && <Chip icon={<Timer {...ICON} />} tone={n.deferred_by_ai ? 'c-red' : undefined}>{n.deferred_by_ai ? s('deferredByAi') : s('deferred')}</Chip>}

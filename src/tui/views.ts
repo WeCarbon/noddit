@@ -430,19 +430,19 @@ export function importantTone(d: Item): 'waiting' | 'you' | 'ai' {
 
 const IMPORTANT_COLOR: Record<ReturnType<typeof importantTone>, string> = { waiting: 'magenta', you: 'yellow', ai: 'blue' }
 
-/** ★ important, ⚑ a milestone — the owner's marks, drawn after the ref. */
+/** ★ important — the owner's mark, drawn after the ref. N250 stopped drawing ⚑ for a milestone
+ *  here: the data (d.milestone / d.due) is still read and still sorts a node first, just no
+ *  longer shown as a flag or a countdown (see milestoneCountdown below). */
 export function flagMark(d: Item, now = Date.now()): Segment | null {
-  if (d.milestone && d.due && !isTerminal(d.state)) {
-    const left = untilDue(d, now)
-    return { text: '⚑ ', color: left < 86_400_000 ? 'red' : 'magenta', bold: left < 86_400_000 }
-  }
   if (d.urgency === 'high' && !isTerminal(d.state)) return { text: '★ ', color: IMPORTANT_COLOR[importantTone(d)], bold: true }
   return null
 }
 
-/** 「Due tomorrow」 / 「Overdue 2 hours」 on any live node with a due date; a milestone has its own countdown. */
+/** 「Due tomorrow」 / 「Overdue 2 hours」 on any live node with a due date, milestone-flagged or
+ *  not — N250 retired the milestone's own countdown (see milestoneCountdown below), so this is
+ *  now the only due-date display, for every node alike. */
 export function dueMark(d: Item, now = Date.now()): Segment | null {
-  if (!d.due || d.milestone || isTerminal(d.state)) return null
+  if (!d.due || isTerminal(d.state)) return null
   const left = untilDue(d, now)
   if (!Number.isFinite(left)) return null
   if (left < 0) return { text: t('bench.badge.overdue', { span: agoSpan(-left / 60_000) }), color: 'red', bold: true }
@@ -451,14 +451,10 @@ export function dueMark(d: Item, now = Date.now()): Segment | null {
   return { text: t('bench.badge.due', { when: day ? dayFromToday(day, new Date(now)) : '' }), color: soon ? 'red' : 'yellow', bold: soon }
 }
 
-/** "in 3 days" / "overdue 2 hours" for a live milestone; null otherwise. */
-export function milestoneCountdown(d: Item, now = Date.now()): Segment | null {
-  if (!d.milestone || !d.due || isTerminal(d.state)) return null
-  const left = untilDue(d, now)
-  if (!Number.isFinite(left)) return null
-  const minutes = Math.abs(left) / 60_000
-  if (left < 0) return { text: t('bench.badge.milestoneOverdue', { span: agoSpan(minutes) }), color: 'red', bold: true }
-  return { text: t('bench.badge.milestoneIn', { span: agoSpan(minutes) }), color: left < 86_400_000 ? 'red' : 'magenta', bold: left < 86_400_000 }
+/** N250: no longer shown — kept as a no-op so callers don't need to change (dueMark above now
+ *  covers a milestone's due date the same as any other node's). */
+export function milestoneCountdown(_d: Item, _now = Date.now()): Segment | null {
+  return null
 }
 
 /** 待决: per project, AI-stuck nodes first, then early-answerable ones.

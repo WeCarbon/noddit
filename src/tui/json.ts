@@ -85,8 +85,9 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
     progress: progressOf(d) ?? null,
     badge: plain(forms[0] ?? []),
     badge_short: plain(forms.at(-1) ?? []),
-    // The owner's marks: 'important' (★) or 'milestone' (⚑, counted down to `due`).
-    flag: isTerminal(d.state) ? null : d.milestone && d.due ? 'milestone' : d.urgency === 'high' ? 'important' : null,
+    // The owner's mark: 'important' (★). N250 dropped the 'milestone' (⚑) mark from here —
+    // existing milestone data (d.milestone / d.due) is still read, just not shown as a flag.
+    flag: isTerminal(d.state) ? null : d.urgency === 'high' ? 'important' : null,
     // 等待: the check-back day, and whether it has come.
     waiting_until: d.state === 'waiting' ? (d.waitingUntil ?? null) : null,
     wait_due: isWaitDue(d, now),

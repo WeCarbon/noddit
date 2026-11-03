@@ -10,7 +10,7 @@ import { ViewEditor, ViewIcon } from './views.tsx'
 import {
   ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
-  Bot, Flag, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
+  Bot, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -571,20 +571,11 @@ export function Bench(props: {
     optimistic(
       both(
         patchNode(node.key, (n) => ({ ...n, urgency: on ? 'high' : 'normal', important: on })),
-        patchRows(node.key, (r) => ({ ...r, flag: r.flag === 'milestone' ? r.flag : on ? 'important' : null })),
+        patchRows(node.key, (r) => ({ ...r, flag: on ? 'important' : null })),
       ),
       () => api.flag(rootOf(node), node.id, on ? 'important' : 'normal'),
       on ? s('flaggedImportant') : s('unflaggedImportant'),
     )
-  }
-  const [milestoneFor, setMilestoneFor] = useState<Node | null>(null)
-  const clearMilestone = () => {
-    if (!node) return
-    // `normal` clears both marks; an important node stays important.
-    act(async () => {
-      await api.flag(rootOf(node), node.id, 'normal')
-      if (node.urgency === 'high') await api.flag(rootOf(node), node.id, 'important')
-    }, s('milestoneRemoved'))
   }
   const reassign = () => {
     if (!node) return
@@ -653,14 +644,12 @@ export function Bench(props: {
   const isMac = /Mac/.test(navigator.platform)
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
-  latest.current = { startAnswer, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign, setDeferFor, delayEvery } as never
+  latest.current = { startAnswer, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, reassign, setDeferFor, delayEvery } as never
 
   const nodeMenu = (n: Node | undefined, r: Row): MenuItem[] => {
     const L = () => latest.current as unknown as {
       startAnswer: (k: string) => void
       toggleImportant: () => void
-      setMilestoneFor: (n: Node) => void
-      clearMilestone: () => void
       reassign: () => void
       setDeferFor: (n: Node) => void
       delayEvery: (n: Node) => void
@@ -695,8 +684,6 @@ export function Bench(props: {
     if (n && !n.terminal) {
       items.push({ kind: 'separator' })
       items.push({ label: s('ctxImportant'), icon: I(Star), shortcut: '!', checked: n.urgency === 'high', run: () => L().toggleImportant() })
-      items.push({ label: n.milestone ? s('ctxChangeMilestone') : s('ctxMilestone'), icon: I(Flag), run: () => L().setMilestoneFor(n) })
-      if (n.milestone) items.push({ label: s('ctxRemoveMilestone'), run: () => L().clearMilestone() })
     }
     if (n && !n.terminal) {
       items.push({ kind: 'separator' })
@@ -916,7 +903,7 @@ export function Bench(props: {
         if (current && !deselected) return deselect()
         return
       }
-      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || milestoneFor || editing || editConflict || editingTitle || titleConflict || viewEditor || isTyping(e)) return
+      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || editing || editConflict || editingTitle || titleConflict || viewEditor || isTyping(e)) return
       if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault()
         return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
@@ -1333,25 +1320,6 @@ export function Bench(props: {
           }}
         />
       )}
-      {milestoneFor && (
-        <MilestoneDialog
-          node={milestoneFor}
-          busy={busy}
-          onClose={() => setMilestoneFor(null)}
-          onSave={(date) => {
-            const n = milestoneFor
-            setMilestoneFor(null)
-            optimistic(
-              both(
-                patchNode(n.key, (x) => ({ ...x, milestone: true, due: `${date}T23:59:59` })),
-                patchRows(n.key, (r) => ({ ...r, flag: 'milestone', due: `${date}T23:59:59` })),
-              ),
-              () => api.flag(rootOf(n), n.id, 'milestone', date),
-              s('milestoneSet'),
-            )
-          }}
-        />
-      )}
       {letterFor && (
         <LetterPicker
           project={letterFor}
@@ -1465,11 +1433,6 @@ function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boo
       <Glyph g={r.glyph} />
       <span class="ref">{r.ref}</span>
       {r.flag === 'important' && <span class="flag-mark important" title={s('important')}>★</span>}
-      {r.flag === 'milestone' && (
-        <span class={`flag-mark milestone ${r.due && Date.parse(r.due) - Date.now() < 86_400_000 ? 'soon' : ''}`} title={s('milestone')}>
-          ⚑
-        </span>
-      )}
       <span class="title" title={r.touch?.text && r.touch.text.trim() !== r.title ? r.touch.text : undefined}>
         {r.title}
         {r.touch?.text && r.touch.text.trim() !== r.title && <span class="excerpt-inline"> {r.touch.text.replace(/\s+/g, ' ')}</span>}
@@ -1998,50 +1961,6 @@ function Help({ onClose }: { onClose: () => void }) {
 export type { View }
 
 /** A milestone's date; today and later. Saved as the end of that day. */
-function MilestoneDialog(p: { node: Node; busy: boolean; onClose: () => void; onSave: (date: string) => void }) {
-  const day = (t: number) => {
-    const d = new Date(t)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
-  const [date, setDate] = useState(p.node.due ? day(Date.parse(p.node.due)) : day(Date.now() + 7 * 86_400_000))
-  const field = useRef<HTMLInputElement>(null)
-  useDialogFocus(field)
-  const save = () => date && p.onSave(date)
-  return (
-    <div class="overlay" onClick={p.onClose}>
-      <div class="confirm milestone-dialog" role="dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>
-          <Flag size={16} strokeWidth={1.75} /> {s('milestoneTitle', { ref: p.node.ref })}
-        </h3>
-        <p class="d">{p.node.title}</p>
-        <label class="milestone-date">
-          <span>{s('milestoneDate')}</span>
-          <input
-            ref={field}
-            type="date"
-            value={date}
-            min={day(Date.now())}
-            onInput={(e) => setDate((e.target as HTMLInputElement).value)}
-            onKeyDown={(e) => {
-              e.stopPropagation()
-              if (e.key === 'Enter') save()
-              if (e.key === 'Escape') p.onClose()
-            }}
-          />
-        </label>
-        <div class="sheet-footer">
-          <button class="ghost" onClick={p.onClose}>
-            {s('cancel')}
-          </button>
-          <button class="primary" disabled={!date || p.busy} onClick={save}>
-            {s('milestoneSave')}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /** The body's rows after its description: from the first heading (a note, a section) on. */
 function afterDescription(rows: Node['body_rows']): Node['body_rows'] {
   const at = rows.findIndex((r) => r.style)

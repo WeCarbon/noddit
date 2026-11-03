@@ -1,4 +1,4 @@
-import { Bot, Flag, FolderGit2, Play, Star, User, WandSparkles } from 'lucide-preact'
+import { Bot, FolderGit2, Play, Star, User, WandSparkles } from 'lucide-preact'
 import { useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { DateField } from './datefield.tsx'
@@ -25,16 +25,13 @@ export function NewNode(p: {
   const [who, setWho] = useState<api.Who>('me')
   const [nested, setNested] = useState(false)
   const [important, setImportant] = useState(false)
-  const [milestoneOn, setMilestoneOn] = useState(false)
-  const [milestoneText, setMilestoneText] = useState('')
-  const [milestone, setMilestone] = useState<string | null>(null)
   const [start, setStart] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const field = useRef<HTMLInputElement>(null)
   useDialogFocus(field)
   const under = p.under && project && p.under.project === project.project ? p.under : null
-  const ready = Boolean(project && title.trim() && (!milestoneOn || milestone))
+  const ready = Boolean(project && title.trim())
 
   const save = async () => {
     if (!project) return setError(s('newNeedsProject'))
@@ -47,7 +44,6 @@ export function NewNode(p: {
         who,
         parentRef: nested && under ? under.ref : undefined,
         important,
-        milestone: milestoneOn && milestone ? milestone : undefined,
         start,
       })
       p.onDone(made, project)
@@ -124,10 +120,6 @@ export function NewNode(p: {
             <Star {...ICON} />
             {s('quickImportant')}
           </button>
-          <button class={`qchip ${milestoneOn ? 'on' : ''}`} onClick={() => setMilestoneOn(!milestoneOn)} aria-pressed={milestoneOn}>
-            <Flag {...ICON} />
-            {s('milestone')}
-          </button>
           {who !== 'brief' && (
             <button class={`qchip ${start ? 'on' : ''}`} onClick={() => setStart(!start)} aria-pressed={start}>
               <Play {...ICON} />
@@ -135,9 +127,6 @@ export function NewNode(p: {
             </button>
           )}
         </div>
-        {milestoneOn && (
-          <DateField value={milestoneText} onText={setMilestoneText} onChange={setMilestone} onEnter={() => void save()} onEscape={p.onClose} placeholder={s('milestonePlaceholder')} />
-        )}
         </div>
 
         {error && <p class="s-error quick-error">{error}</p>}

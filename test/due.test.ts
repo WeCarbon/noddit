@@ -16,7 +16,7 @@ function project(t: { after: (fn: () => void) => void }): string {
 const get = (root: string, id: number) => JSON.parse(decs(root, ['get', String(id), '--json'])) as Record<string, any>
 const node = (due: string | undefined, extra: Partial<Item> = {}) => ({ id: 1, state: 'not_started', due, ...extra }) as Item
 
-test('every live node with a due date says when; past it, overdue in red; a milestone keeps its own countdown', () => {
+test('every live node with a due date says when; past it, overdue in red; a milestone\'s due date shows the same way (N250 retired its own countdown)', () => {
   const now = new Date(2026, 10, 3, 10, 0).getTime()
   const tomorrow = new Date(2026, 10, 4, 23, 59, 59).toISOString()
   const later = new Date(2026, 10, 10, 23, 59, 59).toISOString()
@@ -27,7 +27,7 @@ test('every live node with a due date says when; past it, overdue in red; a mile
   assert.match(over.text, /^Overdue 2 hours$/)
   assert.equal(over.color, 'red')
   assert.equal(dueMark(node(past, { state: 'completed' }), now), null, 'finished: nothing to chase')
-  assert.equal(dueMark(node(past, { milestone: true }), now), null)
+  assert.match(dueMark(node(past, { milestone: true }), now)!.text, /^Overdue 2 hours$/, 'a milestone is just another due date now')
   assert.equal(dueMark(node(undefined), now), null)
 })
 

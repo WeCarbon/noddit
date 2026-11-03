@@ -68,7 +68,7 @@ test('flagged nodes sort first: important or a milestone before normal, the near
   assert.deepEqual(order, ['milestone soon', 'milestone later', 'important', 'plain'])
 })
 
-test('bench: ★ and ⚑ after the ref, a countdown for a milestone, flagged siblings first', (t) => {
+test('bench: ★ after the ref, flagged siblings first — a milestone still sorts first but N250 dropped its ⚑', (t) => {
   const root = scratch()
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const store = new Store([initLayout(root)])
@@ -80,12 +80,12 @@ test('bench: ★ and ⚑ after the ref, a countdown for a milestone, flagged sib
   store.flag(store.create({ title: 'milestone child', author: A, task: true, parent: `${P.id}` }), { milestone: true, due: '2026-11-04T12:00:00+08:00' })
   const items = store.all()
   const rows = rowsFor('all', items)
-  assert.deepEqual(rows.filter((r) => r.node).map((r) => r.node!.title).slice(1), ['important child', 'milestone child', 'plain child'])
+  assert.deepEqual(rows.filter((r) => r.node).map((r) => r.node!.title).slice(1), ['important child', 'milestone child', 'plain child'], 'a milestone still sorts ahead of a plain node')
   const line = (title: string, at = now) => nodeRowSegments(rows.find((r) => r.node?.title === title)!, items, 110, at).map((s) => s.text).join('')
   assert.match(line('important child'), /X3 ★ important child/)
-  assert.match(line('milestone child'), /X4 ⚑ milestone child .*⚑ in 3 days/)
+  assert.doesNotMatch(line('milestone child'), /[★⚑]/, 'the milestone data is read (it still sorted first above), just not shown as a flag')
   assert.doesNotMatch(line('plain child'), /[★⚑]/)
-  assert.match(line('milestone child', Date.parse('2026-11-05T12:00:00+08:00')), /⚑ overdue a day/)
+  assert.doesNotMatch(line('milestone child', Date.parse('2026-11-05T12:00:00+08:00')), /⚑/, 'even overdue, no countdown shows')
 })
 
 test('milestoneDue reads a date, a time or a span', () => {
