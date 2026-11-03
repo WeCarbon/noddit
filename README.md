@@ -110,15 +110,16 @@ get history, diffs, review and grep for free.
 ## What you get
 
 **For the human — the bench.** `nod bench` is a live terminal UI over every
-project you've registered. Five tabs:
+project you've registered. Six tabs:
 
 | tab | shows |
 |---|---|
 | **Available** | what can move now: running, waiting on someone, ready to start, needs you, answered |
 | **Active** | what's happening: running and needs-decision only |
-| **Decide** | just the questions for you, per project, the ones blocking an agent first |
-| **All** | everything, finished nodes folded into a `✓ Completed N` row |
+| **Human work** | what waits on you: decisions to make, and your own to-dos — whatever blocks an AI first |
 | **Waiting** | held up outside — a colleague, a customer, a service — longest wait first |
+| **Live** | every change, by anyone, newest first — finished nodes too |
+| **All** | everything, finished nodes folded into a `✓ Completed N` row |
 
 The left pane is the node tree with progress bars and staleness (grey past 30
 minutes without an update, red past an hour). The right pane is the selected
@@ -140,10 +141,36 @@ nod ask W15 -o 1="Short & playful" 2="Plain & direct" --default 2 <<'EOF'
 EOF
 ```
 
+**Human work, alongside AI's.** `nod add <title> --for me` files a to-do
+that's yours, not an AI's — no agent starts it, checks in on it, or takes it
+as a brief. `nod assign <id> me|ai` moves a node between the two later. The
+bench's **Human work** tab lists both: decisions waiting on you and your own
+to-dos, whatever blocks an AI first.
+
+**Milestones.** `nod add <title> --milestone` (or `nod assign <id>
+milestone`) marks a node as a goal with sub-goals and work under it — a
+phase, not a task. It's never started or finished on its own; the bench
+shows it as `⚑` with a done/total count for its children, and it doesn't
+need a `--due`, though it can take one.
+
+**Due dates, estimates, a repeat cadence.** `--due <date>` on `nod add` or
+`nod edit` puts a deadline on any node — overdue turns red, in the bench and
+the app. `--est 2h` records whose time it costs: yours on your own to-do,
+the AI's otherwise; a parent adds up both across its subtree. `--every 3d`
+gives a node its own cadence, so `nod defer --every` (or `D` on the bench)
+puts it off to today plus that span without typing the date each time.
+
+**A reminder is an AI's job, not yours.** `nod add --remind "fri 2pm"` (or
+`nod edit --remind`) schedules a plain AI task for that moment — it never
+mixes with options, a brief, or `--for`. At the time, `nod monitor` tells
+the node's own agent once, with its next step (tell the owner, then `nod
+done`); the desktop app reminds you too.
+
 **Notifications without polling.** `nod monitor` prints one line per thing an
 agent must act on — an owner answer, a reply, a new item from an external
 source, an answer nobody has picked up for five minutes — and remembers where
-each session left off. The Claude Code plugin starts it for the whole session
+each session left off. It wakes on a filesystem event, not a timer, so nothing
+waits for the next poll. The Claude Code plugin starts it for the whole session
 (`nod monitor --here`, watching the current project); it goes offline by itself
 after two quiet hours with a `DECS-IDLE` line. Sub-agents, or a session after
 `DECS-IDLE`, arm it with Claude Code's Monitor tool:
@@ -152,13 +179,20 @@ after two quiet hours with a `DECS-IDLE` line. Sub-agents, or a session after
 Monitor({ command: "nod monitor --mine", description: "nod", timeout_ms: 1800000 })
 ```
 
+A reply or note longer than a line or two needs `--summary`; that one line —
+not the full text — is what a notice, a reply card's title and the bench show.
+
 **Dependencies and order.** `--after W13` holds a node back until W13 is done.
 You can still answer a question early; the node then waits as **to do** and
 starts when its turn comes.
 
-**External sources.** Point a tiny adapter at GitHub issues, a support inbox or
-a feedback form. It syncs *references only* (id + title, optional url/state/from),
-never bodies, never credentials. The bench header tells you, per source,
+**External sources, synced on their own schedule.** Point a tiny adapter at
+GitHub issues, Azure DevOps, a support inbox or a feedback form. It syncs
+*references only* (id + title, optional url/state/from), never bodies, never
+credentials. Register one with `--sync-cmd "..." --every 10m` and your own
+running `nod monitor` runs the sync itself on that interval — stored only on
+your machine (`~/.decs/source-sync.json`), never in the repo, so cloning it
+never runs anyone's command. The bench header tells you, per source,
 whether it's cleared and who holds what:
 
 ```
@@ -174,6 +208,13 @@ the chat can't approve on your behalf.
 **Defer.** Press `d` on anything you want out of sight. It leaves the working
 views without changing state, and the agent on it is told it was deferred and stops
 until you lift it.
+
+**Act on several at once.** `Space` marks rows on the bench; with any marked,
+the same single-node keys — defer, start, reassign, important, archive — act
+on all of them. The desktop app does the same with `⌘`-click, `⇧`-click or a
+dragged box, and mirrors in-place title/description edits, image zoom and
+pan, and inline Markdown/HTML previews — see [Development](#development)
+below for where the two surfaces are tracked against each other.
 
 ## Install
 
@@ -286,9 +327,12 @@ teammate whatever language their CLI speaks. When you write a file by hand,
 | `nod start / done / close <id>` | To do → In progress → Done / Closed (`--reason obsolete\|superseded\|merged-into:W15`) |
 | `nod ask <id> -o 1=… 2=…` | a running node needs the owner |
 | `nod hold <id> --on "Carol: icon set" --until fri` | waiting on someone outside (an active delay, purple); not counted as stuck — same as `nod defer --on` |
+| `nod add <title> --for me` · `nod assign <id> me\|ai` | a to-do that's yours, not an AI's — listed in **Human work** |
+| `nod add <title> --milestone [--due …]` | a goal with sub-goals under it, never started or finished on its own |
+| `nod edit <id> --due <date> --est 2h --every 3d --remind "fri 2pm"` | due date · whose time it costs · a repeat cadence · an AI reminder |
 | `nod progress <pct> "msg"` · `… \| nod progress --parse pytest` | report progress (or let a pipe report it) |
 | `nod steps <id> "a" "b" "c"` · `nod step <id> 2` | multi-step work, percent computed for you |
-| `nod note <id> "…"` | append a record (agent by default; `--human` for the owner) |
+| `nod note <id> "…" [--summary "…"]` | append a record (agent by default; `--human` for the owner); a summary is required past a line or two |
 | `nod push <id> 2 [--note …]` | record an answer |
 | `nod monitor [--mine] [--here] [--idle-exit 2h]` | the agent's notification stream |
 | `nod read <id>` · `nod queue` | collect answers / see what's uncollected |
@@ -316,8 +360,12 @@ Ids are `305`, `W305` (project letter), `web:305` (project name), or legacy
 | `1`–`9` · `Enter` | answer · take the default |
 | `w` | jump to the next node an agent is stuck on |
 | `g` or `:` | go to an id |
+| `Ctrl-L` | go to the cross-project main agent, or start one if it's offline |
 | `N` | reply without deciding (the node goes back to the agent) |
 | `d` | defer / undefer |
+| `@` | flip who does it: your to-do ↔ an AI's |
+| `m` | flip whether this node is a milestone |
+| `Space` | mark / unmark a row; with any marked, `d D s @ ! A` act on all of them |
 | `X` · `A` | close with a reason · mark looked-at and archive |
 | `M` | move mode: ↑/↓ moves the node among its siblings (or its group in a list), ⏎ done; the app takes a drag |
 | `i` · `o` | pick and view images · open an attachment |
@@ -360,6 +408,12 @@ reversible: true
 Section headings are fixed tokens, not translated: see [Language](#language)
 above for why, and how each person picks their own. Replies and notes are
 appended as their own sections, each recording who wrote it and when.
+
+A node can also carry a few optional fields, set with the matching `nod add`
+/ `nod edit` flags rather than by hand: `due`, `est`, `every`, `remind_at`,
+`assignee` (`human`, for a to-do that's yours) and `milestone` (`true` for a
+goal with sub-goals under it). The bench and the app read all of them
+straight from the front matter.
 
 Statuses: `not_started` To do · `in_progress` In progress · `waiting`
 Waiting · `needs_decision` Needs decision · `decided` Answered, for AI ·
