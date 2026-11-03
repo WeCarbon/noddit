@@ -25,6 +25,7 @@ import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
 import { useLiveMotion } from './motion.ts'
 import { NoticeStack, noticeWhat, useNoticeQueue, type Notice } from './notices.tsx'
+import { plainReply } from './plain-reply.ts'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, heldAt, keepHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, type Held, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
@@ -487,15 +488,28 @@ export function Bench(props: {
     else void api.noticeBanner(n)
   }
   const nodeByRef = (ref: string) => Object.values(benchNow.current.nodes).find((x) => x.ref === ref)
+  /** "An AI replied", carrying the reply itself: read fresh, since the bench on hand predates it. */
+  const notifyReplied = async (ref: string) => {
+    const n = nodeByRef(ref)
+    const root = n && benchNow.current.projects.find((p) => p.project === n.project)?.root
+    let text: string | undefined
+    if (n && root) {
+      try {
+        const fresh = await api.loadNode(root, n.id)
+        const last = [...fresh.notes].reverse().find((x) => x.role === 'agent')
+        text = last ? plainReply(last.text) || undefined : undefined
+      } catch {
+        /* the notice still goes, without the text */
+      }
+    }
+    void notify({ kind: 'replied', key: n?.key ?? '', ref, title: n?.title ?? '', text })
+  }
   useEffect(() => {
     void api.on<Notice>('notice', (n) => void notify(n))
     void api.on<string>('decs-event', (line) => {
       try {
         const ev = JSON.parse(line) as { event?: string; owner_facing?: string[]; ref?: string; title?: string }
-        for (const ref of ev.owner_facing ?? []) {
-          const n = nodeByRef(ref)
-          void notify({ kind: 'replied', key: n?.key ?? '', ref, title: n?.title ?? '' })
-        }
+        for (const ref of ev.owner_facing ?? []) void notifyReplied(ref)
         if (ev.event === 'unclaimed' && ev.ref) void notify({ kind: 'uncollected', key: nodeByRef(ev.ref)?.key ?? '', ref: ev.ref, title: ev.title ?? '' })
       } catch {
         /* not JSON: an older CLI */

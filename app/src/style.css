@@ -2990,6 +2990,11 @@ figcaption {
 .notice .n-what {
   font-size: 12px;
   color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .notice .n-close {
