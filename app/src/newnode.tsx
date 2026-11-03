@@ -1,5 +1,6 @@
 import { Bot, FolderGit2, Play, Star, User, WandSparkles } from 'lucide-preact'
-import { cols, limitInput } from './cols.ts'
+import { cols } from './cols.ts'
+import { limitInput } from './limit-input.ts'
 import { useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { DateField } from './datefield.tsx'

@@ -1,5 +1,5 @@
 import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, GitFork, Link2, PenLine, Radio, Star, Timer, User } from 'lucide-preact'
-import { limitInput } from './cols.ts'
+import { limitInput } from './limit-input.ts'
 import type { ComponentChildren } from 'preact'
 import { useRef } from 'preact/hooks'
 import { useDialogFocus } from './focus.ts'
