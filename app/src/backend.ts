@@ -1,4 +1,5 @@
 import type { Bench, Node, Project, RunOutput, ShellEnv } from './types.ts'
+import type { Variant } from './sounds.ts'
 
 /**
  * Everything the window knows comes from the `decs` CLI: reads are
@@ -345,10 +346,24 @@ export async function on<T>(event: string, handler: (payload: T) => void): Promi
 
 export type NotifyStyle = 'system' | 'banner' | 'off'
 
+/** The "update" (an AI left something new) and "decide" (needs the owner's decision) chimes:
+ *  each on its own, one shared volume, and which of the two synthesized variants to play. */
+export interface SoundSettings {
+  updateOn: boolean
+  decideOn: boolean
+  /** 0..1. */
+  volume: number
+  updateVariant: Variant
+  decideVariant: Variant
+}
+
+export const DEFAULT_SOUND_SETTINGS: SoundSettings = { updateOn: true, decideOn: true, volume: 0.6, updateVariant: 'A', decideVariant: 'A' }
+
 export interface AppSettings {
   notify: NotifyStyle
   hotkey: string
   keepInTray: boolean
+  sounds: SoundSettings
 }
 
 export interface SettingsView {
@@ -359,7 +374,7 @@ export interface SettingsView {
 }
 
 export async function settingsGet(): Promise<SettingsView> {
-  if (!inDesktop) return { settings: { notify: 'system', hotkey: 'Ctrl+Alt+Space', keepInTray: true }, defaultHotkey: 'Ctrl+Alt+Space', ctrlSpaceTaken: true, hotkeyError: null }
+  if (!inDesktop) return { settings: { notify: 'system', hotkey: 'Ctrl+Alt+Space', keepInTray: true, sounds: DEFAULT_SOUND_SETTINGS }, defaultHotkey: 'Ctrl+Alt+Space', ctrlSpaceTaken: true, hotkeyError: null }
   return invoke<SettingsView>('settings_get')
 }
 

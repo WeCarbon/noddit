@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { NoticeStack, useNoticeQueue, type Notice } from './notices.tsx'
+import { playSound } from './notice-sound.ts'
 import { plainReply } from './plain-reply.ts'
 import { s } from './strings.ts'
 
@@ -53,6 +54,12 @@ export function Banner() {
       setDone(false)
       armAutoHide(payload.focus)
       if (payload.focus) setTimeout(() => void api.summoned('banner'), 0)
+    })
+    // A new decision while the main window isn't in front: the app side shows this window
+    // itself (above) and separately asks it for the "decide" chime, since that's the one
+    // decision path with no `Notice` of its own to carry a sound-kind-mapped `kind`.
+    void api.on<{ kind: 'update' | 'decide' }>('play-sound', (p) => {
+      void api.settingsGet().then((view) => playSound(p.kind, view.settings.sounds))
     })
   }, [])
 

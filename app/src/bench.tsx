@@ -27,6 +27,7 @@ import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
 import { useLiveMotion } from './motion.ts'
 import { NoticeStack, noticeWhat, useNoticeQueue, type Notice } from './notices.tsx'
+import { playNoticeSound, playSound } from './notice-sound.ts'
 import { CycleBanner } from './cycles.tsx'
 import { SourcesPanel } from './sources.tsx'
 import { noticeTitle, plainReply } from './plain-reply.ts'
@@ -669,8 +670,10 @@ export function Bench(props: {
   const benchNow = useRef(bench)
   benchNow.current = bench
   const notify = async (n: Notice, osTooFromHere = false) => {
-    const style = api.inDesktop ? (await api.settingsGet()).settings.notify : 'banner'
+    const view = await api.settingsGet()
+    const style = api.inDesktop ? view.settings.notify : 'banner'
     if (style === 'off') return
+    playNoticeSound(n.kind, view.settings.sounds)
     if (style === 'system') {
       if (osTooFromHere) void api.noticeSystem(`${n.ref} · ${noticeWhat(n)}`, n.title)
       return
@@ -702,6 +705,11 @@ export function Bench(props: {
   }
   useEffect(() => {
     void api.on<Notice>('notice', (n) => void notify(n))
+    // A decision raised system-style (the OS notification only — Rust never emits a `notice`
+    // for it) still gets its sound, as long as this window is alive to play it.
+    void api.on<{ kind: 'update' | 'decide' }>('play-sound', (p) => {
+      void api.settingsGet().then((view) => playSound(p.kind, view.settings.sounds))
+    })
     void api.on<string>('decs-event', (line) => {
       try {
         const ev = JSON.parse(line) as { event?: string; owner_facing?: string[]; ref?: string; title?: string }

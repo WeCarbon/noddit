@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'preact/hooks'
 import { Info } from 'lucide-preact'
 import * as api from './backend.ts'
+import { previewSound } from './notice-sound.ts'
+import type { Variant } from './sounds.ts'
 import { s } from './strings.ts'
 
 const isMac = /Mac/.test(navigator.platform)
@@ -172,6 +174,59 @@ export function Settings({ onClose, onShared }: { onClose: () => void; onShared?
               {s('keepInTray')}
             </span>
           </label>
+        </section>
+
+        <section>
+          <div class="s-label">{s('soundsTitle')}</div>
+          <div class="s-sound">
+            <label class="s-toggle">
+              <input type="checkbox" checked={st.sounds.updateOn} onChange={() => void save({ ...st, sounds: { ...st.sounds, updateOn: !st.sounds.updateOn } })} />
+              <span class="s-switch" />
+              <span class="s-choice-label" title={s('soundUpdateHint')}>
+                {s('soundUpdateLabel')}
+              </span>
+            </label>
+            <div class="s-row">
+              {(['A', 'B'] as const satisfies readonly Variant[]).map((v) => (
+                <button key={v} class={`s-variant ${st.sounds.updateVariant === v ? 'on' : ''}`} title={s('soundVariant', { variant: v })} onClick={() => void save({ ...st, sounds: { ...st.sounds, updateVariant: v } })}>
+                  {v}
+                </button>
+              ))}
+              <button class="quiet" onClick={() => previewSound('update', st.sounds.updateVariant, st.sounds.volume)}>
+                {s('soundPreview')}
+              </button>
+            </div>
+          </div>
+          <div class="s-sound">
+            <label class="s-toggle">
+              <input type="checkbox" checked={st.sounds.decideOn} onChange={() => void save({ ...st, sounds: { ...st.sounds, decideOn: !st.sounds.decideOn } })} />
+              <span class="s-switch" />
+              <span class="s-choice-label" title={s('soundDecideHint')}>
+                {s('soundDecideLabel')}
+              </span>
+            </label>
+            <div class="s-row">
+              {(['A', 'B'] as const satisfies readonly Variant[]).map((v) => (
+                <button key={v} class={`s-variant ${st.sounds.decideVariant === v ? 'on' : ''}`} title={s('soundVariant', { variant: v })} onClick={() => void save({ ...st, sounds: { ...st.sounds, decideVariant: v } })}>
+                  {v}
+                </button>
+              ))}
+              <button class="quiet" onClick={() => previewSound('decide', st.sounds.decideVariant, st.sounds.volume)}>
+                {s('soundPreview')}
+              </button>
+            </div>
+          </div>
+          <div class="s-row s-volume">
+            <span class="s-choice-label">{s('soundVolume')}</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={st.sounds.volume}
+              onInput={(e) => void save({ ...st, sounds: { ...st.sounds, volume: Number((e.currentTarget as HTMLInputElement).value) } })}
+            />
+          </div>
         </section>
       </div>
     </div>

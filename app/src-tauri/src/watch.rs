@@ -24,6 +24,26 @@ const TRAY_ITEMS: usize = 5;
 const BANNER_WIDTH: f64 = 400.0;
 const BANNER_HEIGHT: f64 = 236.0;
 
+/// The "update" (an AI left something new) and "decide" (needs the owner's decision) chimes:
+/// each on its own, one shared volume, and which of the two synthesized variants (`app/src/sounds.ts`)
+/// to play. The app side owns the sound itself (Web Audio) — this side only carries the setting
+/// and, for the two notice paths it raises with no webview event of their own, says which chime.
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SoundSettings {
+    pub update_on: bool,
+    pub decide_on: bool,
+    pub volume: f64,
+    pub update_variant: String,
+    pub decide_variant: String,
+}
+
+impl Default for SoundSettings {
+    fn default() -> Self {
+        SoundSettings { update_on: true, decide_on: true, volume: 0.6, update_variant: "A".into(), decide_variant: "A".into() }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
@@ -32,12 +52,23 @@ pub struct Settings {
     pub hotkey: String,
     /// Closing the window leaves the app running in the menu bar / tray.
     pub keep_in_tray: bool,
+    pub sounds: SoundSettings,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { notify: "system".into(), hotkey: default_hotkey(), keep_in_tray: true }
+        Settings { notify: "system".into(), hotkey: default_hotkey(), keep_in_tray: true, sounds: SoundSettings::default() }
     }
+}
+
+/// Tells a window to play its "update"/"decide" chime, for the two paths above that raise a
+/// notice with no webview event of their own to carry a sound along: a system-style decision
+/// (`announce`) and a decision shown by the banner window while main is not in front. Targets one
+/// window (never a plain `emit`) so the two chimes in different windows never both fire for the
+/// same decision; a window that doesn't exist (or isn't alive) silently drops it, same as any
+/// other `emit_to`.
+fn play_sound(app: &AppHandle, window: &str, kind: &str) {
+    let _ = app.emit_to(window, "play-sound", serde_json::json!({ "kind": kind }));
 }
 
 /// ⌃Space is the input-source switch for many people who type CJK; take ⌃⌥Space then.
@@ -466,13 +497,25 @@ fn announce(app: &AppHandle, w: &Waiting, how_many: usize) {
     }
     match style.as_str() {
         "banner" if main_in_front(app) => notice(app, serde_json::json!({ "kind": "decision", "key": w.key, "ref": w.reference, "title": w.title, "more": how_many.saturating_sub(1) })),
-        "banner" => show_banner(app, Some(w.clone()), false),
+        // Not in front: the banner window itself shows the decision (below) and is the one
+        // alive to chime for it — `notice()`/`notify()` (main window) never learns of this one.
+        "banner" => {
+            show_banner(app, Some(w.clone()), false);
+            // Background mode (`APP_BACKGROUND`) means no real notification of any kind —
+            // `show_banner` above already stays hidden there; the chime follows the same rule.
+            if !background() {
+                play_sound(app, "banner", "decide");
+            }
+        }
         "system" => {
             let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
             let more = if how_many > 1 { format!("  +{}", how_many - 1) } else { String::new() };
             let head = if phrases.needs_decision.is_empty() { w.reference.clone() } else { format!("{} · {}", w.reference, phrases.needs_decision) };
             if !background() {
                 let _ = app.notification().builder().title(format!("{head}{more}")).body(&w.title).show();
+                // The OS notification above is the visual; main's own webview is still the one
+                // alive to also chime, same as it would for a banner-style decision in front.
+                play_sound(app, "main", "decide");
             }
         }
         _ => {}

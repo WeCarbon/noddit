@@ -184,6 +184,35 @@
   inset-inline-start: 14px;
 }
 
+.s-sound {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.s-variant {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font: 500 12px var(--font);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.s-variant.on {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
+}
+
+.s-volume {
+  margin-top: 4px;
+}
+
+.s-volume input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
 /* ---------- the banner window ---------- */
 
 .banner-window,
