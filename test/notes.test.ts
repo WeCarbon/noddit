@@ -288,12 +288,13 @@ test("owner feedback on a node waiting for them hands the turn to the AI; decs a
   assert.ok(fed.queued)
   assert.ok(!fed.answer, 'feedback is not an answer')
 
-  // Collecting it means the AI is now working on the feedback.
+  // Collected, but 验收通过 is still unanswered: that is 待决, never 执行中.
   const working = store.deliver(fed)
-  assert.equal(working.state, 'in_progress')
+  assert.equal(working.state, 'needs_decision')
+  assert.throws(() => store.start(working, { force: true }), /waiting on the owner/)
 
   // An agent's own record does not change whose turn it is.
-  assert.equal(store.note(working, { text: 'fixed it', role: 'agent', author: 'lane' }).state, 'in_progress')
+  assert.equal(store.note(working, { text: 'fixed it', role: 'agent', author: 'lane' }).state, 'needs_decision')
 
   // Ready for another look: ask the same question again, same options and default.
   const again = store.ask(store.get(d.id)!, { options: [], text: 'fixed it, take another look', author: 'lane' })
@@ -312,7 +313,7 @@ test('a node the owner replied to before the turn rule existed reads as the AI\'
   writeFileSync(f, readFileSync(f, 'utf8').replace(/^status: decided$/m, 'status: needs_decision'))
   const read = store.get(d.id)!
   assert.equal(read.state, 'decided', 'on the queue = the AI owes the next move')
-  assert.equal(store.deliver(read).state, 'in_progress')
+  assert.equal(store.deliver(read).state, 'needs_decision', 'its option is still unanswered')
 })
 
 /** Polls until `ok`, failing the test after `ms` — load decides how long a spawned monitor takes, not the test. */

@@ -10,7 +10,7 @@ import { ViewEditor, ViewIcon } from './views.tsx'
 import {
   Archive, ArrowRight, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, FileText,
   FolderSearch, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
-  Bot, Flag, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, StickyNote, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
+  Bot, Flag, Hourglass, Pencil, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, StickyNote, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -36,7 +36,7 @@ import { applyOps, both, dropRows, heldAt, keepAllHeld, moveRow, nextStamp, patc
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { NONE, batchActions, boxHits, boxed, extend, listed, range, toggle, type Selection } from './selection.ts'
 import { s } from './strings.ts'
-import { OTHER_KEY, type Attachment, type Bench as BenchData, type Node, type PreviousRound, type Project, type Row, type View, type ViewName } from './types.ts'
+import { OTHER_KEY, type Attachment, type Bench as BenchData, type Node, type Note, type PreviousRound, type Project, type Row, type View, type ViewName } from './types.ts'
 
 export interface Prefs {
   view: ViewName
@@ -407,9 +407,21 @@ export function Bench(props: {
       dropRows(key, ['all', 'live']),
       patchRows(key, (r) => ({ ...r, state, glyph: r.glyph && { ...r.glyph, dim: true, color: undefined }, badge: [], badge_short: [] })),
     )
-  const answered = (key: string, choice?: string) =>
+  const answered = (key: string, choice?: string, text?: string) =>
     both(
-      patchNode(key, (n) => ({ ...n, status: 'decided', answer: { choice, by: 'owner', at: now() } })),
+      patchNode(key, (n) => {
+        const label = choice ? `${choice}${n.options.find((o) => o.key === choice)?.label ? ` —— ${n.options.find((o) => o.key === choice)!.label}` : ''}` : ''
+        const lines = [label, text?.trim() ?? ''].filter(Boolean).join('\n\n').split('\n')
+        // The node's own answer is this round's: one already there means this one changes it.
+        const revises = Boolean(n.answer)
+        return {
+          ...n,
+          status: 'decided',
+          answer: { choice, by: 'owner', at: now() },
+          body_rows: [...n.body_rows, { text: '' }, { text: `${s('you')} | ${s('justNow')}`, style: { text: '', bold: true, color: 'magenta' } }, { text: '' }, ...lines.map((t) => ({ text: t }))],
+          notes: [...n.notes, { kind: ANSWER_KIND, role: 'human', author: 'owner', at: now(), text: lines.join('\n'), revises }],
+        }
+      }),
       dropRows(key, ['available', 'all', 'waiting', 'live']),
       patchRows(key, (r) => ({ ...r, state: 'decided', glyph: r.glyph && { ...r.glyph, color: 'green', bold: false, dim: false }, badge: [{ text: s('answered'), color: 'green' }], badge_short: [{ text: s('answered'), color: 'green' }] })),
     )
@@ -565,11 +577,11 @@ export function Bench(props: {
     if (composer.kind === 'answer') {
       setUnlocked(null)
       holdShown(key)
-      return optimistic(answered(key, composer.key), () => api.answer(root, node.id, composer.key, text || undefined, files), s('sent'), reopen(composer))
+      return optimistic(answered(key, composer.key, text), () => api.answer(root, node.id, composer.key, text || undefined, files), s('sent'), reopen(composer))
     }
     if (composer.kind === 'free' && text) {
       holdShown(key)
-      return optimistic(answered(key), () => api.answerFreeText(root, node.id, text, files), s('sent'), reopen(composer))
+      return optimistic(answered(key, undefined, text), () => api.answerFreeText(root, node.id, text, files), s('sent'), reopen(composer))
     }
     if (composer.kind === 'reply' && text)
       return optimistic(
@@ -890,7 +902,7 @@ export function Bench(props: {
           })),
         })
       if (n.options.length && !n.questions.length && answerLocked(n))
-        items.push({ label: s('changeAnswer'), icon: I(RefreshCcw), run: () => setUnlocked(n.key) })
+        items.push({ label: s('changeAnswer'), icon: I(Pencil), run: () => setUnlocked(n.key) })
       else if (n.status === 'needs_decision') items.push({ label: s('ctxAnswer'), icon: I(PenLine), shortcut: '⏎', run: () => L().setComposer({ kind: 'free' }) })
     }
     if (n) items.push({ label: s('ctxReplyMenu'), icon: I(MessageSquareReply), shortcut: 'N', run: () => L().setComposer({ kind: 'reply' }) })
@@ -1874,7 +1886,7 @@ function Detail(p: {
             {p.canAnswer && chosen && n.status !== 'needs_decision' && (
               <div class="answer-actions">
                 <button class={`ghost change-answer ${p.locked ? '' : 'on'}`} onClick={p.onUnlock} disabled={p.busy}>
-                  {p.locked ? <RefreshCcw size={14} strokeWidth={1.75} /> : <Lock size={14} strokeWidth={1.75} />}
+                  {p.locked ? <Pencil size={14} strokeWidth={1.75} /> : <Lock size={14} strokeWidth={1.75} />}
                   <span>{p.locked ? s('changeAnswer') : s('keepAnswer')}</span>
                 </button>
                 {!p.locked && <span class="d small">{s('changeAnswerHint')}</span>}
@@ -1919,12 +1931,13 @@ function Detail(p: {
               onImage={p.onImage}
               notes={{
                 tools: (i, human) =>
-                  human && p.editing === null ? (
+                  human && p.editing === null && !isAnswerNote(n.notes[i]) ? (
                     <button class="note-edit" onClick={() => p.onEdit(i)} title={s('edEdit')} aria-label={s('edEdit')}>
                       <PenLine size={12} strokeWidth={1.75} />
                     </button>
                   ) : null,
                 summary: (i) => n.notes[i]?.summary,
+                decision: (i) => decisionLabel(n.notes[i]),
                 after: perMessage ? (i) => fileChips(i === -1 ? n.body_attachments : n.notes[i]?.attachments) : undefined,
                 replace: (i) =>
                   p.editing === i ? (
@@ -2289,6 +2302,12 @@ export type { View }
 
 /** A milestone's date; today and later. Saved as the end of that day. */
 /** The body's rows after its description: from the first heading (a note, a section) on. */
+/** The on-disk heading word of an answer section — a file format, never translated. */
+const ANSWER_KIND = '已答'
+/** Each answer is a record of what was decided then: changing it adds a new one, so none is edited in place. */
+const isAnswerNote = (note: Note | undefined) => note?.kind === ANSWER_KIND
+const decisionLabel = (note: Note | undefined) => (isAnswerNote(note) ? s(note!.revises ? 'decisionChangedBlock' : 'decisionBlock') : null)
+
 function afterDescription(rows: Node['body_rows']): Node['body_rows'] {
   const at = rows.findIndex((r) => r.style)
   return at === -1 ? [] : rows.slice(at)

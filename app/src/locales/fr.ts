@@ -21,6 +21,8 @@ export const fr: Strings = {
   changeAnswer: 'Changer la réponse',
   keepAnswer: 'Garder la réponse',
   changeAnswerHint: 'Choisissez une autre option pour répondre à nouveau.',
+  decisionBlock: 'Décidé',
+  decisionChangedBlock: 'Réponse modifiée',
   answerLockedHint: 'Répondu {{key}}. Utilisez « Changer la réponse » pour choisir à nouveau.',
   addNote: 'Ajouter un mot (facultatif)',
   send: 'Envoyer',

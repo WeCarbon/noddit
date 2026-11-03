@@ -1,7 +1,8 @@
 import { basename } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { ATTACHMENT_GROUP_END } from './serialize.ts'
-import { isAnswerKind } from './format.ts'
+import { NOTE_KIND, isAnswerKind } from './format.ts'
+import { withOpenQuestion } from './status.ts'
 import { ENTRY_NAME_RE } from './paths.ts'
 import { parseQuestions } from './questions.ts'
 import {
@@ -276,9 +277,13 @@ export function parseNotes(body: string): DecisionNote[] {
   const sections = sectionAttachments(body)
   const out: DecisionNote[] = []
   let noteIndex = 0
+  let answeredThisRound = false
   for (let i = 0; i < lines.length; i++) {
+    if (OPTIONS_HEADING_RE.test(lines[i])) answeredThisRound = false
     const h = parseNoteHeading(lines[i])
     if (!h) continue
+    const revises = h.kind === NOTE_KIND.answered && answeredThisRound
+    if (h.kind === NOTE_KIND.answered) answeredThisRound = true
     let end = i + 1
     while (end < lines.length && !H2_RE.test(lines[end])) end++
     let text = lines.slice(i + 1, end).join('\n').trim()
@@ -297,6 +302,7 @@ export function parseNotes(body: string): DecisionNote[] {
       heading: lines[i].replace(/^##[ \t]+/, ''),
       ...(writer ? { writer } : {}),
       ...(summary ? { summary } : {}),
+      ...(revises ? { revises: true } : {}),
       attachments: sections.notes[noteIndex] ?? [],
     })
     noteIndex++
@@ -476,8 +482,8 @@ export function parseDecision(
     typeof data.answer === 'string' ||
     (data.answer && typeof data.answer === 'object' && Object.keys(rawAnswer).length > 0)
 
-  const state = stateOf(data.status, { archived, answered: Boolean(hasAnswer), queued: ctx.queued })
   const options = parseOptions(body)
+  const state = withOpenQuestion({ state: stateOf(data.status, { archived, answered: Boolean(hasAnswer), queued: ctx.queued }), options, answer: hasAnswer })
   const notes = parseNotes(body)
   const bodyAttachments = sectionAttachments(body).body
   const extra = Object.fromEntries(Object.entries(data).filter(([k]) => !KNOWN_KEYS.has(k)))

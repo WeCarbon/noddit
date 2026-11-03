@@ -134,7 +134,7 @@ function blocks(rows: BodyRow[], images: Image[], dropAttachmentHeadings = false
 /** `AI | lane-a | 3 hours ago` / `User | 3 hours ago`, as decs words it, laid out on one line: name · when, role.
  *  N203/N206: a `summary` (the note's own one-line `--summary`) takes the title spot instead — who/when
  *  moves down to a small secondary line, same idea as a chat message's own one-line preview. */
-function NoteHead({ text, summary, tools }: { text: string; summary?: string | null; tools?: preact.ComponentChildren }) {
+function NoteHead({ text, summary, label, tools }: { text: string; summary?: string | null; label?: string | null; tools?: preact.ComponentChildren }) {
   const parts = text.split(' | ')
   const role = parts[0]
   const when = parts.length > 1 ? parts.at(-1)! : ''
@@ -146,6 +146,7 @@ function NoteHead({ text, summary, tools }: { text: string; summary?: string | n
         <div class="head-text">
           <span class="summary" dir="auto">{summary}</span>
           <span class="who-line">
+            {label && <span class="decision-label">{label}</span>}
             <span class="who">{who}</span>
             {when && <span class="when">· {when}</span>}
           </span>
@@ -157,6 +158,7 @@ function NoteHead({ text, summary, tools }: { text: string; summary?: string | n
   return (
     <header title={text}>
       <span class="dot" />
+      {label && <span class="decision-label">{label}</span>}
       <span class="who">{who}</span>
       {when && <span class="when">· {when}</span>}
       {who !== role && <span class="role">{role}</span>}
@@ -173,6 +175,8 @@ export interface NoteHooks {
   after?: (index: number) => preact.ComponentChildren | null
   /** The note's own one-line summary (N203/N206), shown as its title instead of who/when. */
   summary?: (index: number) => string | null | undefined
+  /** An answer's own label (「Decided」/「Answer changed」); the note is then drawn as a decision block. */
+  decision?: (index: number) => string | null | undefined
 }
 
 function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks }) {
@@ -182,16 +186,18 @@ function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image
         switch (b.kind) {
           case 'heading':
             return <h3 dir="auto" key={i} class={segClass({ ...b.row.style, color: undefined })}>{b.row.text}</h3>
-          case 'note':
+          case 'note': {
+            const decision = notes?.decision?.(b.index)
             return (
-              <section key={i} class={`note ${b.human ? 'human' : 'agent'}`} data-ctx="note">
-                <NoteHead text={b.row.text} summary={notes?.summary?.(b.index)} tools={notes?.tools?.(b.index, b.human)} />
+              <section key={i} class={`note ${b.human ? 'human' : 'agent'}${decision ? ' decision' : ''}`} data-ctx="note">
+                <NoteHead text={b.row.text} summary={notes?.summary?.(b.index)} label={decision} tools={notes?.tools?.(b.index, b.human)} />
                 <div class="note-body">
                   {notes?.replace?.(b.index) ?? <Blocks list={b.rows} images={images} onImage={onImage} />}
                   {notes?.after?.(b.index)}
                 </div>
               </section>
             )
+          }
           case 'para':
             return (
               <p dir="auto" key={i}>

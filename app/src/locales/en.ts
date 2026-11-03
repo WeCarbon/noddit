@@ -18,6 +18,8 @@ export const en = {
   changeAnswer: 'Change answer',
   keepAnswer: 'Keep the answer',
   changeAnswerHint: 'Pick another option to answer again.',
+  decisionBlock: 'Decided',
+  decisionChangedBlock: 'Answer changed',
   answerLockedHint: 'Answered {{key}}. Use “Change answer” to pick again.',
   addNote: 'Add a note (optional)',
   send: 'Send',

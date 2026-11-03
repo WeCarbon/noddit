@@ -3,7 +3,7 @@ import { fromNow } from '../i18n/time.ts'
 import { ATTACHMENTS_HEADING_RE, OPTIONS_HEADING_RE, parseNoteHeading } from '../core/parse.ts'
 import { QUESTIONS_HEADING_RE } from '../core/questions.ts'
 import { NOTE_KIND, NOTE_TEXT } from '../core/format.ts'
-import type { Decision } from '../core/types.ts'
+import type { Decision, DecisionNote } from '../core/types.ts'
 import { nodeImages, placeholderText, splitImageLinks, walkBody, type NodeImage } from './images.ts'
 import { wrapToWidth } from './width.ts'
 
@@ -14,7 +14,7 @@ import { wrapToWidth } from './width.ts'
  * one-line `--summary`, when it has one — shown ahead of who/when, as this
  * line's title, the terminal's version of the app's note-card title.
  */
-export function noteHeadline(note: { role: string; author: string; at: string }, now = Date.now(), summary?: string): string {
+export function noteHeadline(note: { role: string; author: string; at: string }, now = Date.now(), summary?: string, label?: string): string {
   const when = fromNow(note.at, now)
   const base =
     note.role === 'human'
@@ -23,7 +23,14 @@ export function noteHeadline(note: { role: string; author: string; at: string },
           const name = note.author.split(/[ \t]*·[ \t]*/)[0]?.trim()
           return name ? `${t('bench.note.agent')} | ${name} | ${when}` : `${t('bench.note.agent')} | ${when}`
         })()
-  return summary ? `${summary}  ——  ${base}` : base
+  const title = [label, summary].filter(Boolean).join(' · ')
+  return title ? `${title}  ——  ${base}` : base
+}
+
+/** 「✓ Decided」 on an owner's answer, 「✎ Answer changed」 on one that replaces an earlier answer to the same round. */
+export function decisionLabel(note: Pick<DecisionNote, 'kind' | 'revises'> | undefined): string | undefined {
+  if (note?.kind !== NOTE_KIND.answered) return undefined
+  return note.revises ? t('bench.note.answerChanged') : t('bench.note.decided')
 }
 
 /** Default action only applies to an unsettled decision — Enter on a
@@ -69,11 +76,11 @@ function sectionLabel(line: string): string | undefined {
 
 /** Very light markdown for the terminal — enough for headings/emphasis to read as such.
  *  `summary` (N203/N207) is the note's own one-line `--summary`, if the caller has it to hand. */
-export function styleLine(line: string, now = Date.now(), summary?: string): Segment {
+export function styleLine(line: string, now = Date.now(), summary?: string, label?: string): Segment {
   // human (owner) vs agent must read differently at a glance.
   const note = /^##[ \t]/.test(line) ? parseNoteHeading(line) : null
   if (note) {
-    const text = noteHeadline(note, now, summary)
+    const text = noteHeadline(note, now, summary, label)
     return note.role === 'human' ? { text, bold: true, color: 'magenta' } : { text, color: 'blue' }
   }
   const known = sectionLabel(line)
@@ -151,7 +158,7 @@ function generatedNoteText(line: string, kind: string | undefined): string | und
  * keeps every attachment reachable but as one block at the end, since
  * `condense()`'s paragraph filter may have dropped the note that placed it.
  */
-export function bodyRows(d: Decision, width: number, condensed: boolean, images: NodeImage[] = nodeImages(d)): BodyRow[] {
+export function bodyRows(d: Decision, width: number, condensed: boolean, images: NodeImage[] = nodeImages(d), opts: { decisionLabels?: boolean } = {}): BodyRow[] {
   const out: BodyRow[] = []
   // Matched by occurrence so the condensed body still points at the right entry.
   const used = new Set<number>()
@@ -169,8 +176,9 @@ export function bodyRows(d: Decision, width: number, condensed: boolean, images:
     if (/^#{1,6}[ \t]/.test(raw)) {
       const parsedNote = parseNoteHeading(raw)
       noteKind = parsedNote?.kind
-      const summary = parsedNote ? d.notes?.[noteIdx++]?.summary : undefined
-      const { text, ...style } = styleLine(markDefault(raw, d), undefined, summary)
+      const note = parsedNote ? d.notes?.[noteIdx++] : undefined
+      const label = opts.decisionLabels === false ? undefined : decisionLabel(note)
+      const { text, ...style } = styleLine(markDefault(raw, d), undefined, note?.summary, label)
       for (const piece of wrap(text)) out.push({ text: piece, style })
       return
     }

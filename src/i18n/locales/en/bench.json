@@ -134,7 +134,9 @@
   },
   "note": {
     "user": "User",
-    "agent": "Agent"
+    "agent": "Agent",
+    "decided": "✓ Decided",
+    "answerChanged": "✎ Answer changed"
   },
   "summary": {
     "decideNone": " Decide ",

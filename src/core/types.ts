@@ -117,6 +117,10 @@ export interface DecisionNote {
    *  summary of `text`, shown as a title wherever there isn't room for the
    *  whole reply. Absent on an older note, or a short one that never needed one. */
   summary?: string
+  /** A `## 已答` written after another `## 已答` of the same options round —
+   *  the owner changing their answer. Each one stays its own block; this only
+   *  says how to label it. Derived from the body, never stored. */
+  revises?: boolean
   /** This note's own `## 附件` block — attached with `nod note --attach` or
    *  `nod attach --to` pointed here. Empty when this note has none. */
   attachments: Attachment[]
