@@ -97,7 +97,8 @@ export function Viewer(p: { items: ViewItem[]; at: number; onAt: (i: number) => 
     let live = true
     void api.readPreview(it.path).then(
       (r) => live && setText({ path: it.path, body: r.text, truncated: r.truncated }),
-      (e: Error) => live && setError(e.message),
+      // Tauri rejects with the command's error string, not an Error.
+      (e: unknown) => live && setError(e instanceof Error ? e.message : String(e)),
     )
     return () => {
       live = false

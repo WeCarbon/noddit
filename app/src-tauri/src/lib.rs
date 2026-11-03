@@ -41,12 +41,29 @@ struct Preview {
     size: u64,
 }
 
+/// The registered project folders (`~/.decs/config.json`, or `$NODDIT_HOME`/`$DECS_HOME`), canonical.
+fn registered_roots() -> Vec<std::path::PathBuf> {
+    let home = std::env::var_os("NODDIT_HOME")
+        .or_else(|| std::env::var_os("DECS_HOME"))
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".decs")));
+    let Some(home) = home else { return Vec::new() };
+    let Ok(text) = std::fs::read_to_string(home.join("config.json")) else { return Vec::new() };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { return Vec::new() };
+    json["projects"]
+        .as_array()
+        .map(|ps| ps.iter().filter_map(|p| p["root"].as_str()).filter_map(|r| std::fs::canonicalize(r).ok()).collect())
+        .unwrap_or_default()
+}
+
 #[tauri::command]
 async fn read_preview(path: String, max: Option<u64>) -> Result<Preview, String> {
     use std::io::Read;
     let real = std::fs::canonicalize(&path).map_err(|e| e.to_string())?;
-    if !real.components().any(|c| c.as_os_str() == "decisions") {
-        return Err("not an attachment".into());
+    // An attachment copied into decisions/, or one linked in place (`nod attach --link`) from
+    // inside a registered project — nothing else on the disk.
+    if !real.components().any(|c| c.as_os_str() == "decisions") && !registered_roots().iter().any(|root| real.starts_with(root)) {
+        return Err("not an attachment: only files inside a registered project are previewed".into());
     }
     let max = max.unwrap_or(1_048_576);
     tauri::async_runtime::spawn_blocking(move || {
