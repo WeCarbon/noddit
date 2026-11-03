@@ -6,8 +6,12 @@ import { join } from 'node:path'
 // state) would still read and write the real ~/.decs/config.json. Set a throwaway one before
 // anything else in this process can import that module. ||= so a file that pins its own (the
 // way test/settings-dialog.test.ts must, before any of its own imports) still wins.
+// DECS_HOME only, not NODDIT_HOME: core/env.ts's nodditEnv checks NODDIT_<suffix> first — a
+// global default under that name would outrank the plain `DECS_HOME: home` nearly every
+// decs()/decsResult() call in this suite passes to its own spawned subprocess (test/helpers.ts
+// spreads process.env first), silently redirecting dozens of tests to this one shared throwaway
+// instead of their own. DECS_HOME alone has nothing to lose to.
 const NOD_TEST_HOME = mkdtempSync(join(tmpdir(), 'nod-home-'))
-process.env.NODDIT_HOME ||= NOD_TEST_HOME
 process.env.DECS_HOME ||= NOD_TEST_HOME
 // The suite's expectations are written in English; tests about language pick their own.
 process.env.DECS_LANG ||= 'en'
