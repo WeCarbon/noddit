@@ -33,3 +33,7 @@ process.env.NODDIT_VIEWS ||= join(tmpdir(), `nod-views-${process.pid}-absent.jso
 // Which node each session is on is per user; the suite keeps its own, and never keys it by the session running the suite.
 process.env.NODDIT_SESSION_NODES ||= join(tmpdir(), `nod-session-nodes-${process.pid}.json`)
 delete process.env.CLAUDE_CODE_SESSION_ID
+// Same reasoning, for N296's override: a lane running the suite from its own
+// worktree must not leak that worktree into session-key expectations either.
+delete process.env.NODDIT_WORKTREE
+delete process.env.DECS_WORKTREE

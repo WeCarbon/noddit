@@ -285,3 +285,56 @@ test('N280: the same worktree still shares its current node and remembered autho
   p.run(p.root, ['note', '1', 'reuses the remembered author', '--agent'], { DECS_AUTHOR: undefined })
   assert.equal(p.get(1).notes.at(-1).author, 'lead · main', 'same worktree still reuses the remembered author')
 })
+
+// ---------------------------------------------------------------------------
+// N296: decisions/ is gitignored and only ever checked out in the main
+// worktree, so every lane has to point cwd there to run `nod` at all —
+// unlike the two lanes above, which each kept a cwd of their own. That
+// collapses N280's worktree-of-cwd back to one shared value for every
+// lane, the exact case it was meant to fix. NODDIT_WORKTREE/DECS_WORKTREE
+// lets a lane say which worktree it actually is, independent of cwd.
+// ---------------------------------------------------------------------------
+
+test('N296: two lanes both forced to run nod from the main checkout share a current node and remembered author, same as N280 without the worktree', (t) => {
+  const p = worktreeProject(t)
+  p.run(p.root, ['add', 'lane ones task', '--task', '--author', 'lane-one · work'])
+  p.run(p.root, ['add', 'lane twos task', '--task', '--author', 'lane-two · work'])
+
+  // Both lanes have to run from p.root — the main checkout, where
+  // decisions/ exists — with the same ambient identity worktreeProject's
+  // base gives every call: no NODDIT_WORKTREE either, same as a harness
+  // that gives every lane in one agent process the same session id.
+  p.run(p.root, ['start', '1', '--author', 'lane-one · work'])
+  // Lane two starts its own node from the same cwd right after — same
+  // key, so it clobbers lane one's "current node" pointer instead of
+  // getting one of its own.
+  p.run(p.root, ['start', '2', '--author', 'lane-two · work'])
+  // Lane one's own progress call, with no id given, lands on node 2 instead
+  // of node 1 — whichever lane last ran nod start from that cwd wins.
+  p.run(p.root, ['progress', '10'])
+  assert.equal(p.get(2).progress, 10, 'lane twos node silently absorbed lane ones update')
+  assert.equal(p.get(1).progress ?? 0, 0, 'lane ones own node was never touched')
+
+  p.run(p.root, ['note', '2', 'signed explicitly', '--agent', '--author', 'lane-two · work'], { DECS_AUTHOR: undefined })
+  p.run(p.root, ['note', '1', 'lane one, no author given', '--agent'], { DECS_AUTHOR: undefined })
+  assert.equal(p.get(1).notes.at(-1).author, 'lane-two · work', 'lane ones note silently signed as lane two')
+})
+
+test('N296: NODDIT_WORKTREE keeps a current node and remembered author apart even from that one shared cwd', (t) => {
+  const p = worktreeProject(t)
+  p.run(p.root, ['add', 'lane ones task', '--task', '--author', 'lane-one · work'])
+  p.run(p.root, ['add', 'lane twos task', '--task', '--author', 'lane-two · work'])
+
+  // Lane one starts first; lane two starts second, from the same cwd — the
+  // more recent call, so it is the one a shared key would be left
+  // pointing at. Only a lane-one key of its own survives that.
+  p.run(p.root, ['start', '1', '--author', 'lane-one · work'], { NODDIT_WORKTREE: '/lanes/lane-one' })
+  p.run(p.root, ['start', '2', '--author', 'lane-two · work'], { NODDIT_WORKTREE: '/lanes/lane-two' })
+
+  p.run(p.root, ['progress', '10'], { NODDIT_WORKTREE: '/lanes/lane-one' })
+  assert.equal(p.get(1).progress, 10, 'lane ones own current node')
+  assert.equal(p.get(2).progress ?? 0, 0, 'lane twos is untouched by lane ones progress call')
+
+  p.run(p.root, ['note', '1', 'lane one, no author given', '--agent'], { DECS_AUTHOR: undefined, NODDIT_WORKTREE: '/lanes/lane-one' })
+  assert.equal(p.get(1).notes.at(-1).author, 'lane-one · work', 'reuses lane ones own remembered author, not lane twos')
+})

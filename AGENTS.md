@@ -182,8 +182,11 @@ nod note W305 --human "……"                   # 只有 owner 本人才用
 设字母：`nod config letter W`。正文里写 `W301` 会被识别成引用，`nod get` 显示
 「被 W301 引用」（字母形式要两位数以上，`F1`、`Q2` 这种小标题不算）。
 
-⚠️ **在 git worktree 里干活也照常用 `nod`。** `decisions/` 进 git，你的 worktree
-里也有一份副本，但 `nod` 永远解析到**主仓**。不要手动去改 worktree 里的 `decisions/`。
+⚠️ **在 git worktree 里干活也照常用 `nod`，不用 `cd` 去主仓。** `decisions/` 进 git，
+你的 worktree 里也有一份副本，但 `nod` 永远解析到**主仓**。不要手动去改 worktree 里的
+`decisions/`。当前节点、记住的署名是按 cwd 分的：几个 lane 要是共用同一个 cwd 跑
+`nod`（比如都 `cd` 去主仓），就会互相覆盖——各自设 `NODDIT_WORKTREE=<自己
+worktree 的绝对路径>`（每次调用都带着）能把身份分开。
 
 编号靠 `decisions/.ids/` 里的 `O_EXCL` 文件分配；每次写都在这个节点的锁里重新读一遍
 再改，多个 lane 同时 note 同一个节点不会丢；新文件和改写都是先写临时文件再改名。
