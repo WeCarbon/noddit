@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import { DECS_HOME } from './config.ts'
 import { nodditEnv } from './env.ts'
 import type { Store } from './store.ts'
+import type { SessionTerminal } from './terminal.ts'
 
 /**
  * Who is connected: every running `nod monitor` keeps a heartbeat file under
@@ -20,6 +21,8 @@ export interface Listener {
   role: 'lead' | 'teammate'
   started_at: string
   last_seen: string
+  /** iTerm2 or macOS Terminal, when the monitor could tell which session/tab it runs in; absent otherwise. */
+  terminal?: SessionTerminal
 }
 
 const sessionsDir = () => join(DECS_HOME, 'sessions')

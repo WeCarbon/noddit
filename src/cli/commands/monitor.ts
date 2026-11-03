@@ -16,6 +16,7 @@ import { createSourceSyncRunner } from '../../core/source-sync.ts'
 import { DEFERRAL_CLOCK, isLatestNoteOwnerFacing, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
 import { isUnclaimedBrief, originalWords } from '../../core/intake.ts'
 import { HEARTBEAT_MS, harnessOf, removeHeartbeat, writeHeartbeat } from '../../core/listeners.ts'
+import { currentTerminal } from '../../core/terminal.ts'
 import type { Decision } from '../../core/types.ts'
 import { refOf as refOfNode } from '../../core/ref.ts'
 import { NOTE_KIND, noteKindKey } from '../../core/format.ts'
@@ -565,6 +566,9 @@ export async function run(args: Args): Promise<number> {
   }
   const listenerKey = createHash('sha1').update(`${process.pid}|${stateFile}`).digest('hex').slice(0, 16)
   const startedListening = nowStamp(new Date(), { ms: true })
+  // Computed once: the terminal a monitor runs in doesn't change over its life, and finding
+  // Terminal.app's tty walks the process tree, which is wasted work on every 30s heartbeat.
+  const terminal = currentTerminal()
   const beat = () =>
     writeHeartbeat(listenerKey, {
       pid: process.pid,
@@ -574,6 +578,7 @@ export async function run(args: Args): Promise<number> {
       role: author ? 'teammate' : 'lead',
       started_at: startedListening,
       last_seen: nowStamp(new Date(), { ms: true }),
+      ...(terminal ? { terminal } : {}),
     })
   // A window redrawing (--updates) is not an agent that will pick up a brief.
   const heartbeat = !updates && !bool(args, 'no-heartbeat')
