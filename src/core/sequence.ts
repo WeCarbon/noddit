@@ -96,13 +96,29 @@ export function buildSchedule(items: Item[]): ScheduleRow[] {
   return rows
 }
 
+/** Who waits on whom, built once per items array: resolving every `after` for every node was quadratic. */
+const dependentsIndex = new WeakMap<Item[], Map<string, Item[]>>()
+
 function directDependents(item: Item, items: Item[]): Item[] {
-  return items.filter((y) =>
-    (y.after ?? []).some((raw) => {
-      const d = findRef(raw, y, items)
-      return d?.id === item.id && d?.project === item.project
-    }),
-  )
+  let index = dependentsIndex.get(items)
+  if (!index) {
+    index = new Map()
+    for (const y of items) {
+      const seen = new Set<string>()
+      for (const raw of y.after ?? []) {
+        const d = findRef(raw, y, items)
+        if (!d) continue
+        const key = `${d.project}#${d.id}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        const list = index.get(key)
+        if (list) list.push(y)
+        else index.set(key, [y])
+      }
+    }
+    dependentsIndex.set(items, index)
+  }
+  return index.get(`${item.project}#${item.id}`) ?? []
 }
 
 /**
