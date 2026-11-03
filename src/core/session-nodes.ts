@@ -15,6 +15,9 @@ import { harnessPid } from './session-process.ts'
  *   to when no id is given and `NODDIT_NODE` is unset.
  * - `starters`: which session started each in-progress node, so `nod tidy`
  *   can tell a node someone is still listening for from an orphaned one.
+ * - `authors` (N267): the author this session last signed as — explicitly
+ *   with `--author`, or by running `nod start` under one — so a later write
+ *   that gives neither `--author` nor `NODDIT_AUTHOR` still signs the same way.
  */
 export interface CurrentNode {
   root: string
@@ -31,9 +34,15 @@ export interface Starter {
   at: string
 }
 
+export interface AuthorEntry {
+  author: string
+  at: string
+}
+
 interface State {
   current: Record<string, CurrentNode>
   starters: Record<string, Starter>
+  authors: Record<string, AuthorEntry>
 }
 
 const KEEP_MS = 14 * 86_400_000
@@ -49,9 +58,10 @@ function read(file = stateFile()): State {
     return {
       current: raw?.current && typeof raw.current === 'object' ? raw.current : {},
       starters: raw?.starters && typeof raw.starters === 'object' ? raw.starters : {},
+      authors: raw?.authors && typeof raw.authors === 'object' ? raw.authors : {},
     }
   } catch {
-    return { current: {}, starters: {} }
+    return { current: {}, starters: {}, authors: {} }
   }
 }
 
@@ -67,7 +77,7 @@ function update(fn: (s: State) => void): void {
       const s = read(file)
       fn(s)
       const now = Date.now()
-      writeFileAtomic(file, JSON.stringify({ current: prune(s.current, now), starters: prune(s.starters, now) }))
+      writeFileAtomic(file, JSON.stringify({ current: prune(s.current, now), starters: prune(s.starters, now), authors: prune(s.authors, now) }))
     })
   } catch {
     /* a convenience: an unwritable home only means ids have to be spelled out */
@@ -119,4 +129,26 @@ export function namesStartedBy(pid: number): Set<string> {
       .filter((s) => s.pid === pid && s.name)
       .map((s) => s.name!),
   )
+}
+
+/**
+ * N267: `--author`/`-a` given explicitly, or `nod start` resolving one any
+ * way at all — either means this session signs as `author` from here on,
+ * until an explicit `--author`/`NODDIT_AUTHOR` or a later `recordAuthor`
+ * says otherwise. A no-op outside any session (the owner's own terminal has
+ * no session key, same as `recordStarted`).
+ */
+export function recordAuthor(author: string): boolean {
+  const key = sessionKey()
+  if (!key) return false
+  update((s) => {
+    s.authors[key] = { author, at: new Date().toISOString() }
+  })
+  return true
+}
+
+/** This session's remembered author, if any — between an explicit `--author`/`NODDIT_AUTHOR` and the branch-name guess. */
+export function rememberedAuthor(): string | undefined {
+  const key = sessionKey()
+  return key ? read().authors[key]?.author : undefined
 }

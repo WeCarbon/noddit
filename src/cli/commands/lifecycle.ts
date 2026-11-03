@@ -5,6 +5,7 @@ import { isHumanTask } from '../../core/assignee.ts'
 import { optionsWithoutCost } from '../../core/option-costs.ts'
 import { refOf } from '../../core/ref.ts'
 import { dim, toJSON } from '../../core/render.ts'
+import { recordAuthor } from '../../core/session-nodes.ts'
 import { type Decision } from '../../core/types.ts'
 import { t } from '../../i18n/index.ts'
 
@@ -73,6 +74,9 @@ export async function run(args: Args, verb = ''): Promise<number> {
       // The owner put it aside: an agent leaves it until it comes back.
       if (isDeferred(d) && shellRole() === 'agent' && !force) throw new Error(t('cli.lifecycle.deferredByOwner', { ref: refOf(d) }))
       const author = shellRole() === 'agent' ? resolveAuthor(args) : undefined
+      // N267: nod start under any author — explicit, NODDIT_AUTHOR, or the branch guess —
+      // is remembered for this session, not just an explicit --author (resolveAuthor's own case).
+      if (author) recordAuthor(author)
       // Starting a brief is taking it: the same atomic claim as `nod claim`.
       const node = d.intake ? store.claim(d, author ?? resolveAuthor(args), { force }).node : d
       const started = store.start(node, { force })

@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { readProjects } from '../core/config.ts'
 import { nodditEnv, nodditNodeEnv } from '../core/env.ts'
 import { findLayout, layoutFor, type Layout } from '../core/paths.ts'
-import { currentNode, recordStarted } from '../core/session-nodes.ts'
+import { currentNode, recordAuthor, recordStarted, rememberedAuthor } from '../core/session-nodes.ts'
 import { isTerminal } from '../core/status.ts'
 import { Store, sameAgent } from '../core/store.ts'
 import type { Decision, NoteRole } from '../core/types.ts'
@@ -131,12 +131,22 @@ export function rememberStarted(store: Store, d: Decision, author: string | unde
 /**
  * Who is writing — inferred from the branch name when not given explicitly,
  * since every node needs a signer to know who can answer a follow-up.
+ *
+ * N267: an explicit `--author` is remembered for this session (see
+ * `core/session-nodes.ts`), so a later call that gives neither `--author`
+ * nor `NODDIT_AUTHOR` reuses it instead of falling all the way to the
+ * branch-name guess — `--author`/`NODDIT_AUTHOR` still win outright.
  */
 export function resolveAuthor(args: Args, cwd = process.cwd()): string {
   const explicit = one(args, 'author', 'a')
-  if (explicit) return explicit
+  if (explicit) {
+    recordAuthor(explicit)
+    return explicit
+  }
   const author = nodditEnv('AUTHOR')
   if (author) return author
+  const remembered = rememberedAuthor()
+  if (remembered) return remembered
   try {
     const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd,

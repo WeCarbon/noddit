@@ -164,3 +164,55 @@ test('nod monitor text lines carry their next step: a source item, an owner answ
   assert.match(r.stdout, /login is broken.*→ handle it, then nod source ack issues 7/)
   assert.match(r.stdout, /^X1 owner answered 1.*→ nod read X1 --ack/m)
 })
+
+// ---------------------------------------------------------------------------
+// N267: the author signature, remembered per session the same way as the
+// current node above — same session-nodes.json, same sessionKey().
+// ---------------------------------------------------------------------------
+
+test('an explicit --author is remembered for the session: a later write with neither --author nor NODDIT_AUTHOR signs the same way', (t) => {
+  const p = project(t)
+  p.run(['add', 'first', '--task'])
+  p.run(['note', '1', 'signed explicitly', '--agent', '--author', 'lane-x · work'], { DECS_AUTHOR: undefined })
+  assert.equal(p.get(1).notes.at(-1).author, 'lane-x · work')
+
+  // No --author and no NODDIT_AUTHOR/DECS_AUTHOR this time — same session identity.
+  p.run(['note', '1', 'should reuse it', '--agent'], { DECS_AUTHOR: undefined })
+  assert.equal(p.get(1).notes.at(-1).author, 'lane-x · work')
+})
+
+test('nod start under an author — even one that came from NODDIT_AUTHOR, not --author — is remembered too', (t) => {
+  const p = project(t)
+  p.run(['add', 'second', '--task'])
+  p.run(['start', '1', '--force'], { DECS_AUTHOR: 'start-env · lane' })
+  p.run(['note', '1', 'reuses start’s author', '--agent'], { DECS_AUTHOR: undefined })
+  assert.equal(p.get(1).notes.at(-1).author, 'start-env · lane')
+})
+
+test('an explicit --author or NODDIT_AUTHOR on a later call still wins over the remembered one, but only an explicit --author (or nod start) updates what gets remembered next', (t) => {
+  const p = project(t)
+  p.run(['add', 'third', '--task'])
+  p.run(['note', '1', 'first', '--agent', '--author', 'lane-a · x'], { DECS_AUTHOR: undefined })
+  p.run(['note', '1', 'second', '--agent', '--author', 'lane-b · y'], { DECS_AUTHOR: undefined })
+  assert.equal(p.get(1).notes.at(-1).author, 'lane-b · y', '--author wins outright')
+
+  p.run(['note', '1', 'third', '--agent'], { DECS_AUTHOR: 'env-lane · z' })
+  assert.equal(p.get(1).notes.at(-1).author, 'env-lane · z', 'NODDIT_AUTHOR wins outright')
+
+  // NODDIT_AUTHOR alone (no --author, not nod start) signs its own call but
+  // isn't remembered — the last explicit --author still is.
+  p.run(['note', '1', 'fourth', '--agent'], { DECS_AUTHOR: undefined })
+  assert.equal(p.get(1).notes.at(-1).author, 'lane-b · y', 'the remembered author is unchanged by an env-only call')
+})
+
+test('the remembered author is per session identity: a different session (and the owner’s own terminal) sees none of it', (t) => {
+  const p = project(t)
+  p.run(['add', 'fourth', '--task'])
+  p.run(['note', '1', 'signed', '--agent', '--author', 'lane-a · x'], { DECS_AUTHOR: undefined })
+
+  // A different session identity: nothing remembered, and scratch() is outside any
+  // git repo, so the branch-name guess fails too — the "no author" error, same as ever.
+  const other = p.result(['note', '1', 'from elsewhere', '--agent'], { DECS_AUTHOR: undefined, NODDIT_IDENTITY: 'lane-b#s2' })
+  assert.notEqual(other.code, 0)
+  assert.match(other.stderr, /who is writing this/)
+})
