@@ -73,7 +73,8 @@
     "todo": "مهمتك",
     "doing": "قيد التنفيذ",
     "due": "يستحق {{when}}",
-    "overdue": "متأخر {{span}}"
+    "overdue": "متأخر {{span}}",
+    "byAi": "أجّله وكيل"
   },
   "detail": {
     "aiStuck": "الوكيل متعطل",

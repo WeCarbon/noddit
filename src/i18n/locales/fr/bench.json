@@ -73,7 +73,8 @@
     "todo": "À faire",
     "doing": "En cours",
     "due": "Échéance {{when}}",
-    "overdue": "En retard de {{span}}"
+    "overdue": "En retard de {{span}}",
+    "byAi": "par une IA"
   },
   "detail": {
     "aiStuck": "IA bloquée",

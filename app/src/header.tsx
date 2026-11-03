@@ -146,7 +146,7 @@ export function NodeHeader({
             {`${s('milestone')} · ${ago(n.due)}`}
           </Chip>
         )}
-        {n.deferred_at && <Chip icon={<Timer {...ICON} />}>{s('deferred')}</Chip>}
+        {n.deferred_at && <Chip icon={<Timer {...ICON} />} tone={n.deferred_by_ai ? 'c-red' : undefined}>{n.deferred_by_ai ? s('deferredByAi') : s('deferred')}</Chip>}
         {n.brief === 'unclaimed' && (
           <Chip icon={<PenLine {...ICON} />} tone="c-blue brief">
             {s('briefWaiting')}

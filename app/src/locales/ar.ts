@@ -39,6 +39,7 @@ export const ar: Strings = {
   live: 'مباشر',
   sent: 'أُرسل',
   deferred: 'أُجّل',
+  deferredByAi: 'أجّله وكيل',
   undeferred: 'عاد إلى القوائم',
   replied: 'أُضيف الرد',
   seenShort: 'شوهد',

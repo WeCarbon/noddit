@@ -1,3 +1,4 @@
+import { NOTE_KIND } from './format.ts'
 import { parseRef } from './ref.ts'
 import { t } from '../i18n/index.ts'
 import type { Item, ItemStatus } from './types.ts'
@@ -57,6 +58,12 @@ export function delayOf(i: Pick<Item, 'state'> & Partial<Pick<Item, 'deferredAt'
   if (i.state === 'waiting') return { kind: 'active', ...(i.waitingOn ? { on: i.waitingOn } : {}), ...(i.waitingUntil ? { until: i.waitingUntil } : {}), due: isWaitDue(i, now) }
   if (isDeferred({ deferredAt: i.deferredAt, deferredUntil: i.deferredUntil, state: i.state }, now)) return { kind: 'passive', ...(i.deferredUntil ? { until: i.deferredUntil } : {}), due: false }
   return undefined
+}
+
+/** The latest 延迟 on record was an agent's (with the owner's words, or from before agents were stopped) — shown marked. */
+export function deferredByAgent(i: Pick<Item, 'deferredAt' | 'notes'>): boolean {
+  if (!i.deferredAt) return false
+  return i.notes.findLast((n) => n.kind === NOTE_KIND.deferred)?.role === 'agent'
 }
 
 /** Deferred `--until` a moment that has now come. */

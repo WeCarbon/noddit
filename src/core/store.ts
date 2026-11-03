@@ -999,17 +999,17 @@ export class Store {
    * 延迟, the one verb behind `nod defer` and `nod hold`: with `on` (or on a node already
    * waiting) it is an active wait — `hold`; with only a day it is a passive deferral — `defer`.
    */
-  delay(d: Decision, opts: { by: string; role: NoteRole; until?: string; on?: string }): Decision {
+  delay(d: Decision, opts: { by: string; role: NoteRole; until?: string; on?: string; ownerSaid?: string }): Decision {
     const on = opts.on?.trim() || undefined
     if (on || (d.state === 'waiting' && opts.until)) return this.hold(d, on, opts.by, { until: opts.until, role: opts.role })
     return this.defer(d, opts)
   }
 
   /** 「延迟 R 天」: delayed to the start of the day `every` (or the node's own R) after today — a wait keeps its who. */
-  delayEvery(d: Decision, opts: { by: string; role: NoteRole; every?: string }): Decision {
+  delayEvery(d: Decision, opts: { by: string; role: NoteRole; every?: string; ownerSaid?: string }): Decision {
     const every = opts.every ?? d.every
     if (!every) throw new Error(t('core.store.noEvery', { ref: refOf(d) }))
-    return this.delay(d, { by: opts.by, role: opts.role, until: nowStamp(everyUntil(every)) })
+    return this.delay(d, { by: opts.by, role: opts.role, until: nowStamp(everyUntil(every)), ownerSaid: opts.ownerSaid })
   }
 
   /** Front-matter fields set after the fact (`nod edit --every / --due / --est`); null clears one. Not a request: nothing is queued. */
@@ -1031,7 +1031,7 @@ export class Store {
    * node that was waiting, which stops waiting (one 延迟 at a time) and goes back to 待开始.
    * `until` (an ISO stamp) brings it back on its own at that moment; deferring again changes or drops it.
    */
-  defer(d: Decision, opts: { by: string; role: NoteRole; until?: string }): Decision {
+  defer(d: Decision, opts: { by: string; role: NoteRole; until?: string; ownerSaid?: string }): Decision {
     if (d.state === 'completed' || d.state === 'closed') throw new Error(t('core.store.alreadyFinishedNoDefer', { ref: refOf(d) }))
     if (isDeferred(d) && d.deferredUntil === opts.until && d.state !== 'waiting') return d
     return this.mutate(d, (d) => {
@@ -1045,7 +1045,11 @@ export class Store {
           deferredAt: at,
           deferredBy: opts.by,
           deferredUntil: opts.until,
-          body: appendSection(d.body, noteHeading(NOTE_KIND.deferred, opts.role, opts.by, nowStamp()), day ? NOTE_TEXT.deferredUntil(day) : NOTE_TEXT.deferred),
+          body: appendSection(
+            d.body,
+            noteHeading(NOTE_KIND.deferred, opts.role, opts.by, nowStamp()),
+            [day ? NOTE_TEXT.deferredUntil(day) : NOTE_TEXT.deferred, opts.ownerSaid?.trim() ? NOTE_TEXT.ownerSaid(opts.ownerSaid.trim()) : ''].filter(Boolean).join('\n\n'),
+          ),
         },
       }
     })

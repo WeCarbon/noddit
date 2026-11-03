@@ -39,6 +39,7 @@ export const zhHant: Strings = {
   live: '即時',
   sent: '已送出',
   deferred: '已延後',
+  deferredByAi: 'AI 延後的',
   undeferred: '已回到清單',
   replied: '已回覆',
   seenShort: '看過',

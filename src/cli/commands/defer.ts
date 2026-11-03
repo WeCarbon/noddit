@@ -1,5 +1,5 @@
 import { dayKey, parseWhen, untilDay } from '../../core/fuzzy-date.ts'
-import { isDeferred, statusLabel } from '../../core/status.ts'
+import { isDeferred, isTerminal, statusLabel } from '../../core/status.ts'
 import { nowStamp } from '../../core/store.ts'
 import { dayText } from '../../i18n/time.ts'
 import { bool, one, type Args } from '../args.ts'
@@ -39,6 +39,8 @@ export async function run(args: Args, verb = 'defer'): Promise<number> {
   const on = onRaw && onRaw !== 'true' ? onRaw.trim() : undefined
   if (onRaw === 'true') throw new Error(`${t('cli.lifecycle.needOn')}\n\n${t('cli.help.hold')}`)
   if (off && (untilRaw || on)) throw new Error(t('cli.defer.untilWithOff'))
+  const saidRaw = one(args, 'owner-said')
+  const ownerSaid = saidRaw && saidRaw !== 'true' ? saidRaw.trim() : undefined
   const everyRaw = one(args, 'every')
   if (everyRaw !== undefined && (untilRaw || on || off)) throw new Error(t('cli.defer.everyAlone'))
   const every = everyRaw === undefined || everyRaw === 'true' ? undefined : everyArg(everyRaw)
@@ -49,7 +51,10 @@ export async function run(args: Args, verb = 'defer'): Promise<number> {
     if (!off && (on || (d.state === 'waiting' && until)) && !until && !(d.state === 'waiting' && d.waitingUntil))
       throw new Error(`${t('cli.lifecycle.needUntil')}\n\n${t('cli.help.hold')}`)
     const byEvery = everyRaw !== undefined
-    const next = off ? store.undelay(d, { by, role }) : byEvery ? store.delayEvery(d, { by, role, every }) : store.delay(d, { by, role, until: until && nowStamp(until), on })
+    const active = Boolean(on) || (d.state === 'waiting' && Boolean(until || byEvery))
+    // Putting work off is the owner's call: an agent asks, unless it carries the owner's own words.
+    if (!off && !active && role === 'agent' && !ownerSaid && !isTerminal(d.state)) throw new Error(t('cli.defer.askOwner', { ref: refOf(d), id: String(d.id) }))
+    const next = off ? store.undelay(d, { by, role }) : byEvery ? store.delayEvery(d, { by, role, every, ownerSaid }) : store.delay(d, { by, role, until: until && nowStamp(until), on, ownerSaid })
     const back = byEvery ? new Date(next.waitingUntil ?? next.deferredUntil ?? '') : until
     if (bool(args, 'json')) console.log(JSON.stringify(toJSON(next)))
     else console.log(`${refOf(next)} ${off ? offText(d) : delayText(d, next, back)} · ${statusLabel(next.state)}`)

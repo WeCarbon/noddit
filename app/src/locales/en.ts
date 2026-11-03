@@ -37,6 +37,7 @@ export const en = {
   live: 'Live',
   sent: 'Sent',
   deferred: 'Deferred',
+  deferredByAi: 'Deferred by an AI',
   undeferred: 'Back on the lists',
   replied: 'Reply added',
   seenShort: 'Seen',

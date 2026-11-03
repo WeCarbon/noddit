@@ -125,7 +125,7 @@ function fileFormatUnder(lang: string): string {
     run(['push', '1', '1', '--note', 'going with option 1'])
     run(['note', '1', 'additional context for the lane', '--agent'])
     run(['attach', '1', shot])
-    run(['defer', '1'])
+    run(['defer', '1', '--human'])
     run(['hold', '1', '--on', 'someone external', '--until', '2030-01-15', '--author', 'lane-x · testing'])
 
     const file = readdirSync(join(root, 'decisions', 'active')).find((f) => f.startsWith('1-'))!

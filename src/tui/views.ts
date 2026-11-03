@@ -9,7 +9,7 @@ import { parseNotes } from '../core/parse.ts'
 import { refOf } from '../core/ref.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isStale, minutesSince } from '../core/staleness.ts'
-import { ITEM_STATUSES, deferHidden, delayOf, dependenciesOf, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel, waitingOnOwner } from '../core/status.ts'
+import { ITEM_STATUSES, deferHidden, deferredByAgent, delayOf, dependenciesOf, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps, stepProgress } from '../core/steps.ts'
 import type { Decision as Item } from '../core/types.ts'
 import { isRtl, lang, t } from '../i18n/index.ts'
@@ -935,15 +935,16 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
     return forms
   }
   if (isDeferred(d, now)) {
+    const ai: Segment[] = deferredByAgent(d) ? [{ text: `${t('bench.badge.byAi')} · `, color: 'red' }] : []
     const since = d.deferredAt ? ago(minutesSince({ updatedAt: d.deferredAt, created: d.created }, now)) : ''
     const back = d.deferredUntil ? untilDay(d.deferredUntil) : undefined
     if (back) {
       const date = dayText(back, new Date(now))
-      forms.push([...fold, { text: t('bench.badge.deferredUntil', { date, relative: dayFromToday(back, new Date(now)) }), dim: true }])
-      forms.push([...fold, { text: t('bench.badge.deferredUntilShort', { date }), dim: true }])
+      forms.push([...fold, ...ai, { text: t('bench.badge.deferredUntil', { date, relative: dayFromToday(back, new Date(now)) }), dim: true }])
+      forms.push([...fold, ...ai, { text: t('bench.badge.deferredUntilShort', { date }), dim: true }])
     }
-    if (since) forms.push([...fold, { text: t('bench.badge.deferredSince', { since }), dim: true }])
-    forms.push([...fold, { text: t('bench.badge.deferred'), dim: true }])
+    if (since) forms.push([...fold, ...ai, { text: t('bench.badge.deferredSince', { since }), dim: true }])
+    forms.push([...fold, ...ai, { text: t('bench.badge.deferred'), dim: true }])
     return forms
   }
   if (isUnclaimedBrief(d)) {

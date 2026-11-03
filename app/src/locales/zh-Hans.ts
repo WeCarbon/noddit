@@ -39,6 +39,7 @@ export const zhHans: Strings = {
   live: '实时',
   sent: '已发送',
   deferred: '已延迟',
+  deferredByAi: 'AI 延迟的',
   undeferred: '已回到列表',
   replied: '已回复',
   seenShort: '看过',

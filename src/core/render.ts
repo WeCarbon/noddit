@@ -9,7 +9,7 @@ import { overdue } from './order.ts'
 import { isWaitDue } from './status.ts'
 import { formatRef, refOf } from './ref.ts'
 import { minutesSince, stalenessOf } from './staleness.ts'
-import { delayOf, isDeferred, statusLabel } from './status.ts'
+import { deferredByAgent, delayOf, isDeferred, statusLabel } from './status.ts'
 import { lastHumanAt, reopenedAfterArchive } from './store.ts'
 import { type Attachment, type AttachmentApproval, type Decision } from './types.ts'
 
@@ -180,6 +180,8 @@ export function toJSON(d: Decision): Record<string, unknown> {
     wait_due: isWaitDue(d),
     deferred_at: d.deferredAt ?? null,
     deferred_by: d.deferredBy ?? null,
+    /** The deferral on record was an agent's, not the owner's — shown marked. */
+    deferred_by_ai: deferredByAgent(d),
     /** `nod defer --until`: when it comes back on its own; null = deferred until undeferred (or not deferred). */
     deferred_until: d.deferredAt ? (d.deferredUntil ?? null) : null,
     /** 延迟, whichever record holds it: `{ kind: passive | active, until, on }`, or null. */

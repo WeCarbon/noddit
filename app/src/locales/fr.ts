@@ -40,6 +40,7 @@ export const fr: Strings = {
   live: 'En direct',
   sent: 'Envoyé',
   deferred: 'Reporté',
+  deferredByAi: 'Reporté par une IA',
   undeferred: 'De retour dans les listes',
   replied: 'Commentaire ajouté',
   seenShort: 'Vu',

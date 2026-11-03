@@ -4,7 +4,7 @@ import { approvalLabel, deferredLabel } from '../core/render.ts'
 import { refOf } from '../core/ref.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { minutesSince } from '../core/staleness.ts'
-import { dependenciesOf, isDeferred, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
+import { deferredByAgent, dependenciesOf, isDeferred, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps } from '../core/steps.ts'
 import { type Decision as Item } from '../core/types.ts'
 import { OTHER_KEY, type DecisionQuestion } from '../core/questions.ts'
@@ -97,7 +97,7 @@ export function metaLines(d: Item, items: Item[], now: number, width: number, ba
   out.push([{ text: ` ${d.author || t('bench.detail.unsigned')}`, dim: true }, { text: `  ${waited}`, dim: true }])
 
   const flags: Segment[] = []
-  if (isDeferred(d)) flags.push({ text: ` ${t('bench.detail.undefer', { label: deferredLabel(d, now) })}`, color: 'gray' })
+  if (isDeferred(d)) flags.push({ text: ` ${deferredByAgent(d) ? `${t('bench.badge.byAi')} · ` : ''}${t('bench.detail.undefer', { label: deferredLabel(d, now) })}`, color: deferredByAgent(d) ? 'red' : 'gray' })
   if (d.urgency === 'high') flags.push({ text: ` ★ ${t('bench.badge.urgent')}`, color: 'yellow', bold: true })
   if (d.urgency === 'low') flags.push({ text: ` ${t('bench.badge.notUrgent')}`, dim: true })
   if (d.every && !isTerminal(d.state)) flags.push({ text: ` ${t('bench.detail.every', { every: d.every })}`, color: 'magenta' })

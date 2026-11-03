@@ -73,7 +73,8 @@
     "todo": "To do",
     "doing": "In progress",
     "due": "Due {{when}}",
-    "overdue": "Overdue {{span}}"
+    "overdue": "Overdue {{span}}",
+    "byAi": "by an AI"
   },
   "detail": {
     "aiStuck": "AI stuck",

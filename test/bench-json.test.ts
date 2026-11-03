@@ -72,7 +72,7 @@ test('decs bench --json: stale_count is not_started/not-deferred nodes; a node\'
   decs(root, ['add', 'also not started', '--task'])
   decs(root, ['add', 'running', '--task'])
   decs(root, ['start', '3'])
-  decs(root, ['defer', '1'])
+  decs(root, ['defer', '1', '--human'])
 
   const j = benchJson(root)
   assert.equal(j.projects[0].stale_count, 1, 'node 1 is deferred, so only node 2 counts')

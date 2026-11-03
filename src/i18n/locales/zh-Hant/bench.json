@@ -73,7 +73,8 @@
     "todo": "待辦",
     "doing": "在做",
     "due": "{{when}}到期",
-    "overdue": "逾期 {{span}}"
+    "overdue": "逾期 {{span}}",
+    "byAi": "AI 延後的"
   },
   "detail": {
     "aiStuck": "AI 卡住",
