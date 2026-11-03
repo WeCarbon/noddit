@@ -1,6 +1,7 @@
-import { assigneeArg, isHumanTask, isMilestoneWord } from '../../core/assignee.ts'
+import { assigneeArg, HUMAN, isHumanTask, isMilestoneWord } from '../../core/assignee.ts'
 import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
+import { mentionsRemind } from '../../core/remind.ts'
 import { bool, one, type Args } from '../args.ts'
 import { requireDecision, resolveStore, shellRole } from '../context.ts'
 import { t } from '../../i18n/index.ts'
@@ -38,5 +39,7 @@ export function run(args: Args): number {
   const next = handOff ? store.handToAi(d, { by: one(args, 'by') ?? 'owner', text: note }) : store.assign(d, assignee)
   if (bool(args, 'json')) console.log(JSON.stringify(toJSON(next)))
   else console.log(t(handOff ? 'cli.assign.handedToAi' : assignee ? 'cli.assign.toHuman' : 'cli.assign.toAi', { ref: refOf(next) }))
+  // 「提醒我」「告诉我」: handing this to the owner doesn't make reminding them the owner's own job.
+  if (assignee === HUMAN && mentionsRemind(`${d.title} ${d.body}`)) process.stderr.write(`${t('cli.assign.remindHint', { ref: refOf(next) })}\n`)
   return 0
 }

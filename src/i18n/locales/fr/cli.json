@@ -519,6 +519,7 @@
     "toHuman": "{{ref}} est à vous maintenant — dans Travail humain, aucune IA n’y touche",
     "toAi": "{{ref}} est confié à une IA",
     "handedToAi": "{{ref}} est confié à une IA — celle qui s’en charge l’apprend comme une réponse",
+    "remindHint": "remarque : est-ce que {{ref}} est quelque chose que le responsable fait lui-même ? rappeler, informer ou signaler quelque chose au responsable est le travail d’une IA — utilisez `nod add --remind <heure> \"<quoi>\"`",
     "toMilestone": "{{ref}} est un jalon maintenant — un objectif, la tâche de personne"
   },
   "date": {

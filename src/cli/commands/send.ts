@@ -8,6 +8,7 @@ import { isListening } from '../../core/listeners.ts'
 import { assigneeArg, HUMAN } from '../../core/assignee.ts'
 import { milestoneDue } from './flag.ts'
 import { parseEvery } from '../../core/fuzzy-date.ts'
+import { mentionsRemind } from '../../core/remind.ts'
 import { nodditEnv, setNodditEnv } from '../../core/env.ts'
 import { URGENCIES } from '../../core/order.ts'
 import { parseOptions, splitFrontMatter } from '../../core/parse.ts'
@@ -95,6 +96,8 @@ export async function run(args: Args): Promise<number> {
   const store = resolveStore(args)
   const d = store.create(input)
   warnOtherAuthor(d.author, refOf(d))
+  // 「提醒我」「告诉我」: the owner wrote a request for an AI to act on, not a to-do for their own hands.
+  if (assignee === HUMAN && mentionsRemind(`${input.title} ${input.body}`)) process.stderr.write(`${t('cli.assign.remindHint', { ref: refOf(d) })}\n`)
 
   if (brief) {
     const root = store.layoutOf(d).projectRoot

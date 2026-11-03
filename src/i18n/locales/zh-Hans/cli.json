@@ -505,6 +505,7 @@
     "toHuman": "{{ref}} 现在是你的事——在「人类工作」里，AI 不会去做",
     "toAi": "{{ref}} 现在交给 AI",
     "handedToAi": "{{ref}} 交给 AI 了——做它的 AI 会像收到回复一样收到",
+    "remindHint": "提示：{{ref}} 是负责人亲手做的事吗？提醒、汇报、通知负责人是 AI 的活——用 `nod add --remind <时间> \"<内容>\"`",
     "toMilestone": "{{ref}} 现在是里程碑——不是谁的事"
   },
   "date": {

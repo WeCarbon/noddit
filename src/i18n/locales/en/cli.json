@@ -520,7 +520,8 @@
     "toHuman": "{{ref}} is yours now — it is in Human work, and no AI works on it",
     "toAi": "{{ref}} is for an AI now",
     "toMilestone": "{{ref}} is a milestone now — a goal, not anyone's to-do",
-    "handedToAi": "{{ref}} is handed to an AI — whoever runs it hears it, like a reply"
+    "handedToAi": "{{ref}} is handed to an AI — whoever runs it hears it, like a reply",
+    "remindHint": "hint: is {{ref}} something the owner does by hand? reminding, reporting to, or notifying the owner is an AI's job — use `nod add --remind <time> \"<what>\"`"
   },
   "date": {
     "suggest": {
