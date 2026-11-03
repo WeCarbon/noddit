@@ -368,7 +368,7 @@ export const fr: Strings = {
   moveToPlaceholder: 'Le nouveau parent : un numéro ou des mots de son titre',
   movedUnder: 'Déplacé sous {{ref}}',
   ctxCopyRefs: 'Copier les {{count}} numéros',
-  batchDone: '{{what}} · {{count}} nœuds',
+  batchDone: '{{what}} · {{count}}',
   batchFailed: 'Non enregistré pour {{refs}} — le reste est passé',
   batchHint: 'Clic droit sur une ligne choisie pour les mêmes actions · Échap pour tout désélectionner',
 }

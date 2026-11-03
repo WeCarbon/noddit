@@ -365,7 +365,7 @@ export const en = {
   moveToPlaceholder: 'The new parent: a number or words from its title',
   movedUnder: 'Moved under {{ref}}',
   ctxCopyRefs: 'Copy the {{count}} numbers',
-  batchDone: '{{what}} · {{count}} nodes',
+  batchDone: '{{what}} · {{count}}',
   batchFailed: 'Not saved for {{refs}} — the rest went through',
   batchHint: 'Right-click a picked row for the same actions · Esc clears',
 }

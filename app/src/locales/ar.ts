@@ -367,7 +367,7 @@ export const ar: Strings = {
   moveToPlaceholder: 'الأصل الجديد: رقم أو كلمات من عنوانه',
   movedUnder: 'نُقلت تحت {{ref}}',
   ctxCopyRefs: 'نسخ الأرقام ({{count}})',
-  batchDone: '{{what}} · {{count}} عقد',
+  batchDone: '{{what}} · {{count}}',
   batchFailed: 'لم يُحفظ لـ {{refs}} — والباقي تمّ',
   batchHint: 'انقر بزر الفأرة الأيمن على صف محدد للإجراءات نفسها · Esc لإلغاء التحديد',
 }

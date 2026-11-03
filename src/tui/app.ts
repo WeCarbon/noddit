@@ -290,6 +290,13 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (index >= 0) lastIndex.current = index
   }, [index])
   const current: Decision | undefined = index >= 0 ? list[index]?.node : undefined
+  /** Space marks rows; with any marked, the action keys act on every marked node still listed here. */
+  const [marked, setMarked] = useState<ReadonlySet<string>>(new Set())
+  const markedNodes = useMemo(() => {
+    const seen = new Map<string, Decision>()
+    for (const r of list) if (r.kind === 'node' && r.node && marked.has(keyOf(r.node))) seen.set(keyOf(r.node), r.node)
+    return [...seen.values()]
+  }, [list, marked])
   const backlinks = useMemo(() => (current ? store.backlinks(current, items) : []), [store, current, items])
 
   const reload = useCallback(() => {
@@ -457,7 +464,52 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     reload()
   }
 
+  /** `fn` on every marked node, then one line: how many it did, and which refused and why. The marks go. */
+  const onMarked = (what: string, fn: (d: Decision) => void) => {
+    const failed: string[] = []
+    let why = ''
+    for (const d of markedNodes) {
+      try {
+        fn(d)
+      } catch (e) {
+        failed.push(refOf(d))
+        why ||= (e as Error).message.split('\n')[0]
+      }
+    }
+    const count = markedNodes.length - failed.length
+    say(failed.length ? t('bench.toast.batchFailed', { what, n: count, refs: failed.join(' '), error: why }) : t('bench.toast.batchDone', { what, n: count }))
+    setMarked(new Set())
+    reload()
+  }
+  const live = (d: Decision) => {
+    if (isTerminal(d.state)) throw new Error(t('bench.toast.alreadyPendingChange', { ref: refOf(d), status: statusLabel(d.state) }))
+  }
+  /** The prompt for a batch: the "N marked" line just shown would hide it, so it goes. */
+  const askForMarked = (m: Mode) => {
+    setBanner(null)
+    startText(m)
+  }
+  const toggleMark = () => {
+    if (!current) return
+    const k = keyOf(current)
+    const next = new Set(markedNodes.map(keyOf))
+    if (next.has(k)) next.delete(k)
+    else next.add(k)
+    setMarked(next)
+    say(next.size ? t('bench.toast.marked', { n: next.size }) : t('bench.toast.marksCleared'))
+  }
+
   const commitClose = () => {
+    if (markedNodes.length) {
+      const reason = draft.trim() || 'obsolete'
+      setMode('browse')
+      setDraft('')
+      return onMarked(t('bench.toast.batchArchived'), (d) => {
+        live(d)
+        if (d.state === 'decided') store.dismiss(d)
+        else store.close(d, reason)
+      })
+    }
     if (current) {
       const reason = draft.trim() || 'obsolete'
       try {
@@ -549,6 +601,13 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
 
   /** 延迟 (`d`): already delayed, it is lifted; otherwise a prompt asks until when, and on what. */
   const toggleDefer = () => {
+    if (markedNodes.length) {
+      if (!markedNodes.every((d) => delayOf(d) || d.deferredAt)) return askForMarked('delay')
+      return onMarked(t('bench.toast.batchUndelayed'), (d) => {
+        live(d)
+        store.undelay(d, { by: 'owner', role: 'human' })
+      })
+    }
     if (!current) return
     if (isTerminal(current.state)) return say(t('bench.toast.cannotDeferTerminal'))
     if (delayOf(current) || current.deferredAt) {
@@ -565,6 +624,11 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
 
   /** `s`: picks the node up. Already running or finished says so; needing a decision or an unmet `after` refuses with the store's own reason. */
   const startNode = () => {
+    if (markedNodes.length)
+      return onMarked(t('bench.toast.batchStarted'), (d) => {
+        if (d.state === 'in_progress' || d.state === 'decided' || isTerminal(d.state)) throw new Error(t('bench.toast.alreadyPendingChange', { ref: refOf(d), status: statusLabel(d.state) }))
+        store.start(d, {})
+      })
     if (!current) return
     if (current.state === 'in_progress' || current.state === 'decided' || isTerminal(current.state))
       return say(t('bench.toast.alreadyPendingChange', { ref: refOf(current), status: statusLabel(current.state) }))
@@ -581,6 +645,14 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
    *  path `nod assign <id> ai` from the owner takes); taking an AI's node for yourself
    *  is a plain reassignment — bench always answers as the owner, so there is no `--force` gate. */
   const reassign = () => {
+    if (markedNodes.length) {
+      // All the owner's already: hand them to an AI; otherwise take every one that isn't yet.
+      const toAi = markedNodes.every(isHumanTask)
+      return onMarked(t(toAi ? 'bench.toast.batchAssignedAi' : 'bench.toast.batchAssignedMe'), (d) => {
+        if (toAi) store.handToAi(d, { by: 'owner' })
+        else if (!isHumanTask(d)) store.assign(d, HUMAN)
+      })
+    }
     if (!current) return
     try {
       const toAi = isHumanTask(current)
@@ -594,6 +666,12 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
 
   /** 「延迟 R 天」 (`D`): to today + the node's R; a wait keeps its who. */
   const delayEvery = () => {
+    if (markedNodes.length)
+      return onMarked(t('bench.toast.batchDelayed'), (d) => {
+        live(d)
+        if (!d.every) throw new Error(t('bench.toast.noEvery', { ref: refOf(d) }))
+        store.delayEvery(d, { by: 'owner', role: 'human' })
+      })
     if (!current) return
     if (isTerminal(current.state)) return say(t('bench.toast.cannotDeferTerminal'))
     if (!current.every) return say(t('bench.toast.noEvery', { ref: refOf(current) }))
@@ -617,6 +695,11 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     try {
       if (rest && !when) throw new Error(t('bench.toast.delayNeedsDate'))
       if (when && when.at.getTime() <= Date.now()) throw new Error(t('cli.defer.untilPast', { value: raw, date: dayText(when.day) }))
+      if (markedNodes.length)
+        return onMarked(t('bench.toast.batchDelayed'), (d) => {
+          live(d)
+          store.delay(d, { by: 'owner', role: 'human', until: when && nowStamp(when.at), on: rest || undefined })
+        })
       const next = store.delay(current, { by: 'owner', role: 'human', until: when && nowStamp(when.at), on: rest || undefined })
       const date = when ? dayText(when.day) : ''
       say(next.state === 'waiting' ? t('bench.toast.delayedOn', { ref: refOf(next), on: next.waitingOn ?? '', date }) : when ? t('bench.toast.delayedUntil', { ref: refOf(next), date }) : t('bench.toast.deferred', { ref: refOf(next) }))
@@ -629,6 +712,10 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   /** 归档 (`a`): decided (you answered, an AI hasn't picked it up) archives right away, same
    *  as the old "seen"; anything still open asks why first, same as the old "close". */
   const archive = () => {
+    if (markedNodes.length) {
+      if (!markedNodes.every((d) => d.state === 'decided')) return askForMarked('close')
+      return onMarked(t('bench.toast.batchArchived'), (d) => store.dismiss(d))
+    }
     if (!current) return
     if (isTerminal(current.state)) return say(t('bench.toast.alreadyPendingChange', { ref: refOf(current), status: statusLabel(current.state) }))
     if (current.state === 'decided') {
@@ -967,6 +1054,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   }, [mode, imageSel, current?.file, width, rows, zoom, imgMeta])
 
   const frameInput: FrameInput = {
+    marked: markedNodes.length ? new Set(markedNodes.map(keyOf)) : undefined,
     view, list, index, current, items, overview, now, backlinks,
     rows, width, listTop, offset, condensed, mode, draft, caret, imageSel, pendingKey, banner,
     zoom, zoomable: imgMeta !== null, detailFocus, pickToOpen,
@@ -1236,6 +1324,10 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       if (key.rightArrow) return
     }
 
+    if (key.escape && markedNodes.length) {
+      setMarked(new Set())
+      return say(t('bench.toast.marksCleared'))
+    }
     if (input === 'q' || key.escape) return exit()
     if (key.tab) return cycleView(key.shift ? -1 : 1)
 
@@ -1255,7 +1347,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (input === 'k') return setOffset((o) => Math.max(0, o - 1))
     if (input === 'j') return setOffset((o) => o + 1)
     if (key.pageUp) return setOffset((o) => Math.max(0, o - pageRows))
-    if (key.pageDown || input === ' ') return setOffset((o) => o + pageRows)
+    if (key.pageDown) return setOffset((o) => o + pageRows)
+    if (input === ' ') return toggleMark()
     if (input === '+' || input === '=') return foldKeyPress(false)
     if (input === '-') return foldKeyPress(true)
     // g is goto, like `:`; the body's top moved to Home.
@@ -1323,6 +1416,13 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (input === 'n' || input === 'N') return startText('note')
     if (input === 'T') return startText('retitle', current.title)
     if (input === 'a' || input === 'A') return archive()
+    if (input === '!' && markedNodes.length) {
+      const on = !markedNodes.every((d) => d.urgency === 'high')
+      return onMarked(t(on ? 'bench.toast.batchImportant' : 'bench.toast.batchUnimportant'), (d) => {
+        live(d)
+        store.flag(d, { important: on })
+      })
+    }
     if (input === '!') {
       const on = current.urgency !== 'high'
       try {
@@ -1374,6 +1474,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
 }
 
 export interface FrameInput {
+  /** Keys of the marked nodes (space), when any are. */
+  marked?: ReadonlySet<string>
   view: View
   list: Row[]
   /** Index into `list` of the cursor row; -1 when there is nothing to select. */
@@ -2044,6 +2146,7 @@ export function renderList(s: FrameInput, g: Geometry, width: number, rows: numb
       segs = [{ text: fit(` ${'  '.repeat(row.depth)} ${row.text}`, inner, isRtl()), dim: !selected, color: selected ? undefined : 'green' }]
     } else {
       segs = nodeRowSegments(row, s.items, inner, s.now, { tree: isTreeView(s.view) })
+      if (s.marked?.has(keyOf(row.node!))) segs = [{ text: '•', color: 'magenta', bold: true }, ...segs.slice(1)]
     }
     out.push(selected ? padLine(segs, inner).map((seg) => ({ ...seg, inverse: true })) : segs)
   })
@@ -2220,9 +2323,10 @@ function promptPrefix(s: FrameInput): Line | null {
     const q = d.questions?.[s.qIndex ?? 0]
     return [{ text: t('bench.prompt.qother', { key: q?.key ?? '' }), color: 'magenta', bold: true }]
   }
-  if (s.mode === 'close') return [{ text: t('bench.prompt.close', { ref: refOf(d) }), color: 'red', bold: true }]
+  const target = s.marked?.size ? t('bench.toast.markedCount', { n: s.marked.size }) : refOf(d)
+  if (s.mode === 'close') return [{ text: t('bench.prompt.close', { ref: target }), color: 'red', bold: true }]
   if (s.mode === 'retitle') return [{ text: t('bench.prompt.retitle', { ref: refOf(d) }), color: 'cyan', bold: true }]
-  if (s.mode === 'delay') return [{ text: t('bench.prompt.delay', { ref: refOf(d) }), color: 'magenta', bold: true }]
+  if (s.mode === 'delay') return [{ text: t('bench.prompt.delay', { ref: target }), color: 'magenta', bold: true }]
   return null
 }
 
