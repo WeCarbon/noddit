@@ -9,3 +9,10 @@ export function plainReply(markdown: string): string {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+/** A brief's title is the owner's words cut to fit a list row; a notice has room for all of them. */
+export function noticeTitle(n: { title: string; intake?: boolean; original?: string | null }): string {
+  const cut = n.title.endsWith('…') ? n.title.slice(0, -1).trimEnd() : null
+  const words = n.original?.replace(/\s+/g, ' ').trim()
+  return n.intake && cut && words?.startsWith(cut) ? words : n.title
+}

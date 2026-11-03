@@ -25,7 +25,7 @@ import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
 import { useLiveMotion } from './motion.ts'
 import { NoticeStack, noticeWhat, useNoticeQueue, type Notice } from './notices.tsx'
-import { plainReply } from './plain-reply.ts'
+import { noticeTitle, plainReply } from './plain-reply.ts'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, heldAt, keepHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, type Held, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
@@ -493,16 +493,18 @@ export function Bench(props: {
     const n = nodeByRef(ref)
     const root = n && benchNow.current.projects.find((p) => p.project === n.project)?.root
     let text: string | undefined
+    let title = n ? noticeTitle(n) : ''
     if (n && root) {
       try {
         const fresh = await api.loadNode(root, n.id)
+        title = noticeTitle(fresh)
         const last = [...fresh.notes].reverse().find((x) => x.role === 'agent')
         text = last ? plainReply(last.text) || undefined : undefined
       } catch {
-        /* the notice still goes, without the text */
+        /* the notice still goes, with what the bench on hand knows */
       }
     }
-    void notify({ kind: 'replied', key: n?.key ?? '', ref, title: n?.title ?? '', text })
+    void notify({ kind: 'replied', key: n?.key ?? '', ref, title, text })
   }
   useEffect(() => {
     void api.on<Notice>('notice', (n) => void notify(n))
@@ -525,13 +527,13 @@ export function Bench(props: {
     for (const n of Object.values(props.bench.nodes)) {
       const was = before.nodes[n.key]
       if (!was) continue
-      if (was.brief === 'unclaimed' && n.brief === 'claimed') void notify({ kind: 'claimed', key: n.key, ref: n.ref, title: n.title }, true)
+      if (was.brief === 'unclaimed' && n.brief === 'claimed') void notify({ kind: 'claimed', key: n.key, ref: n.ref, title: noticeTitle(n) }, true)
     }
     const due = (b: BenchData) => new Set(b.views.flatMap((v) => v.rows).filter((r) => r.wait_due && r.node).map((r) => r.node!))
     const dueBefore = due(before)
     for (const key of due(props.bench)) {
       const n = props.bench.nodes[key]
-      if (n && !dueBefore.has(key)) void notify({ kind: 'checkBack', key, ref: n.ref, title: n.title }, true)
+      if (n && !dueBefore.has(key)) void notify({ kind: 'checkBack', key, ref: n.ref, title: noticeTitle(n) }, true)
     }
   }, [props.bench])
   const toggleImportant = () => {
