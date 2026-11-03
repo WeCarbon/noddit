@@ -10,13 +10,14 @@ import { resolveAuthor, resolveStore } from '../context.ts'
 import { askIfDue, staleNagDue, staleTasksOf } from '../../core/checkins.ts'
 import { parseDuration, parseSince } from '../../core/duration.ts'
 import { currentIdentity } from '../../core/identity.ts'
-import { findLayout } from '../../core/paths.ts'
+import { findLayout, type Layout } from '../../core/paths.ts'
 import { listSources, sourceEventsSince } from '../../core/sources.ts'
 import { createSourceSyncRunner } from '../../core/source-sync.ts'
 import { DEFERRAL_CLOCK, isLatestNoteOwnerFacing, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
 import { isUnclaimedBrief, originalWords } from '../../core/intake.ts'
 import { HEARTBEAT_MS, harnessOf, removeHeartbeat, writeHeartbeat } from '../../core/listeners.ts'
 import { currentTerminal } from '../../core/terminal.ts'
+import { isAuthorListening, recordTidySent, tidyDue, tidyFindings } from '../../core/tidy.ts'
 import type { Decision } from '../../core/types.ts'
 import { refOf as refOfNode } from '../../core/ref.ts'
 import { NOTE_KIND, noteKindKey } from '../../core/format.ts'
@@ -419,6 +420,9 @@ export async function run(args: Args): Promise<number> {
 
   const pass = (first = false) => {
     const startedAt = nowStamp(new Date(), { ms: true })
+    // N187/N189: whether this pass has printed anything else yet — an
+    // "attach" tidy nudge only rides along one of those, never fires alone.
+    const eventAtBeforeTidy = lastEventAt
     if (updates) {
       try {
         reportUpdates(first)
@@ -531,6 +535,43 @@ export async function run(args: Args): Promise<number> {
       } catch (err) {
         process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
       }
+    }
+    // Tree tidiness (N187/N188/N189): this session's own nag clock
+    // (core/tidy.ts's tidyDue), not a per-node one — `nod tidy` is the ack.
+    // `push` goes out on its own; `attach` only rides along something this
+    // pass already printed, so a quiet project isn't nagged out of nowhere
+    // before the push span.
+    try {
+      const items = store.all()
+      const findings = tidyFindings(items, (d, name) => isAuthorListening(store.layoutOf(d).projectRoot, name))
+      const byKey = new Map(items.map((d) => [`${d.project}#${d.id}`, d]))
+      const findingsOf = (l: Layout) => {
+        const project = store.projectName(l)
+        const mine = findings.filter((f) => f.project === project)
+        return author ? mine.filter((f) => ownedBy(byKey.get(`${f.project}#${f.id}`)!, author)) : mine
+      }
+      const emitTidy = (l: Layout) => {
+        const mine = findingsOf(l)
+        const refs = mine.map((f) => f.ref)
+        lastEventAt = Date.now()
+        process.stdout.write(
+          asJson
+            ? `${JSON.stringify({ event: 'tidy', refs, count: mine.length })}\n`
+            : `NODDIT-TIDY ${mine.length ? `${refs.join(' ')} ${t('cli.monitor.tidy', { count: mine.length })}` : t('cli.monitor.tidyClean')}\n`,
+        )
+        recordTidySent(l, author)
+      }
+      const pendingAttach: Layout[] = []
+      for (const l of store.layouts) {
+        const mode = tidyDue(l, author)
+        if (mode === 'push') emitTidy(l)
+        else if (mode === 'attach') pendingAttach.push(l)
+      }
+      if (pendingAttach.length && lastEventAt !== eventAtBeforeTidy) {
+        for (const l of pendingAttach) emitTidy(l)
+      }
+    } catch (err) {
+      process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
     }
     cursor = startedAt
     saveCursor(stateFile, cursor)

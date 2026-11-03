@@ -11,7 +11,9 @@
     "mouse": "Souris",
     "idle-exit": "Arrêt de la surveillance après inactivité",
     "unclaimed-after": "Réponse non reprise après",
-    "checkin-after": "Relance d’avancement après"
+    "checkin-after": "Relance d’avancement après",
+    "tidy-after": "Relance d’arbre (en écho) après",
+    "tidy-push-after": "Relance d’arbre (seule) après"
   },
   "value": {
     "auto": "automatique",

@@ -111,6 +111,9 @@ nod 里批（bench 里按数字，或 owner 自己的终端）；`--human` 只�
   `nod progress` / `nod note` / `nod beat <id>`（没有新内容时用，等于「我还在做」）；
 - `NODDIT-STALE` → 有节点既不待决策、也没人在做，放太久了，`nod start` / `nod defer` /
   `nod close` 或重新规划；
+- `NODDIT-TIDY` → 这个会话自己的树跟状态对不上，或者只是有一阵子没查了——`nod tidy` 看看
+  哪里对不上，然后 `nod done` / `nod close` / `nod move` 或重新规划；没问题就在节点上记
+  一句为什么；`nod tidy` 本身就是回应这条提醒的方式（会记一次 ack，清零下次提醒的计时）；
 - `DECS-ERROR` → 看一眼，monitor 会继续；
 - `DECS-IDLE` → 连续 2 小时（`--idle-exit`，0 = 不下线）没有事件，monitor 自己下线了。
 

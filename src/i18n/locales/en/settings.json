@@ -11,7 +11,9 @@
     "mouse": "Mouse",
     "idle-exit": "Monitor stops after idle",
     "unclaimed-after": "Unclaimed answer after",
-    "checkin-after": "Check in after"
+    "checkin-after": "Check in after",
+    "tidy-after": "Tidy nudge after",
+    "tidy-push-after": "Tidy nudge alone after"
   },
   "value": {
     "auto": "automatic",

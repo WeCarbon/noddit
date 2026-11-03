@@ -11,7 +11,9 @@
     "mouse": "鼠标",
     "idle-exit": "监听空闲多久下线",
     "unclaimed-after": "答复多久没人取算没人管",
-    "checkin-after": "没更新多久要问进度"
+    "checkin-after": "没更新多久要问进度",
+    "tidy-after": "多久没理树就搭话提醒",
+    "tidy-push-after": "多久没理树就主动提醒"
   },
   "value": {
     "auto": "自动",

@@ -89,6 +89,20 @@ export const SETTINGS: readonly Setting[] = [
     default: '30m',
     env: 'CHECKIN_AFTER',
   },
+  {
+    key: 'tidy-after',
+    type: 'duration',
+    values: ['30m', '1h', '2h', '4h'],
+    default: '1h',
+    env: 'TIDY_AFTER',
+  },
+  {
+    key: 'tidy-push-after',
+    type: 'duration',
+    values: ['1h', '2h', '4h', '8h'],
+    default: '2h',
+    env: 'TIDY_PUSH_AFTER',
+  },
 ]
 
 export function settingFor(key: string): Setting | undefined {

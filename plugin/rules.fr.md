@@ -93,8 +93,8 @@ suite — tout est dans `nod bench`. Hors nod, invisible. Détails :
   en écho d'une autre ligne, mais elle peut apparaître seule après un
   silence assez long) ; `NODDIT-STALE` → des nœuds ni à décider ni en
   cours dorment depuis trop longtemps — `nod start`, `nod defer`,
-  `nod close`, ou replanifiez chacun ; `DECS-ERROR` → regardez, la
-  surveillance continue.
+  `nod close`, ou replanifiez chacun ; `NODDIT-TIDY` → `nod tidy` pour
+  régler ; `DECS-ERROR` → regardez, la surveillance continue.
 - **`DECS-IDLE`** : après 2 heures de calme, la surveillance s'arrête seule.
   Besoin d'attendre une réponse ensuite ?
   `Monitor({ command: "nod monitor", description: "nod", timeout_ms:

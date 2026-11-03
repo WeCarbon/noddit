@@ -96,8 +96,8 @@ load the decs skill.
   on another line, but it can show up on its own after a long enough
   silence); a `NODDIT-STALE` line → some not-started, not-decision-
   blocked nodes have sat untouched — `nod start`, `nod defer`,
-  `nod close`, or re-plan each one; `DECS-ERROR` → look, the monitor
-  keeps going.
+  `nod close`, or re-plan each one; `NODDIT-TIDY` → `nod tidy` to fix
+  it; `DECS-ERROR` → look, the monitor keeps going.
 - **`DECS-IDLE`**: after 2 quiet hours the monitor stops itself. Need to
   wait on a reply again later? Arm it: `Monitor({ command: "nod
   monitor", description: "nod", timeout_ms: 1800000 })`, re-arm

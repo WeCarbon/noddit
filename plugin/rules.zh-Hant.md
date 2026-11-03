@@ -53,7 +53,9 @@
   `NODDIT-CHECKIN` → 馬上在那個節點上用 `nod progress`、`nod note`，或沒有新內容就 `nod beat <id>`
   回報——問滿 3 次沒回看板會標出來（多半搭著別的訊息一起來，靜默夠久也可能自己單獨出現）；
   `NODDIT-STALE` → 有些既不待決策、也沒人在做的節點放太久了，逐一 `nod start`、`nod defer`、`nod close`
-  或重新規劃；`DECS-ERROR` → 看一眼，監聽會繼續。
+  或重新規劃；`NODDIT-TIDY` → 這個工作階段自己的樹跟狀態對不上，或者只是有一陣子沒查了——用 `nod tidy`
+  看看怎麼對不上，然後 `nod done`、`nod close`、`nod move` 或重新規劃，沒問題就在節點上記一句為什麼；
+  `DECS-ERROR` → 看一眼，監聽會繼續。
 - **`DECS-IDLE`**：連續 2 小時沒有事件，監聽自己下線了。之後又有要等負責人回覆的事，自己掛：
   `Monitor({ command: "nod monitor", description: "nod", timeout_ms: 1800000 })`，到期原樣重掛（它自己記得看到哪）。
 - **裸的 `nod monitor` 只盯 cwd 所在的專案**——跟 `--here` 一樣，只是沒專案時不會退出。要盯所有登記過的
