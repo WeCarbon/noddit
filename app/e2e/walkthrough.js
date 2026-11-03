@@ -208,6 +208,52 @@
     key('Escape')
     await until('viewer closed', () => !$('.viewer'))
 
+    log('STEP image-zoom')
+    // Only images zoom: wheel (and trackpad pinch, the same event with ctrlKey) around the
+    // cursor, clamped to 1x-8x; drag pans once zoomed; 0 and leaving the image reset.
+    $$('.row.node').find((r) => r.textContent.includes('Write the schema')).click()
+    ;(await until('the screenshot thumbnail', () => $$('.shot').find((f) => f.textContent.includes('screenshot.png')))).click()
+    const img = await until('the image shown', () => $('.viewer-stage.image img'))
+    await until('the image loaded', () => img.complete && img.naturalWidth > 0, 5000)
+    const scaleOf = () => Number(/scale\(([\d.]+)\)/.exec(img.style.transform)?.[1] ?? 1)
+    const xyOf = () => (/translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(img.style.transform)?.slice(1).map(Number)) ?? [0, 0]
+    if ($('.lb-caption').textContent.includes('%')) throw new Error('a percent showed before any zoom')
+    const imgBox = img.getBoundingClientRect()
+    const wheel = (deltaY, opts = {}) => img.dispatchEvent(new WheelEvent('wheel', { deltaY, clientX: imgBox.left + imgBox.width / 2, clientY: imgBox.top + imgBox.height / 2, bubbles: true, cancelable: true, ...opts }))
+    wheel(-600)
+    await until('zoomed past fit', () => scaleOf() > 1)
+    await until('the percent in the caption', () => /\d+%/.test($('.lb-caption').textContent))
+    await shot('image-zoom')
+    const zoomedOnce = scaleOf()
+    wheel(-200, { ctrlKey: true }) // a trackpad pinch
+    await until('the pinch zoomed further', () => scaleOf() > zoomedOnce)
+    wheel(-1e6) // enough to go well past 8x if nothing clamped it
+    await until('clamped at 8x', () => scaleOf() === 8)
+
+    // Drag to pan; the release must not fall through to the background's click-to-close.
+    const [x0, y0] = xyOf()
+    img.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1, button: 0, buttons: 1, clientX: imgBox.left + 5, clientY: imgBox.top + 5 }))
+    img.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 1, buttons: 1, clientX: imgBox.left + 60, clientY: imgBox.top + 55 }))
+    await until('the drag panned it', () => { const [x, y] = xyOf(); return x !== x0 || y !== y0 })
+    img.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 1, clientX: imgBox.left + 60, clientY: imgBox.top + 55 }))
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    await sleep(50)
+    if (!$('.viewer')) throw new Error('the drag release closed the viewer')
+
+    key('0')
+    await until('reset to fit', () => scaleOf() === 1)
+    if ($('.lb-caption').textContent.includes('%')) throw new Error('the percent stayed after reset')
+    wheel(-600)
+    await until('zoomed again', () => scaleOf() > 1)
+    key('ArrowLeft')
+    await until('moved to the log, not an image', () => $('.viewer-stage.text')?.textContent.includes('migration 2 ok'))
+    key('ArrowRight')
+    const img2 = await until('back on the screenshot', () => $('.viewer-stage.image img'))
+    const scaleOf2 = () => Number(/scale\(([\d.]+)\)/.exec(img2.style.transform)?.[1] ?? 1)
+    await until('leaving and returning to the image dropped the old zoom', () => scaleOf2() === 1)
+    key('Escape')
+    await until('viewer closed', () => !$('.viewer'))
+
     log('STEP defer')
     // d asks until when; Enter on an empty date defers indefinitely.
     const deferNow = async () => {

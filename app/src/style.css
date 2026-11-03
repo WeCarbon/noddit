@@ -2131,6 +2131,12 @@ figcaption {
   justify-content: center;
 }
 
+/* Zoom pivots on the image's own top-left corner — the pan math in viewer.tsx assumes it. */
+.viewer-stage.image img {
+  transform-origin: 0 0;
+  touch-action: none;
+}
+
 .viewer-stage.text,
 .viewer-stage.markdown,
 .viewer-stage.other {

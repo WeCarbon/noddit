@@ -1,9 +1,10 @@
 import { Code2, ExternalLink, FileText, Globe } from 'lucide-preact'
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { Body } from './body.tsx'
 import { s } from './strings.ts'
 import type { Attachment, Node } from './types.ts'
+import { clampPan, FIT, zoomTo, ZOOM_MIN, type ZoomState } from './zoom.ts'
 
 /** One thing the big viewer can show. */
 export interface ViewItem {
@@ -87,6 +88,9 @@ export function Viewer(p: { items: ViewItem[]; at: number; onAt: (i: number) => 
   const kind = kindOf(it)
   const [text, setText] = useState<{ path: string; body: string; truncated: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [zoom, setZoom] = useState<ZoomState>(FIT)
+  // A click right after a drag-pan release must not fall through to the background's close.
+  const draggedRef = useRef(false)
   useEffect(() => {
     setError(null)
     if (kind !== 'text' && kind !== 'markdown' && kind !== 'html') return
@@ -99,16 +103,63 @@ export function Viewer(p: { items: ViewItem[]; at: number; onAt: (i: number) => 
       live = false
     }
   }, [it.path])
+  useEffect(() => setZoom(FIT), [it.path])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') (e.preventDefault(), e.stopPropagation(), p.onAt(Math.min(p.items.length - 1, p.at + 1)))
       else if (e.key === 'ArrowLeft') (e.preventDefault(), e.stopPropagation(), p.onAt(Math.max(0, p.at - 1)))
       else if (e.key === 'Escape') (e.preventDefault(), e.stopPropagation(), p.onClose())
       else if (e.key === 'o' || e.key === 'O') (e.preventDefault(), e.stopPropagation(), void api.openPath(it.path))
+      else if (e.key === '0' && kind === 'image') (e.preventDefault(), e.stopPropagation(), setZoom(FIT))
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [p.at, p.items, it.path])
+  }, [p.at, p.items, it.path, kind])
+  /** Wheel (and trackpad pinch, which macOS reports as ctrl+wheel) zooms around the cursor. */
+  const onWheel = (e: WheelEvent) => {
+    e.preventDefault()
+    const img = e.currentTarget as HTMLImageElement
+    const rect = img.getBoundingClientRect()
+    const relX = e.clientX - rect.left
+    const relY = e.clientY - rect.top
+    setZoom((z) => {
+      const scaled = zoomTo(z, z.scale * Math.exp(-e.deltaY * 0.0025), relX, relY)
+      return clampPan(scaled, rect.width / z.scale, rect.height / z.scale, window.innerWidth, window.innerHeight)
+    })
+  }
+  /** Drag to pan once zoomed in; a click right after release is swallowed above. */
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.button !== 0 || zoom.scale <= ZOOM_MIN) return
+    e.preventDefault()
+    const img = e.currentTarget as HTMLImageElement
+    img.setPointerCapture(e.pointerId)
+    const rect = img.getBoundingClientRect()
+    const fitW = rect.width / zoom.scale
+    const fitH = rect.height / zoom.scale
+    const x0 = e.clientX
+    const y0 = e.clientY
+    const start = zoom
+    let moved = false
+    const move = (m: PointerEvent) => {
+      const dx = m.clientX - x0
+      const dy = m.clientY - y0
+      if (!moved && Math.hypot(dx, dy) < 3) return
+      moved = true
+      setZoom(clampPan({ ...start, x: start.x + dx, y: start.y + dy }, fitW, fitH, window.innerWidth, window.innerHeight))
+    }
+    const up = () => {
+      img.removeEventListener('pointermove', move)
+      img.removeEventListener('pointerup', up)
+      img.removeEventListener('pointercancel', up)
+      if (moved) {
+        draggedRef.current = true
+        setTimeout(() => (draggedRef.current = false), 0)
+      }
+    }
+    img.addEventListener('pointermove', move)
+    img.addEventListener('pointerup', up)
+    img.addEventListener('pointercancel', up)
+  }
 
   const shown = text?.path === it.path ? text : null
   const [source, setSource] = useState(false)
@@ -129,9 +180,19 @@ export function Viewer(p: { items: ViewItem[]; at: number; onAt: (i: number) => 
     })
   }
   return (
-    <div class="lightbox viewer" onClick={p.onClose}>
+    <div class="lightbox viewer" onClick={() => (draggedRef.current ? (draggedRef.current = false) : p.onClose())}>
       <div class={`viewer-stage ${kind}`} onClick={(e) => e.stopPropagation()}>
-        {kind === 'image' && <img src={api.imageSrc(it.path)} alt={it.name} />}
+        {kind === 'image' && (
+          <img
+            src={api.imageSrc(it.path)}
+            alt={it.name}
+            draggable={false}
+            style={{ transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` }}
+            onWheel={onWheel}
+            onPointerDown={onPointerDown}
+            onDblClick={() => setZoom(FIT)}
+          />
+        )}
         {(kind === 'text' || kind === 'markdown') && (
           <div class="viewer-text">
             {error ? (
@@ -165,6 +226,7 @@ export function Viewer(p: { items: ViewItem[]; at: number; onAt: (i: number) => 
       </div>
       <div class="lb-caption" onClick={(e) => e.stopPropagation()}>
         <span class="cap-text">{it.caption ?? it.name}</span>
+        {kind === 'image' && zoom.scale > ZOOM_MIN && <span class="d"> · {Math.round(zoom.scale * 100)}%</span>}
         {p.items.length > 1 && <span class="d"> · {p.at + 1} / {p.items.length}</span>}
         {kind === 'html' && (
           <button class="ghost viewer-open" onClick={() => setSource(!source)} aria-pressed={source}>

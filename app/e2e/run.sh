@@ -43,7 +43,19 @@ decs add "Weekly report is ready" --body "Nothing unusual this week."
 decs ask 1 -o 1=SQLite 2=Postgres --text "Asking again: the JSON columns matter now."
 printf '# Schema notes\n\n- users: id, email\n' > "$work/schema.md"
 printf 'migration 1 ok\nmigration 2 ok\n' > "$work/migrate.log"
-decs attach 2 "$work/schema.md" "$work/migrate.log"
+# A real-sized image (not a 1x1 fixture): big enough for the lightbox to actually zoom and pan.
+node -e '
+  const fs = require("fs"), zlib = require("zlib")
+  function crc32(buf) { let c, crc = 0xffffffff; for (const b of buf) { c = (crc ^ b) & 0xff; for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crc = (crc >>> 8) ^ c }; return (crc ^ 0xffffffff) >>> 0 }
+  function chunk(type, data) { const t = Buffer.from(type); const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([t, data]))); return Buffer.concat([len, t, data, crc]) }
+  const w = 320, h = 320
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2
+  const raw = Buffer.alloc((w * 3 + 1) * h)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = y * (w * 3 + 1) + 1 + x * 3; raw[o] = x % 256; raw[o + 1] = y % 256; raw[o + 2] = 180 }
+  const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  fs.writeFileSync(process.argv[1], Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]))
+' "$work/screenshot.png"
+decs attach 2 "$work/schema.md" "$work/migrate.log" "$work/screenshot.png"
 printf 'week 44\n' > "$work/week44.txt"
 printf 'week 45\n' > "$work/week45.txt"
 decs note 7 "Week 44 numbers" --attach "$work/week44.txt"
