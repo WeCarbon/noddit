@@ -314,6 +314,25 @@ export function parseNotes(body: string): DecisionNote[] {
  *  per-question breakdown `Store.answer` writes under `## 已答`. */
 const SUB_ANSWER_LINE_RE = /^-[ \t]+(\S+)[ \t]*=[ \t]*(\S+)[ \t]*——/
 
+/** The kinds of note in which the owner talks back, as opposed to bookkeeping (延迟, 已提醒, an edit record…). */
+const REPLY_KINDS: readonly string[] = [NOTE_KIND.reply, NOTE_KIND.followUp]
+
+/**
+ * The owner replied after the current `## 选项` block without picking one: that
+ * round is withdrawn — nobody is waiting on it any more, and the AI asks again
+ * (`nod ask`) when it has something new. Derived from the body, never stored.
+ */
+export function roundWithdrawn(body: string): boolean {
+  const lines = body.split('\n')
+  const start = lines.findLastIndex((l) => OPTIONS_HEADING_RE.test(l))
+  if (start === -1) return false
+  for (let i = start + 1; i < lines.length; i++) {
+    const h = parseNoteHeading(lines[i])
+    if (h && h.role === 'human' && REPLY_KINDS.includes(h.kind)) return true
+  }
+  return false
+}
+
 /**
  * Earlier `## 选项（第 N 轮）` rounds — history, never the node's live state.
  * Each round's own `## 已答` note is the only copy of what it was answered,
@@ -483,7 +502,8 @@ export function parseDecision(
     (data.answer && typeof data.answer === 'object' && Object.keys(rawAnswer).length > 0)
 
   const options = parseOptions(body)
-  const state = withOpenQuestion({ state: stateOf(data.status, { archived, answered: Boolean(hasAnswer), queued: ctx.queued }), options, answer: hasAnswer })
+  const withdrawn = roundWithdrawn(body)
+  const state = withOpenQuestion({ state: stateOf(data.status, { archived, answered: Boolean(hasAnswer), queued: ctx.queued }), options, answer: hasAnswer, roundWithdrawn: withdrawn })
   const notes = parseNotes(body)
   const bodyAttachments = sectionAttachments(body).body
   const extra = Object.fromEntries(Object.entries(data).filter(([k]) => !KNOWN_KEYS.has(k)))
@@ -549,6 +569,7 @@ export function parseDecision(
     options,
     questions: parseQuestions(body, strMap(data.question_defaults) ?? {}, Math.max(1, optionsRoundOf(body))),
     previousRounds: parsePreviousRounds(body),
+    ...(withdrawn ? { roundWithdrawn: true } : {}),
     attachments: [...bodyAttachments, ...notes.flatMap((n) => n.attachments)],
     bodyAttachments,
     notes,

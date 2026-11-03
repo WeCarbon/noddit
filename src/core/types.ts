@@ -273,6 +273,9 @@ export interface Decision {
   /** Earlier `## 选项（第 N 轮）` rounds, each with whatever it was answered —
    *  history for the app/TUI to show collapsed. See `PreviousRound`. */
   previousRounds?: PreviousRound[]
+  /** The owner replied after the current options without picking one — the round is
+   *  withdrawn and counts as settled for the node's state (see `parse.ts#roundWithdrawn`). */
+  roundWithdrawn?: boolean
   /** Every `## 附件` in the body, flat and in file order — the concatenation
    *  of `bodyAttachments` and every note's own `attachments`. Kept for
    *  whatever wants one flat numbered list (the bench's picker, `nod open`). */

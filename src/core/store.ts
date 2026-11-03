@@ -881,7 +881,8 @@ export class Store {
     const wasQueued = d.queued
     const next = (d: Decision): Decision => {
       if (d.state !== 'decided' && !(wasQueued && d.state === 'needs_decision')) return d
-      // The owner replied without picking an option: once collected, it is the owner's turn again.
+      // A reply withdraws the round (the AI re-asks after acting on it); anything else
+      // the owner wrote leaves the options open, so it is their turn again.
       if (awaitsDecision(d)) return { ...d, state: 'needs_decision' }
       return { ...d, state: isStartable(d, deps) ? 'in_progress' : 'not_started' }
     }

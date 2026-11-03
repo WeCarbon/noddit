@@ -119,19 +119,41 @@ test('the terminal labels each answer block; the window gets the same facts as f
   assert.ok(!j.body_rows.some((r) => /Decided|Answer changed/.test(r.text)), 'the app draws its own label')
 })
 
-test('options waiting on the owner keep a node 待决策: collecting a plain reply hands it back, start refuses even with --force', (t) => {
+test('unanswered options keep a node 待决策: start refuses it even with --force', (t) => {
   const store = tmpStore(t)
   const d = store.create({ title: 'pick a db', author: 'lane · x', options: opts, default: '1' })
-  const replied = store.note(d, { text: 'what does SQLite cost us?', role: 'human', author: 'owner' })
-  assert.equal(replied.state, 'decided', 'the reply is the AI’s to collect')
-  const collected = store.deliver(replied)
-  assert.equal(collected.state, 'needs_decision')
-  assert.throws(() => store.start(collected, { force: true }), /still has options waiting on the owner/)
+  assert.throws(() => store.start(d, { force: true }), /still has options waiting on the owner/)
   assert.equal(store.get(d.id)!.state, 'needs_decision')
+  // Owner bookkeeping (a defer) is not a reply: the round stays open.
+  const deferred = store.defer(d, { by: 'owner', role: 'human' })
+  assert.equal(deferred.roundWithdrawn, undefined)
+  assert.equal(store.undefer(deferred, { by: 'owner', role: 'human' }).state, 'needs_decision')
+})
 
-  // Once answered it runs as usual.
-  const answered = store.answer(store.get(d.id)!, { choice: '2', by: 'owner', role: 'human' })
-  assert.equal(store.deliver(answered).state, 'in_progress')
+test('a reply without a pick withdraws the round: collected it runs, start works, history is untouched, and nod ask opens a new round', (t) => {
+  const store = tmpStore(t)
+  const d = store.create({ title: 'pick a db', author: 'lane · x', options: opts, default: '1' })
+  const answered = store.answer(d, { choice: '1', by: 'owner', role: 'human' })
+  const reasked = store.ask(store.deliver(answered), { options: [{ key: '1', label: 'ship' }, { key: '2', label: 'wait' }], default: '1', author: 'lane' })
+  const replied = store.note(reasked, { text: 'the screenshot is wrong, fix it first', role: 'human', author: 'owner' })
+  assert.equal(replied.state, 'decided', 'the reply is the AI’s to collect')
+  assert.equal(replied.roundWithdrawn, true)
+
+  const collected = store.deliver(replied)
+  assert.equal(collected.state, 'in_progress', 'a withdrawn round is settled for the node’s state')
+  assert.equal(store.start(collected).state, 'in_progress', 'start is allowed again')
+  // The earlier round's 已答 still shows exactly as it did.
+  const answers = collected.notes.filter((n) => n.kind === '已答')
+  assert.deepEqual(answers.map((n) => [n.text, Boolean(n.revises)]), [['1 —— Postgres', false]])
+  assert.equal(collected.previousRounds?.[0]?.answer, '1 —— Postgres')
+  const heads = bodyRows(collected, 200, false).filter((r) => /Decided|Answer changed/.test(r.text))
+  assert.equal(heads.length, 1)
+
+  // The AI asks again after the fix: a fresh round, 待决策 until answered.
+  const again = store.ask(store.get(d.id)!, { options: [], text: 'fixed, take another look', author: 'lane' })
+  assert.equal(again.state, 'needs_decision')
+  assert.equal(again.roundWithdrawn, undefined)
+  assert.throws(() => store.start(again, { force: true }), /still has options waiting on the owner/)
 })
 
 test('a started node that is asked again is 待决策, and a claimed brief asked to confirm its plan cannot be started', (t) => {
