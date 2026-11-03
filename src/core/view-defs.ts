@@ -71,12 +71,12 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     deferred: 'show',
     filter: parseFilter('state:in_progress,waiting,needs_decision,decided or state:not_started is:startable'),
   },
-  // 活动 = 可用 minus what the AIs are waiting on; the owner's own waits stay (人类工作 ⊆ 活动).
+  // 活动 = 可用 minus everything waiting or put off, the owner's own included; a waiting parent still shows, dim, above what moves under it.
   {
     id: 'active',
     icon: 'activity',
     layout: 'tree',
-    filter: parseFilter('state:in_progress,needs_decision,decided or state:not_started is:startable or assignee:human state:waiting'),
+    filter: parseFilter('state:in_progress,needs_decision,decided or state:not_started is:startable'),
   },
   {
     id: 'decide',
