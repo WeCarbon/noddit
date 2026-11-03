@@ -20,7 +20,8 @@ export interface Listener {
   author: string | null
   /** The agent CLI it runs under, when it can tell: `claude-code`, `codex`, or `NODDIT_HARNESS`/`DECS_HARNESS`. */
   harness: string | null
-  role: 'lead' | 'teammate'
+  /** `main`: the cross-project main session (core/main-session.ts); its roots are only its own store. */
+  role: 'lead' | 'teammate' | 'main'
   started_at: string
   last_seen: string
   /** iTerm2 or macOS Terminal, when the monitor could tell which session/tab it runs in; absent otherwise. */
@@ -66,24 +67,14 @@ export function removeHeartbeat(key: string): void {
   rmSync(join(sessionsDir(), `${key}.json`), { force: true })
 }
 
-/** Live sessions whose monitor covers `projectRoot`, longest-running first. Dead or stale files are swept. */
-export function listenersFor(projectRoot: string, now = Date.now()): Listener[] {
+/** Every live session, longest-running first. Dead or stale files are swept. */
+export function liveListeners(now = Date.now()): Listener[] {
   let names: string[]
   try {
     names = readdirSync(sessionsDir()).filter((n) => n.endsWith('.json'))
   } catch {
     return []
   }
-  // .native to agree with core/paths.ts's own canonicalization — plain realpathSync can
-  // normalise a Windows path differently, breaking the identity check below.
-  const real = (p: string) => {
-    try {
-      return realpathSync.native(p)
-    } catch {
-      return resolve(p)
-    }
-  }
-  const root = real(projectRoot)
   const out: Listener[] = []
   for (const n of names) {
     const file = join(sessionsDir(), n)
@@ -95,7 +86,7 @@ export function listenersFor(projectRoot: string, now = Date.now()): Listener[] 
         if (now - Date.parse(l.last_seen) > 10 * HEARTBEAT_STALE_MS) rmSync(file, { force: true })
         continue
       }
-      if (Array.isArray(l.roots) && l.roots.some((r) => real(r) === root)) out.push(l)
+      if (Array.isArray(l.roots)) out.push(l)
     } catch {
       /* half-written or foreign file */
     }
@@ -103,12 +94,34 @@ export function listenersFor(projectRoot: string, now = Date.now()): Listener[] 
   return out.sort((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at))
 }
 
+// .native to agree with core/paths.ts's own canonicalization — plain realpathSync can
+// normalise a Windows path differently, breaking the identity check below.
+const real = (p: string) => {
+  try {
+    return realpathSync.native(p)
+  } catch {
+    return resolve(p)
+  }
+}
+
+/** Live sessions whose monitor covers `projectRoot`, longest-running first. */
+export function listenersFor(projectRoot: string, now = Date.now()): Listener[] {
+  const root = real(projectRoot)
+  return liveListeners(now).filter((l) => l.roots.some((r) => real(r) === root))
+}
+
+/** The main session, when one is live: the longest-running, should two ever be. */
+export function mainListener(now = Date.now()): Listener | undefined {
+  return liveListeners(now).find((l) => l.role === 'main')
+}
+
 /** A brief gets picked up by a lead's monitor (one not narrowed to an author). */
 export function leadFor(projectRoot: string, now = Date.now()): Listener | undefined {
   return listenersFor(projectRoot, now).find((l) => l.role === 'lead')
 }
 
-export const isListening = (projectRoot: string, now = Date.now()) => leadFor(projectRoot, now) !== undefined
+/** Someone will pick up a brief filed there: the project's lead, or else the main session, which watches every project. */
+export const isListening = (projectRoot: string, now = Date.now()) => leadFor(projectRoot, now) !== undefined || mainListener(now) !== undefined
 
 /** Each project's live sessions — the shape `nod sessions`, `nod briefs` and `nod bench --json` share. */
 export function projectSessions(store: Store, now = Date.now()) {

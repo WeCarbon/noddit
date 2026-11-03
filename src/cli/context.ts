@@ -81,11 +81,12 @@ export { parseRef } from '../core/ref.ts'
 /**
  * Who is at the keyboard when no flag says: Claude Code sets `CLAUDECODE`;
  * `NODDIT_ROLE=agent|human` (or the older `DECS_ROLE`) covers other
- * harnesses. Anything else is the owner's own terminal.
+ * harnesses; `main` (the main session) is an agent. Anything else is the owner's own terminal.
  */
 export function shellRole(env: NodeJS.ProcessEnv = process.env): NoteRole {
   const role = nodditEnv('ROLE', env)
   if (role === 'agent' || role === 'human') return role
+  if (role === 'main') return 'agent'
   return env.CLAUDECODE ? 'agent' : 'human'
 }
 

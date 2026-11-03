@@ -68,3 +68,6 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 - **负责人派的活**（`DECS-BRIEF`）：先 `nod claim <id>`（原子的，说别人接了就别碰）；`nod expand` 写清做什么 / 为什么 /
   做完的标准，假设标明是假设，「原话」一个字不改；拆子节点；`nod ask` 请负责人确认，答 1 之前不开工。
   不要自己 `nod session start`，开不开新会话是负责人的事。
+- **主会话**（`nod session start --main`，环境里 `NODDIT_ROLE=main`；或者开在不属于任何项目、但下面有登记项目的目录里）：
+  不属于任何项目，monitor 盯所有项目，有在线负责人会话的项目留给那个会话。每条命令都用 `--dir` 或带字母的编号指明项目；
+  先 `nod search` / `nod tree` 找已有节点再建；自己的记录放 `--dir ~/.decs/main`（本机，不进任何项目）；这里 `nod init` 会被拒绝。

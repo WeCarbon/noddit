@@ -10,7 +10,7 @@ import { resolveAuthor, resolveStore } from '../context.ts'
 import { askIfDue, staleNagDue, staleTasksOf } from '../../core/checkins.ts'
 import { parseDuration, parseSince } from '../../core/duration.ts'
 import { currentIdentity } from '../../core/identity.ts'
-import { findLayout, type Layout } from '../../core/paths.ts'
+import { findLayout, layoutFor, type Layout } from '../../core/paths.ts'
 import { listSources, sourceEventsSince } from '../../core/sources.ts'
 import { createSourceSyncRunner } from '../../core/source-sync.ts'
 import { DEFERRAL_CLOCK, isLatestNoteOwnerFacing, nowStamp, ownedBy, sameAgent, type ChangeEvent } from '../../core/store.ts'
@@ -19,6 +19,8 @@ import { HEARTBEAT_MS, harnessOf, removeHeartbeat, writeHeartbeat } from '../../
 import { currentTerminal } from '../../core/terminal.ts'
 import { harnessPid, imageName, locateSession, parsePsLine, parseWinProcessLine, sessionPid } from '../../core/session-process.ts'
 import { isNodeListened, recordTidySent, tidyDue, tidyFindings } from '../../core/tidy.ts'
+import { isMainSession, leftToProjectSession, mainStoreRoot, mainWatchLayouts } from '../../core/main-session.ts'
+import { Store } from '../../core/store.ts'
 import type { Decision } from '../../core/types.ts'
 import { refOf as refOfNode } from '../../core/ref.ts'
 import { NOTE_KIND, noteKindKey } from '../../core/format.ts'
@@ -192,19 +194,21 @@ export async function run(args: Args): Promise<number> {
     return 0
   }
   const here = bool(args, 'here')
-  if (here && !findLayout()) return 0
-  const allProjects = bool(args, 'all-projects')
   const explicitDirs = many(args, 'dir', 'd').length > 0
+  // The main session (core/main-session.ts) watches every project and its own store.
+  const main = !explicitDirs && isMainSession()
+  if (here && !main && !findLayout()) return 0
+  const allProjects = bool(args, 'all-projects')
   // Default scope is this project alone — the same thing --here does, minus
   // exiting when there's none. Every other registered project needs
   // --all-projects spelled out; otherwise an agent re-arming a bare `nod
   // monitor` from inside project A never hears about project B's events.
-  if (!here && !allProjects && !explicitDirs && !findLayout()) {
+  if (!main && !here && !allProjects && !explicitDirs && !findLayout()) {
     process.stderr.write(`${t('cli.monitor.noProjectHere')}\n`)
     return 0
   }
-  const store = resolveStore(args, { allowRegistry: allProjects, preferRegistry: allProjects })
-  const explicitlyScoped = Boolean(one(args, 'author')) || bool(args, 'mine') || bool(args, 'all')
+  const store = main ? new Store(mainWatchLayouts()) : resolveStore(args, { allowRegistry: allProjects, preferRegistry: allProjects })
+  const explicitlyScoped = main || Boolean(one(args, 'author')) || bool(args, 'mine') || bool(args, 'all')
   // A teammate watches only its own nodes even when the plugin starts it without --mine; a lead watches everything.
   // The session's own argv decides when it can be read; the team config is
   // only a fallback when it can't (no ps, an unrecognised build).
@@ -242,6 +246,13 @@ export async function run(args: Args): Promise<number> {
     const s = listSources(store, Date.now()).find((x) => x.project === project && x.name === name)
     return !s?.ownerAgent || sameAgent(s.ownerAgent, author) || sameAgent(author, s.ownerAgent)
   }
+
+  /** Projects whose own lead session is live: the main session leaves their work to it. Refreshed each pass. */
+  let leftAlone = new Set<string>()
+  const refreshLeftAlone = () => {
+    if (main) leftAlone = new Set(store.layouts.filter((l) => leftToProjectSession(l.projectRoot)).map((l) => store.projectName(l)))
+  }
+  const theirs = (project: string) => leftAlone.has(project)
 
   // Events at the cursor's own instant can come back on the next pass; a key
   // per event keeps each one to a single notification.
@@ -303,7 +314,7 @@ export async function run(args: Args): Promise<number> {
       return false
     }
     for (const d of items) {
-      if (!isUnclaimedBrief(d) || (author && !underMine(d))) continue
+      if (!isUnclaimedBrief(d) || (author && !underMine(d)) || theirs(d.project)) continue
       const base = `${d.project}|${d.id}`
       const age = Date.now() - Date.parse(d.created)
       const words = originalWords(d)
@@ -336,7 +347,7 @@ export async function run(args: Args): Promise<number> {
   const reportBackFromDeferral = () => {
     store.returnDueDeferrals()
     for (const d of store.all()) {
-      if (author && !ownedBy(d, author)) continue
+      if ((author && !ownedBy(d, author)) || theirs(d.project)) continue
       const note = d.notes.findLast((n) => n.kind === NOTE_KIND.undeferred && n.author === DEFERRAL_CLOCK)
       if (!note || Date.parse(note.at) < Date.parse(cursor) - 60_000) continue
       emit(`b|${d.project}|${d.id}|${note.at}`, note.at, `NODDIT-UNDEFERRED ${t('cli.monitor.backFromDeferral', { ref: refOfNode(d), title: d.title })}`, {
@@ -349,7 +360,7 @@ export async function run(args: Args): Promise<number> {
   const reportCheckBacks = () => {
     store.remindDueWaits()
     for (const d of store.all()) {
-      if (d.state !== 'waiting' || (author && !ownedBy(d, author))) continue
+      if (d.state !== 'waiting' || (author && !ownedBy(d, author)) || theirs(d.project)) continue
       const note = d.notes.findLast((n) => n.author === DEFERRAL_CLOCK && n.kind === NOTE_KIND.addendum)
       if (!note || Date.parse(note.at) < Date.parse(cursor) - 60_000) continue
       emit(`w|${d.project}|${d.id}|${note.at}`, note.at, `NODDIT-CHECK-BACK ${t('cli.monitor.checkBack', { ref: refOfNode(d), on: d.waitingOn ?? '', title: d.title })}`, {
@@ -363,6 +374,7 @@ export async function run(args: Args): Promise<number> {
     // N187/N189: whether this pass has printed anything else yet — an
     // "attach" tidy nudge only rides along one of those, never fires alone.
     const eventAtBeforeTidy = lastEventAt
+    refreshLeftAlone()
     if (updates) {
       try {
         reportUpdates(first)
@@ -372,7 +384,7 @@ export async function run(args: Args): Promise<number> {
     }
     try {
       for (const e of store.changes(cursor, { author, role: 'human' })) {
-        if (e.event === 'created' || e.event === 'completed' || e.event === 'closed') continue
+        if (e.event === 'created' || e.event === 'completed' || e.event === 'closed' || theirs(e.project)) continue
         // A brief's 原话 is reported once, as DECS-BRIEF below.
         if (e.kind === NOTE_KIND.original) continue
         // This session's own write (e.g. relaying the owner's words), however it's signed.
@@ -381,7 +393,7 @@ export async function run(args: Args): Promise<number> {
       }
       if (withSources) {
         for (const e of sourceEventsSince(store, cursor)) {
-          if (e.kind === 'gone' || !mySource(e.project, e.source)) continue
+          if (e.kind === 'gone' || !mySource(e.project, e.source) || theirs(e.project)) continue
           const what = e.kind === 'new' ? t('cli.monitor.sourceNew') : t('cli.monitor.sourceChanged')
           const text = `${e.projectLetter}·${e.source}#${e.id} ${t('cli.monitor.line', { what, title: flat(e.title) })}${e.state ? ` [${e.state}]` : ''}${e.url ? ` ${e.url}` : ''} ${t('cli.monitor.nextSource', { source: e.source, id: e.id })}  since=${e.at}`
           emit(`s|${e.project}|${e.source}|${e.id}|${e.kind}|${e.at}`, e.at, text, { ...e, event: `source_${e.kind}`, since: e.at })
@@ -399,6 +411,7 @@ export async function run(args: Args): Promise<number> {
     try {
       // Picking up answers nobody collected is the lead's job.
       for (const d of teammate ? [] : store.queue({})) {
+        if (theirs(d.project)) continue
         const at = d.answer?.at ?? d.notes.filter((n) => n.role === 'human').at(-1)?.at
         const age = at ? Date.now() - Date.parse(at) : NaN
         if (!(age >= unclaimedMs)) continue
@@ -460,6 +473,7 @@ export async function run(args: Args): Promise<number> {
       try {
         const due: Decision[] = []
         for (const d of staleTasksOf(store.all())) {
+          if (theirs(d.project)) continue
           if (staleNagDue(store.layoutOf(d), d)) due.push(d)
         }
         if (due.length) {
@@ -503,6 +517,7 @@ export async function run(args: Args): Promise<number> {
       }
       const pendingAttach: Layout[] = []
       for (const l of store.layouts) {
+        if (theirs(store.projectName(l))) continue
         const mode = tidyDue(l, author)
         if (mode === 'push') emitTidy(l)
         else if (mode === 'attach') pendingAttach.push(l)
@@ -535,8 +550,10 @@ export async function run(args: Args): Promise<number> {
   }
   // Already-answered, uncollected nodes go out first, so an answer that
   // landed before this monitor started isn't missed.
+  refreshLeftAlone()
   try {
     for (const d of store.queue({ author })) {
+      if (theirs(d.project)) continue
       const text = t('cli.monitor.notCollected', { what: d.answer?.choice ? t('cli.monitor.repliedChoice', { choice: d.answer.choice }) : t('cli.monitor.hasReply') })
       emit(`q|${d.project}|${d.id}`, nowStamp(), `${t('cli.monitor.queued', { ref: refOfNode(d), title: d.title, text })} ${t('cli.monitor.nextRead', { ref: refOfNode(d) })}  since=${cursor}`, {
         event: 'queued', ref: refOfNode(d), id: d.id, project: d.project, title: d.title, choice: d.answer?.choice ?? null, since: cursor,
@@ -555,10 +572,11 @@ export async function run(args: Args): Promise<number> {
     writeHeartbeat(listenerKey, {
       pid: process.pid,
       ...(harness ? { session_pid: harness } : {}),
-      roots: store.layouts.map((l) => l.projectRoot),
+      // Not every project's root: the main session doesn't count as anyone's lead.
+      roots: main ? [layoutFor(mainStoreRoot()).projectRoot] : store.layouts.map((l) => l.projectRoot),
       author: author ?? nodditEnv('AUTHOR') ?? null,
       harness: harnessOf(),
-      role: author ? 'teammate' : 'lead',
+      role: main ? 'main' : author ? 'teammate' : 'lead',
       started_at: startedListening,
       last_seen: nowStamp(new Date(), { ms: true }),
       ...(terminal ? { terminal } : {}),
@@ -570,9 +588,9 @@ export async function run(args: Args): Promise<number> {
     process.on('exit', () => removeHeartbeat(listenerKey))
   }
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(sig, () => process.exit(0))
-  // Sources' sync commands are run by a lead's monitor only — never a lane's, nor a window redrawing.
+  // Sources' sync commands are run by a lead's monitor only — never a lane's, the main session's, nor a window redrawing.
   const syncRunner =
-    !author && !updates && !bool(args, 'no-sync')
+    !author && !main && !updates && !bool(args, 'no-sync')
       ? createSourceSyncRunner({ layouts: store.layouts, onError: (message) => process.stdout.write(`DECS-ERROR ${flat(message)}\n`) })
       : undefined
   if (syncRunner) process.on('exit', () => syncRunner.stop())

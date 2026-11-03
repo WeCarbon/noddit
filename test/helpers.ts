@@ -16,7 +16,7 @@ export function decs(cwd: string, args: string[], env: Record<string, string | u
     cwd,
     // CLAUDECODE pinned so the default note role does not depend on which
     // shell runs the suite; a test passes `CLAUDECODE: undefined` to unset it.
-    env: withoutUndefined({ ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', DECS_LANG: 'en', CLAUDECODE: '1', DECS_ROLE: undefined, ...env }),
+    env: withoutUndefined({ ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', DECS_LANG: 'en', CLAUDECODE: '1', DECS_ROLE: undefined, NODDIT_ROLE: undefined, ...env }),
     encoding: 'utf8',
     input,
   })

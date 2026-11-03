@@ -29,6 +29,8 @@ export interface LaunchPlan {
 
 export const PICKUP_PROMPT = 'nod: pick up the briefs waiting in this project (nod briefs), expand and split each one, then nod ask the owner to confirm before starting.'
 
+export const MAIN_PROMPT = 'nod: you are the main session, across every registered project (nod sessions). Wait for the owner; file what they say in the right project.'
+
 /** POSIX single quotes: everything literal, a `'` closed, escaped, reopened. */
 export function shQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`
@@ -78,15 +80,18 @@ export function realRoot(root: string): string {
   }
 }
 
-export function launchPlan(agent: AgentCli, root: string, env: LaunchEnv, prompt = PICKUP_PROMPT): LaunchPlan {
+/** `vars` are set for the agent alone, e.g. `NODDIT_ROLE=main`; names must be plain identifiers. */
+export function launchPlan(agent: AgentCli, root: string, env: LaunchEnv, prompt = PICKUP_PROMPT, vars: Record<string, string> = {}): LaunchPlan {
   const args = agentArgs(agent, prompt)
+  const pairs = Object.entries(vars).filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k))
   if (env.platform === 'win32') {
-    const inner = args.map((a, i) => (i === 0 ? a : cmdQuote(a))).join(' ')
+    const sets = pairs.map(([k, v]) => `set "${k}=${v.replace(/"/g, '')}"&& `).join('')
+    const inner = sets + args.map((a, i) => (i === 0 ? a : cmdQuote(a))).join(' ')
     // Passed verbatim (see runPlan): cmd and wt parse their own quotes.
     if (env.has('wt')) return { agent, root, command: inner, terminal: 'wt', exec: { file: 'wt', args: ['-d', cmdQuote(root), 'cmd', '/k', inner] } }
     return { agent, root, command: inner, terminal: 'cmd', exec: { file: 'cmd', args: ['/c', 'start', '""', '/D', cmdQuote(root), 'cmd', '/k', inner] } }
   }
-  const command = `cd ${shQuote(root)} && ${args.map(shQuote).join(' ')}`
+  const command = `cd ${shQuote(root)} && ${pairs.map(([k, v]) => `${k}=${shQuote(v)} `).join('')}${args.map(shQuote).join(' ')}`
   if (env.platform === 'darwin') {
     if (env.has('iTerm.app')) {
       const script = [

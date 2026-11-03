@@ -2,6 +2,7 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { addProject, isScratchPath } from '../../core/config.ts'
 import { ensureGitignoreLines } from '../../core/gitignore.ts'
+import { initRefusal } from '../../core/main-session.ts'
 import { initLayout } from '../../core/paths.ts'
 import { writeProjectConfig } from '../../core/project.ts'
 import { bool, one, type Args } from '../args.ts'
@@ -38,6 +39,7 @@ hand out numbers without colliding.
 
 export function run(args: Args): number {
   const root = resolve(one(args, 'dir', 'd') ?? args._[0] ?? process.cwd())
+  if (initRefusal(root)) throw new Error(t('cli.init.mainRefuses', { root }))
   const l = initLayout(root)
   const readme = join(l.root, 'README.md')
   if (!existsSync(readme)) writeFileSync(readme, README)

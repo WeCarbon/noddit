@@ -340,5 +340,7 @@ export const ar: Strings = {
   ctxGotoSessionIterm2: 'الانتقال إلى جلسة iTerm2',
   ctxGotoSessionTerminal: 'الانتقال إلى جلسة Terminal',
   sessionGone: 'لم تعد الجلسة موجودة',
+  mainAgent: 'الوكيل الرئيسي',
+  mainAgentOffline: 'الوكيل الرئيسي غير متصل — شغّله في طرفية: nod session start --main',
   keyQuick: 'مهمة جديدة لوكيل',
 }

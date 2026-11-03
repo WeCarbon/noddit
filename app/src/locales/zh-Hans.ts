@@ -340,5 +340,7 @@ export const zhHans: Strings = {
   ctxGotoSessionIterm2: '转到 iTerm2 会话',
   ctxGotoSessionTerminal: '转到终端会话',
   sessionGone: '会话已不在',
+  mainAgent: '主智能体',
+  mainAgentOffline: '主智能体不在线——在终端里运行 nod session start --main 启动',
   keyQuick: '派给 AI',
 }

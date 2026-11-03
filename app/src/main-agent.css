@@ -1,0 +1,14 @@
+.project.main-agent {
+  margin-block-end: 4px;
+}
+
+.project.main-agent .letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.project.main-agent.offline .label,
+.project.main-agent.offline .letter {
+  color: var(--text-3);
+}

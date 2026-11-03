@@ -1,9 +1,12 @@
 import { bool, one, type Args } from '../args.ts'
 import { resolveStore } from '../context.ts'
 import { nodditEnv } from '../../core/env.ts'
-import { AGENTS, hostEnv, launchPlan, realRoot, runPlan, type AgentCli, type LaunchPlan } from '../../core/launch.ts'
+import { AGENTS, hostEnv, launchPlan, MAIN_PROMPT, realRoot, runPlan, type AgentCli, type LaunchPlan } from '../../core/launch.ts'
 import { runGotoSession } from '../../core/goto-session.ts'
-import { leadFor, listenersFor, projectSessions, type Listener } from '../../core/listeners.ts'
+import { leadFor, listenersFor, mainListener, projectSessions, type Listener } from '../../core/listeners.ts'
+import { commonParent, ensureMainStore, MAIN_AUTHOR, MAIN_ROLE } from '../../core/main-session.ts'
+import { readProjects } from '../../core/config.ts'
+import { resolve } from 'node:path'
 import { bold, dim } from '../../core/render.ts'
 import type { Layout } from '../../core/paths.ts'
 import type { SessionTerminal } from '../../core/terminal.ts'
@@ -41,6 +44,26 @@ export function startSession(layout: Layout, agent: AgentCli, opts: { dryRun?: b
   return { ok: true, started: true, plan }
 }
 
+/**
+ * `nod session start --main`: the cross-project main session, opened in `dir`
+ * or else the registered projects' common parent, with NODDIT_ROLE=main so the
+ * plugin and the monitor know what it is. One at a time.
+ */
+export function startMainSession(dir: string | undefined, agent: AgentCli, opts: { dryRun?: boolean } = {}): StartResult {
+  const live = mainListener()
+  if (live) {
+    const { roots: _roots, ...session } = live
+    return { ok: false, reason: 'already_listening', session }
+  }
+  const at = dir ? resolve(dir) : commonParent(readProjects().map((p) => p.root))
+  if (!at) throw new Error(t('cli.session.noMainDir'))
+  ensureMainStore()
+  const plan = launchPlan(agent, realRoot(at), hostEnv(), MAIN_PROMPT, { NODDIT_ROLE: MAIN_ROLE, NODDIT_AUTHOR: MAIN_AUTHOR })
+  if (opts.dryRun || !plan.exec) return { ok: true, started: false, plan }
+  runPlan(plan)
+  return { ok: true, started: true, plan }
+}
+
 export function describeStart(r: StartResult, project: string): string {
   if (!r.ok) return t('cli.session.alreadyListening', { project, who: who(r.session), since: durationText(Date.now() - Date.parse(r.session.started_at)) })
   if (!r.plan.exec) return t('cli.session.noTerminal', { command: r.plan.command })
@@ -72,6 +95,14 @@ export function gotoSession(layout: Layout, opts: { dryRun?: boolean } = {}): Go
   return runGotoSession(terminal) ? { ok: true, terminal } : { ok: false, reason: 'not_found' }
 }
 
+/** `nod session goto --main`: the main session's terminal (core/main-session.ts). */
+export function gotoMainSession(opts: { dryRun?: boolean } = {}): GotoResult {
+  const terminal = mainListener()?.terminal
+  if (!terminal) return { ok: false, reason: 'no_terminal_session' }
+  if (opts.dryRun) return { ok: true, terminal }
+  return runGotoSession(terminal) ? { ok: true, terminal } : { ok: false, reason: 'not_found' }
+}
+
 export function describeGoto(r: GotoResult, project: string): string {
   return r.ok ? t('cli.session.gotoFound', { project }) : t('cli.session.gotoNotFound', { project })
 }
@@ -84,6 +115,16 @@ export function run(args: Args, name: string): number {
   }
   const verb = name === 'sessions' ? 'list' : (args._[0] ?? 'list')
   const asJson = bool(args, 'json')
+  if (verb === 'start' && bool(args, 'main')) {
+    const given = one(args, 'agent')
+    const agent = given && given !== 'true' ? given : given ? args._[1] : undefined
+    const r = startMainSession(one(args, 'dir', 'd'), agentArg(agent), { dryRun: bool(args, 'dry-run') })
+    const name = t('cli.session.mainName')
+    if (asJson) console.log(JSON.stringify({ ...r, main: true, dry_run: bool(args, 'dry-run') }))
+    else if (r.ok && r.started) console.log(t('cli.session.mainStarted', { terminal: r.plan.terminal, agent: r.plan.agent, root: r.plan.root }))
+    else (r.ok ? console.log : console.error)(describeStart(r, name))
+    return r.ok ? 0 : 1
+  }
   if (verb === 'start') {
     const store = resolveStore(args)
     const layout = store.primary
@@ -93,6 +134,13 @@ export function run(args: Args, name: string): number {
     const r = startSession(layout, agentArg(agent), { dryRun: bool(args, 'dry-run') })
     if (asJson) console.log(JSON.stringify({ ...r, project: store.projectName(layout), dry_run: bool(args, 'dry-run') }))
     else (r.ok ? console.log : console.error)(describeStart(r, store.projectName(layout)))
+    return r.ok ? 0 : 1
+  }
+  if (verb === 'goto' && bool(args, 'main')) {
+    const dryRun = bool(args, 'dry-run')
+    const r = gotoMainSession({ dryRun })
+    if (asJson) console.log(JSON.stringify({ ...r, dry_run: dryRun }))
+    else (r.ok ? console.log : console.error)(describeGoto(r, t('cli.session.mainName')))
     return r.ok ? 0 : 1
   }
   if (verb === 'goto') {
@@ -108,11 +156,14 @@ export function run(args: Args, name: string): number {
 
   const store = resolveStore(args, { allowRegistry: true })
   const projects = projectSessions(store)
+  const live = mainListener()
+  const main = live ? (({ roots, ...s }) => ({ ...s, root: roots[0] ?? null }))(live) : null
   if (asJson) {
-    console.log(JSON.stringify({ projects }))
+    console.log(JSON.stringify({ projects, main }))
     return 0
   }
   const now = Date.now()
+  if (main) console.log(`● ${bold(t('cli.session.mainName'))} · ${who(main)} · ${dim(t('cli.session.since', { duration: durationText(now - Date.parse(main.started_at)) }))}`)
   for (const p of projects) {
     if (!p.sessions.length) {
       console.log(`○ ${bold(`${p.letter} ${p.project}`)} · ${dim(t('cli.session.none'))}`)

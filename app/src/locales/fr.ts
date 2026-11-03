@@ -341,5 +341,7 @@ export const fr: Strings = {
   ctxGotoSessionIterm2: 'Aller à la session iTerm2',
   ctxGotoSessionTerminal: 'Aller à la session Terminal',
   sessionGone: 'La session n’est plus là',
+  mainAgent: 'Agent principal',
+  mainAgentOffline: 'L’agent principal est hors ligne — lancez-le dans un terminal : nod session start --main',
   keyQuick: 'Nouveau pour une IA',
 }

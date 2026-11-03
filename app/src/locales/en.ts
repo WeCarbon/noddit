@@ -338,6 +338,8 @@ export const en = {
   ctxGotoSessionIterm2: 'Go to iTerm2 session',
   ctxGotoSessionTerminal: 'Go to Terminal session',
   sessionGone: 'Session is gone',
+  mainAgent: 'Main agent',
+  mainAgentOffline: 'Main agent is offline — start it in a terminal: nod session start --main',
   keyQuick: 'New for an AI',
 }
 

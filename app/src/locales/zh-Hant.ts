@@ -340,5 +340,7 @@ export const zhHant: Strings = {
   ctxGotoSessionIterm2: '前往 iTerm2 工作階段',
   ctxGotoSessionTerminal: '前往終端機工作階段',
   sessionGone: '工作階段已不在',
+  mainAgent: '主智能體',
+  mainAgentOffline: '主智能體不在線——在終端機裡執行 nod session start --main 啟動',
   keyQuick: '派給 AI',
 }

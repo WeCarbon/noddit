@@ -155,7 +155,7 @@ export interface Session {
   pid: number
   author: string | null
   harness: 'claude-code' | 'codex' | null
-  role: 'lead' | 'teammate'
+  role: 'lead' | 'teammate' | 'main'
   started_at: string
   last_seen: string
   terminal?: SessionTerminal
@@ -225,6 +225,29 @@ export async function startSession(root: string, agent: AgentKind): Promise<Sess
 export async function gotoSession(root: string): Promise<boolean> {
   if (!inDesktop) return true
   const out = await run(['session', 'goto', '--dir', root, '--json'])
+  try {
+    return Boolean((JSON.parse(out.stdout) as { ok: boolean }).ok)
+  } catch {
+    return false
+  }
+}
+
+/** The cross-project main session (`nod session start --main`), when it is live; null otherwise or on an older CLI. */
+export async function mainSession(): Promise<Session | null> {
+  if (!inDesktop) return null
+  const out = await run(['sessions', '--json'])
+  if (out.code !== 0) return null
+  try {
+    return (JSON.parse(out.stdout) as { main?: Session | null }).main ?? null
+  } catch {
+    return null
+  }
+}
+
+/** `nod session goto --main`; `false` when its terminal is no longer there. */
+export async function gotoMainSession(): Promise<boolean> {
+  if (!inDesktop) return true
+  const out = await run(['session', 'goto', '--main', '--json'])
   try {
     return Boolean((JSON.parse(out.stdout) as { ok: boolean }).ok)
   } catch {
