@@ -88,7 +88,8 @@
     "milestoneIsTask": "--milestone 本身就是一件任務：不帶選項，不能 --brief，不能 --fyi",
     "milestoneNotAssignee": "--milestone 不跟 --for 混用——它不是誰的事",
     "remindIsTask": "--remind 本身就是一件任務：不帶選項，不能 --brief，不能 --fyi",
-    "remindNotAssignee": "--remind 不跟 --for 混用——提醒負責人是 AI 的活，不是負責人自己的"
+    "remindNotAssignee": "--remind 不跟 --for 混用——提醒負責人是 AI 的活，不是負責人自己的",
+    "briefNeedsTitle": "AI 代理轉來的派活要有自己的短標題：--title \"<要做什麼，≤32 欄>\"——負責人的原話照樣完整寫進「原話」；背景、計劃這些放在管道傳入的正文裡，不要塞進標題"
   },
   "check": {
     "letterClash": "專案字母 {{letter}} 被不只一個專案使用——{{letter}}1 這樣的引用有歧義；改用專案名稱引用",

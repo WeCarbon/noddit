@@ -65,7 +65,13 @@ export async function run(args: Args): Promise<number> {
   if (remindRaw !== undefined && (bool(args, 'brief') || cliOptions.length || questions.length || bool(args, 'fyi'))) throw new Error(t('cli.send.remindIsTask'))
   const brief = !assignee && !milestone && remindRaw === undefined && isBrief(args, { options: cliOptions.length > 0, questions: questions.length > 0, meta, body: piped.body })
 
-  const title = brief && words ? briefTitle(words) : words || piped.title
+  // A brief an agent relays needs its own short title: the owner's words go to 原话 whole, but a
+  // notice or list row is no place for a paragraph. The owner's own terminal still cuts one for them.
+  const briefTitleArg = brief ? one(args, 'title') : undefined
+  if (brief && briefTitleArg) assertTitleFits(oneLine(briefTitleArg))
+  if (brief && words && !briefTitleArg && shellRole() === 'agent' && briefTitle(words) !== words.replace(/\s+/g, ' ').trim())
+    throw new Error(t('cli.send.briefNeedsTitle'))
+  const title = brief && words ? (briefTitleArg ?? briefTitle(words)) : words || piped.title
   if (!title) throw new Error(`${t('cli.send.titleRequired')}\n\n${help()}`)
   if (!brief) assertTitleFits(oneLine(title))
 

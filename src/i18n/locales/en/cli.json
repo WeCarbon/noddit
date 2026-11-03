@@ -88,7 +88,8 @@
     "remindNotAssignee": "--remind doesn't mix with --for — reminding the owner is an AI's job, not theirs",
     "taskNext": "next: nod start {{ref}} when you begin on it (it then becomes this session's current node)",
     "optionsWithoutCost": "options {{keys}} don’t say what choosing them costs (time, who does it, what’s given up, risk, can it be undone) — the owner can’t decide from a label. Add a `### <key> · <label>` section per option to the body: `nod ask {{id}} … <<'EOF'` … `EOF`",
-    "badEvery": "--every \"{{value}}\" is not a number of days or weeks: 3d, 2w, 3"
+    "badEvery": "--every \"{{value}}\" is not a number of days or weeks: 3d, 2w, 3",
+    "briefNeedsTitle": "a brief relayed by an agent needs a short title of its own: --title \"<what to do, ≤32 columns>\" — the owner's words still go into 原话 in full; anything else (context, plan) belongs in the piped body, not the title"
   },
   "check": {
     "letterClash": "project letter {{letter}} is used by more than one project — refs like {{letter}}1 are ambiguous; use project-name refs",

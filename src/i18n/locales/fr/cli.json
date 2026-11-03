@@ -88,7 +88,8 @@
     "milestoneIsTask": "--milestone est un objectif à lui seul : pas d’options, pas de --brief, pas de --fyi",
     "milestoneNotAssignee": "--milestone ne se combine pas avec --for — ce n’est la tâche de personne",
     "remindIsTask": "--remind est une tâche simple : pas d’options, pas de --brief, pas de --fyi",
-    "remindNotAssignee": "--remind ne se combine pas avec --for — rappeler quelque chose au responsable est le travail d’une IA, pas le sien"
+    "remindNotAssignee": "--remind ne se combine pas avec --for — rappeler quelque chose au responsable est le travail d’une IA, pas le sien",
+    "briefNeedsTitle": "une demande relayée par un agent a besoin de son propre titre court : --title \"<quoi faire, ≤ 32 colonnes>\" — les mots du responsable vont toujours en entier dans 原话 ; le reste (contexte, plan) va dans le corps passé par le tube, pas dans le titre"
   },
   "check": {
     "letterClash": "la lettre de projet {{letter}} est utilisée par plus d’un projet — des références comme {{letter}}1 sont ambiguës ; utilisez des références par nom de projet",

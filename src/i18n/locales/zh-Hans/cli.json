@@ -88,7 +88,8 @@
     "milestoneIsTask": "--milestone 本身就是一件任务：不带选项，不能 --brief，不能 --fyi",
     "milestoneNotAssignee": "--milestone 不跟 --for 混用——它不是谁的事",
     "remindIsTask": "--remind 本身就是一件任务：不带选项，不能 --brief，不能 --fyi",
-    "remindNotAssignee": "--remind 不跟 --for 混用——提醒负责人是 AI 的活，不是负责人自己的"
+    "remindNotAssignee": "--remind 不跟 --for 混用——提醒负责人是 AI 的活，不是负责人自己的",
+    "briefNeedsTitle": "智能体转来的派活要有自己的短标题：--title \"<要做什么，≤32 列>\"——负责人的原话照样完整写进「原话」；背景、计划这些放在管道传入的正文里，不要塞进标题"
   },
   "check": {
     "letterClash": "项目字母 {{letter}} 被不止一个项目使用——{{letter}}1 这样的引用有歧义；改用项目名引用",
