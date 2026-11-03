@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { NoticeStack, useNoticeQueue, type Notice } from './notices.tsx'
+import { plainReply } from './plain-reply.ts'
 import { s } from './strings.ts'
 
 interface Shown {
@@ -125,6 +126,11 @@ export function Banner() {
       <div class="b-title" dir="auto">
         {n.title}
       </div>
+      {n.replySummary && (
+        <div class="b-summary" dir="auto">
+          {n.replySummary}
+        </div>
+      )}
       {done ? (
         <div class="b-done">✓ {s('sent')}</div>
       ) : (
@@ -162,8 +168,21 @@ async function demoShown(): Promise<Shown | null> {
   const decide = b.views.find((v) => v.view === 'decide')?.rows.filter((r) => r.kind === 'node') ?? []
   const n = decide[0] && b.nodes[decide[0].node!]
   if (!n) return null
+  const last = [...n.notes].reverse().find((x) => x.role === 'agent')
+  const replySummary = last ? last.summary || plainReply(last.text) || null : null
   return {
-    node: { key: n.key, id: n.id, ref: n.ref, project: n.project, title: n.title, root: '', options: n.options.map((o) => ({ key: o.key, label: o.label })), default: n.default, urgent: n.urgency === 'high' },
+    node: {
+      key: n.key,
+      id: n.id,
+      ref: n.ref,
+      project: n.project,
+      title: n.title,
+      root: '',
+      options: n.options.map((o) => ({ key: o.key, label: o.label })),
+      default: n.default,
+      urgent: n.urgency === 'high',
+      replySummary,
+    },
     count: decide.length,
     focus: true,
   }

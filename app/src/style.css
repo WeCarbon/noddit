@@ -958,6 +958,43 @@ svg.lucide.ico {
   font-weight: 400;
 }
 
+/* N203/N206: a note with its own --summary shows it as a title, wrapping in
+ * full; who/when moves down to a small secondary line instead of the title spot. */
+.note header.has-summary {
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.note header.has-summary .head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.note header.has-summary .summary {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.note header.has-summary .who-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.note header.has-summary .who-line .who {
+  font-weight: 400;
+  overflow: visible;
+  text-overflow: initial;
+}
+
 .note .dot {
   width: 7px;
   height: 7px;

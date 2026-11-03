@@ -10,13 +10,20 @@ import { wrapToWidth } from './width.ts'
 /**
  * `User | 2 days ago` / `Agent | lane-a | 3 days ago` — who and when only.
  * The full heading stays in the file for `decs get`; the bench just needs
- * whose words these are and how old.
+ * whose words these are and how old. `summary` (N203/N207): the note's own
+ * one-line `--summary`, when it has one — shown ahead of who/when, as this
+ * line's title, the terminal's version of the app's note-card title.
  */
-export function noteHeadline(note: { role: string; author: string; at: string }, now = Date.now()): string {
+export function noteHeadline(note: { role: string; author: string; at: string }, now = Date.now(), summary?: string): string {
   const when = fromNow(note.at, now)
-  if (note.role === 'human') return `${t('bench.note.user')} | ${when}`
-  const name = note.author.split(/[ \t]*·[ \t]*/)[0]?.trim()
-  return name ? `${t('bench.note.agent')} | ${name} | ${when}` : `${t('bench.note.agent')} | ${when}`
+  const base =
+    note.role === 'human'
+      ? `${t('bench.note.user')} | ${when}`
+      : (() => {
+          const name = note.author.split(/[ \t]*·[ \t]*/)[0]?.trim()
+          return name ? `${t('bench.note.agent')} | ${name} | ${when}` : `${t('bench.note.agent')} | ${when}`
+        })()
+  return summary ? `${summary}  ——  ${base}` : base
 }
 
 /** Default action only applies to an unsettled decision — Enter on a
@@ -60,12 +67,13 @@ function sectionLabel(line: string): string | undefined {
   return undefined
 }
 
-/** Very light markdown for the terminal — enough for headings/emphasis to read as such. */
-export function styleLine(line: string, now = Date.now()): Segment {
+/** Very light markdown for the terminal — enough for headings/emphasis to read as such.
+ *  `summary` (N203/N207) is the note's own one-line `--summary`, if the caller has it to hand. */
+export function styleLine(line: string, now = Date.now(), summary?: string): Segment {
   // human (owner) vs agent must read differently at a glance.
   const note = /^##[ \t]/.test(line) ? parseNoteHeading(line) : null
   if (note) {
-    const text = noteHeadline(note, now)
+    const text = noteHeadline(note, now, summary)
     return note.role === 'human' ? { text, bold: true, color: 'magenta' } : { text, color: 'blue' }
   }
   const known = sectionLabel(line)
@@ -151,14 +159,18 @@ export function bodyRows(d: Decision, width: number, condensed: boolean, images:
     images.findIndex((im, i) => im.source === 'body' && !used.has(i) && im.alt === alt && im.target === target)
   const findAttachment = (n: number) => images.findIndex((im) => im.source === 'attachment' && im.attachment === n)
   let noteKind: string | undefined
+  // In file order, same as `parseNotes` counts them — this picks out each heading's own summary.
+  let noteIdx = 0
   // An infinite width is a window that wraps for itself.
   const wrap = (text: string) => (Number.isFinite(width) ? wrapToWidth(text, width) : [text])
   const pushText = (raw: string) => {
     // HTML comments are bookkeeping for tools (writer marks, group ends), never for reading.
     if (/^\s*<!--.*-->\s*$/.test(raw)) return
     if (/^#{1,6}[ \t]/.test(raw)) {
-      noteKind = parseNoteHeading(raw)?.kind
-      const { text, ...style } = styleLine(markDefault(raw, d))
+      const parsedNote = parseNoteHeading(raw)
+      noteKind = parsedNote?.kind
+      const summary = parsedNote ? d.notes?.[noteIdx++]?.summary : undefined
+      const { text, ...style } = styleLine(markDefault(raw, d), undefined, summary)
       for (const piece of wrap(text)) out.push({ text: piece, style })
       return
     }

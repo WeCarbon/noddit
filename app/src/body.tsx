@@ -131,12 +131,29 @@ function blocks(rows: BodyRow[], images: Image[], dropAttachmentHeadings = false
   return out
 }
 
-/** `AI | lane-a | 3 hours ago` / `User | 3 hours ago`, as decs words it, laid out on one line: name · when, role. */
-function NoteHead({ text, tools }: { text: string; tools?: preact.ComponentChildren }) {
+/** `AI | lane-a | 3 hours ago` / `User | 3 hours ago`, as decs words it, laid out on one line: name · when, role.
+ *  N203/N206: a `summary` (the note's own one-line `--summary`) takes the title spot instead — who/when
+ *  moves down to a small secondary line, same idea as a chat message's own one-line preview. */
+function NoteHead({ text, summary, tools }: { text: string; summary?: string | null; tools?: preact.ComponentChildren }) {
   const parts = text.split(' | ')
   const role = parts[0]
   const when = parts.length > 1 ? parts.at(-1)! : ''
   const who = parts.length > 2 ? parts.slice(1, -1).join(' | ') : role
+  if (summary) {
+    return (
+      <header class="has-summary" title={text}>
+        <span class="dot" />
+        <div class="head-text">
+          <span class="summary" dir="auto">{summary}</span>
+          <span class="who-line">
+            <span class="who">{who}</span>
+            {when && <span class="when">· {when}</span>}
+          </span>
+        </div>
+        {tools && <span class="note-tools">{tools}</span>}
+      </header>
+    )
+  }
   return (
     <header title={text}>
       <span class="dot" />
@@ -154,6 +171,8 @@ export interface NoteHooks {
   replace?: (index: number) => preact.ComponentChildren | null
   /** Drawn at the end of each note (its files), and after the description (`-1`). When set, attachment headings are left out. */
   after?: (index: number) => preact.ComponentChildren | null
+  /** The note's own one-line summary (N203/N206), shown as its title instead of who/when. */
+  summary?: (index: number) => string | null | undefined
 }
 
 function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks }) {
@@ -166,7 +185,7 @@ function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image
           case 'note':
             return (
               <section key={i} class={`note ${b.human ? 'human' : 'agent'}`} data-ctx="note">
-                <NoteHead text={b.row.text} tools={notes?.tools?.(b.index, b.human)} />
+                <NoteHead text={b.row.text} summary={notes?.summary?.(b.index)} tools={notes?.tools?.(b.index, b.human)} />
                 <div class="note-body">
                   {notes?.replace?.(b.index) ?? <Blocks list={b.rows} images={images} onImage={onImage} />}
                   {notes?.after?.(b.index)}

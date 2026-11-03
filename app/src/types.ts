@@ -212,6 +212,10 @@ export interface Note {
   author: string
   at: string
   text: string
+  /** A one-line summary (N203/N205's `--summary`), shown instead of `text` wherever there isn't
+   *  room for the whole reply — a notice, a note card's title, the TUI. Absent on a short note
+   *  (which is its own summary) or one written before `--summary` existed. */
+  summary?: string | null
   /** This note's own attachments. */
   attachments?: Attachment[]
 }

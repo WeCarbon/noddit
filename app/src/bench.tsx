@@ -526,7 +526,9 @@ export function Bench(props: {
         const fresh = await api.loadNode(root, n.id)
         title = noticeTitle(fresh)
         const last = [...fresh.notes].reverse().find((x) => x.role === 'agent')
-        text = last ? plainReply(last.text) || undefined : undefined
+        // N203/N206: the reply's own one-line --summary, when it has one; its flattened
+        // text (clamped to three lines by CSS) otherwise, same as before --summary existed.
+        text = last ? last.summary || plainReply(last.text) || undefined : undefined
       } catch {
         /* the notice still goes, with what the bench on hand knows */
       }
@@ -1653,6 +1655,7 @@ function Detail(p: {
                       <PenLine size={12} strokeWidth={1.75} />
                     </button>
                   ) : null,
+                summary: (i) => n.notes[i]?.summary,
                 after: perMessage ? (i) => fileChips(i === -1 ? n.body_attachments : n.notes[i]?.attachments) : undefined,
                 replace: (i) =>
                   p.editing === i ? (

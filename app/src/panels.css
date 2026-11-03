@@ -258,6 +258,18 @@
   overflow: hidden;
 }
 
+/* N203/N211: the latest reply's own summary (or flattened text) — why the
+ * owner is being asked, without opening the app. Secondary to .b-title. */
+.b-summary {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .b-options {
   display: flex;
   flex-direction: column;

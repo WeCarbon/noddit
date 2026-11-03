@@ -12,7 +12,7 @@ import { Store } from '../src/core/store.ts'
 import type { Decision } from '../src/core/types.ts'
 import { buildFrame, geometry, hitTest, type FrameInput } from '../src/tui/app.ts'
 import { IMAGE_MARK, ensureVisible, imageName, nodeImages, placeholderText, selectableImages, splitImageLinks, stepImage, stepSelectable } from '../src/tui/images.ts'
-import { bodyRows } from '../src/tui/model.ts'
+import { bodyRows, noteHeadline, styleLine } from '../src/tui/model.ts'
 import { nearestSelectable, rowsFor } from '../src/tui/views.ts'
 import { RESET, zoomHintText } from '../src/tui/zoom.ts'
 import { fit, graphemes, stringWidth, wrapToWidth } from '../src/tui/width.ts'
@@ -172,6 +172,41 @@ test('bodyRows: an attachment under a note renders right after that note, not bu
     ['', undefined],
     ['🖼️ after.png', 1],
   ])
+})
+
+test('noteHeadline/styleLine: a note with a summary (N203/N207) shows it ahead of who | when; one with none is unchanged', () => {
+  const human = { role: 'human', author: 'owner', at: new Date().toISOString() }
+  const agent = { role: 'agent', author: 'lane-a · x', at: new Date().toISOString() }
+  assert.match(noteHeadline(human, Date.now()), /^User \| /)
+  assert.match(noteHeadline(human, Date.now(), '一句摘要'), /^一句摘要  ——  User \| /)
+  assert.match(noteHeadline(agent, Date.now(), 'did the thing'), /^did the thing  ——  Agent \| lane-a \| /)
+
+  const line = '## 回复（human · owner · 2026-10-28 10:51:30）'
+  const plain = styleLine(line)
+  assert.match(plain.text, /^User \| /)
+  const withSummary = styleLine(line, Date.now(), 'a short summary')
+  assert.match(withSummary.text, /^a short summary  ——  User \| /)
+  assert.equal(withSummary.bold, plain.bold)
+  assert.equal(withSummary.color, plain.color)
+})
+
+test('bodyRows: a note with its own summary shows it as the heading row\'s title; one with none reads as before', () => {
+  const d = {
+    body: ['## 回复（human · owner · 2026-10-28 10:51:30）', '', 'the full long reply', ''].join('\n'),
+    notes: [{ kind: '回复', role: 'human', author: 'owner', at: '2026-10-28T10:51:30+08:00', text: 'the full long reply', summary: 'a short title', heading: '回复（human · owner · 2026-10-28 10:51:30）', attachments: [] }],
+  } as unknown as Decision
+  const rows = bodyRows(d, Infinity, false)
+  assert.match(rows[0].text, /^a short title  ——  User \| /)
+
+  const noSummary = { ...d, notes: [{ ...(d.notes as unknown as { summary?: string }[])[0], summary: undefined }] } as unknown as Decision
+  const rows2 = bodyRows(noSummary, Infinity, false)
+  assert.match(rows2[0].text, /^User \| /)
+  assert.doesNotMatch(rows2[0].text, /——/)
+})
+
+test('bodyRows never throws on a Decision-like object with no notes array at all (a test fixture, or any caller that omits it)', () => {
+  const d = { body: ['## 回复（human · owner · 2026-10-28 10:51:30）', '', 'text', ''].join('\n') } as unknown as Decision
+  assert.doesNotThrow(() => bodyRows(d, Infinity, false))
 })
 
 test('bodyRows: the condensed body still points each placeholder at its entry in the full list', (t) => {

@@ -85,6 +85,10 @@ pub struct Waiting {
     options: Vec<Opt>,
     default: Option<String>,
     urgent: bool,
+    /// N203/N211: the latest agent note's own `--summary`, else its text flattened — shown in
+    /// the quick-answer banner so the owner sees why they're being asked without opening the app.
+    #[serde(rename = "replySummary")]
+    reply_summary: Option<String>,
 }
 
 /// A live node with a due date (`nod show due`); `milestone` when the owner also marked it one (⚑).
@@ -284,6 +288,16 @@ fn start_clock(app: &AppHandle) {
     });
 }
 
+/// N203/N211: the latest agent note's own `--summary`, else its text flattened (`plain_reply`);
+/// `None` when nothing has been written yet (a brand-new question, nothing to explain further).
+fn last_agent_summary(notes: &Value) -> Option<String> {
+    let last = notes.as_array()?.iter().rev().find(|n| n["role"] == "agent")?;
+    match last["summary"].as_str() {
+        Some(s) => Some(s.to_string()),
+        None => last["text"].as_str().map(plain_reply),
+    }
+}
+
 fn parse_waiting(json: &str) -> Vec<Waiting> {
     let Ok(Value::Array(items)) = serde_json::from_str::<Value>(json) else { return vec![] };
     items
@@ -306,6 +320,7 @@ fn parse_waiting(json: &str) -> Vec<Waiting> {
                     .unwrap_or_default(),
                 default: d["default"].as_str().map(str::to_string),
                 urgent: d["urgency"] == "high",
+                reply_summary: last_agent_summary(&d["notes"]),
             }
         })
         .collect()
@@ -390,14 +405,73 @@ fn announce(app: &AppHandle, w: &Waiting, how_many: usize) {
     }
 }
 
+/// A rough, dependency-free parallel to `app/src/plain-reply.ts`'s `plainReply`: strips HTML
+/// comments (the `<!-- nod:… -->` markers) and collapses whitespace onto one line — enough for
+/// a system notification body when a reply carries no `--summary` of its own. Doesn't bother
+/// with markdown emphasis/links; this is a fallback path, not the detail pane.
+fn plain_reply(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("<!--") {
+        out.push_str(&rest[..start]);
+        rest = match rest[start..].find("-->") {
+            Some(end) => &rest[start + end + 3..],
+            None => "",
+        };
+    }
+    out.push_str(rest);
+    let flat = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.chars().count() > 200 {
+        let head: String = flat.chars().take(199).collect();
+        format!("{head}…")
+    } else {
+        flat
+    }
+}
+
 /// An agent's first reply after something the owner wrote (`owner_facing` on an update line).
+/// N203/N206: shows the reply's own `--summary` when it has one, else its text, flattened — the
+/// monitor line itself only carries refs, so this reads the node fresh via the CLI, same as
+/// `refresh()` does for `show --json`. `changed` (N258) already names each ref's id/file; no
+/// extra round trip to find them.
 fn announce_replies(app: &AppHandle, line: &Value) {
-    let refs: Vec<&str> = line["owner_facing"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    let refs: Vec<String> = line["owner_facing"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
     if refs.is_empty() || settings(app).notify != "system" || background() {
         return;
     }
-    let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
-    let _ = app.notification().builder().title(refs.join(" ")).body(phrase(&phrases.agent_replied, "an AI replied")).show();
+    let changed = line["changed"].as_array().cloned().unwrap_or_default();
+    let target = refs.iter().find_map(|r| {
+        let c = changed.iter().find(|c| c["ref"] == *r)?;
+        let id = c["id"].as_u64()?;
+        let file = c["file"].as_str()?;
+        let root = file.split("/decisions/").next()?;
+        Some((id, root.to_string()))
+    });
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
+        let mut body = phrase(&phrases.agent_replied, "an AI replied");
+        if let Some((id, root)) = target {
+            if let Some(env) = env_now(&app) {
+                let args = ["bench".into(), "--json".into(), "--node".into(), id.to_string(), "--dir".into(), root];
+                if let Ok(mut cmd) = decs_command(&env, &args, None) {
+                    if let Ok(out) = cmd.output().await {
+                        if out.status.success() {
+                            if let Ok(node) = serde_json::from_slice::<Value>(&out.stdout) {
+                                let last = node["notes"].as_array().and_then(|notes| notes.iter().rev().find(|n| n["role"] == "agent"));
+                                if let Some(s) = last.and_then(|n| n["summary"].as_str()) {
+                                    body = s.to_string();
+                                } else if let Some(t) = last.and_then(|n| n["text"].as_str()) {
+                                    body = plain_reply(t);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let _ = app.notification().builder().title(refs.join(" ")).body(body).show();
+    });
 }
 
 /// `decs monitor` says an answer has sat uncollected: the owner may want to nudge an agent.
@@ -814,7 +888,7 @@ pub fn stop_monitor(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{chrono_ms, reminder_for, DAY_MS, HOUR_MS};
+    use super::{chrono_ms, plain_reply, reminder_for, DAY_MS, HOUR_MS};
 
     #[test]
     fn reads_the_times_nod_writes() {
@@ -831,5 +905,20 @@ mod tests {
         assert_eq!(reminder_for(2 * HOUR_MS), Some("day"));
         assert_eq!(reminder_for(HOUR_MS), Some("hour"));
         assert_eq!(reminder_for(-1), None);
+    }
+
+    #[test]
+    fn plain_reply_drops_comments_and_collapses_whitespace() {
+        assert_eq!(plain_reply("line one\n<!-- nod:by=lane-x -->\nline two"), "line one line two");
+        assert_eq!(plain_reply("before <!-- nod:summary=x --> after"), "before after");
+        assert_eq!(plain_reply("  a   b  \n c "), "a b c");
+    }
+
+    #[test]
+    fn plain_reply_truncates_past_two_hundred_characters() {
+        let long = "x".repeat(250);
+        let got = plain_reply(&long);
+        assert_eq!(got.chars().count(), 200);
+        assert!(got.ends_with('…'));
     }
 }

@@ -375,6 +375,9 @@ export interface WaitingNode {
   options: { key: string; label: string }[]
   default: string | null
   urgent: boolean
+  /** N203/N211: the latest agent note's own one-line --summary, else its text
+   *  flattened; null when nothing has been written on this node yet. */
+  replySummary: string | null
 }
 
 export async function waitingGet(): Promise<WaitingNode[]> {
