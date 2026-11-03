@@ -27,6 +27,18 @@ test('concurrent notes on one entry never lose a write', async (t) => {
   assert.ok(!existsSync(join(root, 'decisions', '.locks', `D${d.id}.lock`)), 'the lock is released')
 })
 
+test('answers pushed at once, as the desktop app does, all land and all queue', async (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  const ids = Array.from({ length: 6 }, (_, i) => store.create({ title: `pick ${i}`, author: 'race · lane', options: [{ key: '1', label: 'a' }, { key: '2', label: 'b' }] }).id)
+  // Each push rewrites its own node, then queue.json and checkins.json, which every push shares.
+  await Promise.all(ids.map((id) => decsAsync(root, ['push', String(id), '2', '--human'])))
+  for (const id of ids) assert.equal(store.get(id)!.answer?.choice, '2', `the answer to ${id} was lost`)
+  const queued = (JSON.parse(readFileSync(join(root, 'decisions', 'queue.json'), 'utf8')) as { queue: number[] }).queue
+  assert.deepEqual([...queued].sort((a, b) => a - b), ids, 'every answer is waiting for its lane')
+})
+
 test('a note and an answer on a stale copy both land', (t) => {
   const root = scratch()
   t.after(() => rmSync(root, { recursive: true, force: true }))
