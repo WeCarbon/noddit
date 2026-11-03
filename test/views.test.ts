@@ -79,10 +79,10 @@ test('Available: running, waiting, startable, needing a decision and answered-fo
   assert.ok(!nodeRowSegments(rows[at('a')], items, 70, Date.now(), { tree: true }).slice(1).every((s) => s.dim))
 })
 
-test('Active: running and needs-decision only — not answered-for-AI, not to-do', (t) => {
+test('Active: Available minus what the AIs are waiting on', (t) => {
   const { store } = fixture(t)
   const rows = rowsFor('active', store.all())
-  assert.deepEqual(named(rows).sort(), ['P', 'Q', 'U', 'c', 'd', 'r', 'v'].sort())
+  assert.deepEqual(named(rows).sort(), ['P', 'Q', 'U', 'a', 'c', 'd', 'e', 'r', 'v'].sort())
   assert.deepEqual(rows.filter((r) => r.context).map((r) => r.node!.title[0]).sort(), ['Q', 'U'])
 })
 
@@ -125,7 +125,7 @@ test('tab counts: Available / Active / Decide / Waiting count what each lists; A
   const { store } = fixture(t)
   const items = store.all()
   const counts = Object.fromEntries(VIEWS.map((v) => [v, viewCount(v, items)]))
-  assert.deepEqual(counts, { available: 8, active: 5, decide: 2, all: undefined, waiting: 1, live: undefined })
+  assert.deepEqual(counts, { available: 8, active: 7, decide: 2, all: undefined, waiting: 1, live: undefined })
   for (const v of VIEWS) {
     if (v === 'all' || v === 'live') continue
     const listed = rowsFor(v, items).filter((r) => r.kind === 'node' && !r.context).length
@@ -153,7 +153,7 @@ test('App: opens in Available, Tab walks Available Active Decide Waiting Live Al
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a startable/))
   const header = () => b.frame()[0]
-  assert.match(header(), /^decs +Available 8 +Active 5 +Human work 2 +Waiting 1/)
+  assert.match(header(), /^decs +Available 8 +Active 7 +Human work 2 +Waiting 1/)
   const before = b.frame().join('\n')
   await b.press('c')
   await b.quiet()
@@ -169,7 +169,7 @@ test('App: opens in Available, Tab walks Available Active Decide Waiting Live Al
       : /✓ Finished/.test(left) ? 'all'
       : /f waiting externally/.test(left) && !/c AI stuck/.test(left) ? 'waiting'
       : /c AI stuck/.test(left) && !/P parent task/.test(left) ? 'decide'
-      : /e answered/.test(left) ? 'available'
+      : /P parent task/.test(left) && /f waiting externally/.test(left) ? 'available'
       : /P parent task/.test(left) ? 'active' : '?'
     seen.push(which)
   }

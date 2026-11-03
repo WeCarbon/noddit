@@ -69,12 +69,12 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     layout: 'tree',
     filter: parseFilter('state:in_progress,waiting,needs_decision,decided or state:not_started is:startable'),
   },
-  // 人类工作 ⊆ 活动: a decision (any assignee) or a human task — in progress, waiting, decided or startable.
+  // 活动 = 可用 minus what the AIs are waiting on; the owner's own waits stay (人类工作 ⊆ 活动).
   {
     id: 'active',
     icon: 'activity',
     layout: 'tree',
-    filter: parseFilter('state:in_progress,needs_decision or assignee:human state:waiting,decided or assignee:human state:not_started is:startable'),
+    filter: parseFilter('state:in_progress,needs_decision,decided or state:not_started is:startable or assignee:human state:waiting'),
   },
   {
     id: 'decide',

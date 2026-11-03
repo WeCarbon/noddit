@@ -211,14 +211,14 @@ test('the default option is marked so Enter is not a guess', (t) => {
   assert.ok(text.includes('(⏎)'), 'the default option must be visibly marked')
 })
 
-test('an answered entry leaves Decide and Active, and waits in Available for an AI to pick it up', (t) => {
+test('an answered entry leaves Decide, and stays in Active and Available for an AI to pick it up', (t) => {
   const { store, root } = fixture()
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const first = listFor(store)[0]
   store.answer(first, { choice: '2', note: 'press 2 first' })
 
   assert.ok(!listFor(store, 'decide').some((d) => d.id === first.id), 'no answered group in Decide any more')
-  assert.ok(!listFor(store, 'active').some((d) => d.id === first.id), 'Active is running + Decide only')
+  assert.ok(listFor(store, 'active').some((d) => d.id === first.id), 'Active is Available minus AI waits')
   assert.ok(listFor(store, 'available').some((d) => d.id === first.id), 'Available has it, as answered — for AI')
   assert.ok(listFor(store, 'all').some((d) => d.id === first.id), 'All still shows it')
 })
