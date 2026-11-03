@@ -9,7 +9,7 @@ import { BodyEditor } from './editor.tsx'
 import { ViewEditor, ViewIcon } from './views.tsx'
 import {
   ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
-  FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
+  FolderSearch, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
   Bot, Flag, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
@@ -718,8 +718,18 @@ export function Bench(props: {
     }
     items.push({ kind: 'separator' })
     if (n?.parent != null) items.push({ label: s('ctxGoParent'), icon: I(CornerLeftUp), shortcut: '←', run: () => L().goParent() })
-    items.push({ label: s('ctxCopyRef', { ref: r.ref ?? '' }), icon: I(Hash), run: () => copy(r.ref ?? '') })
-    items.push({ label: s('ctxCopyTitle'), icon: I(Copy), run: () => copy(r.title ?? '') })
+    items.push({
+      label: s('ctxCopy'),
+      icon: I(Copy),
+      sub: [
+        { label: s('ctxCopyRef', { ref: r.ref ?? '' }), run: () => copy(r.ref ?? '') },
+        { label: s('ctxCopyTitle'), run: () => copy(r.title ?? '') },
+        { label: s('ctxCopyRefTitle', { ref: r.ref ?? '' }), run: () => copy(`${r.ref ?? ''} ${r.title ?? ''}`.trim()) },
+        ...(n?.file ? [{ label: s('ctxCopyPath'), run: () => copy(n.file, n.file) } as MenuItem] : []),
+        ...(n?.file ? [{ label: s('ctxCopyMarkdown'), run: () => copy(`[${r.ref ?? ''} ${r.title ?? ''}](${n.file})`) } as MenuItem] : []),
+        { label: s('ctxCopyCommand', { ref: r.ref ?? '' }), run: () => copy(`nod get ${r.ref ?? ''}`) },
+      ],
+    })
     if (n?.file) {
       items.push({ kind: 'separator' })
       items.push({ label: revealLabel, icon: I(FolderSearch), run: () => void api.reveal(n.file) })
