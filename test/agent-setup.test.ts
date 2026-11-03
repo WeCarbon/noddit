@@ -50,7 +50,7 @@ test('detectAgents reports each of claude/codex/kimi independently', (t) => {
 })
 
 // ---------------------------------------------------------------------------
-// rulesBody — the same text the Claude plugin injects, English in every language
+// rulesBody — the same text the plugin injects, English in every language
 // ---------------------------------------------------------------------------
 
 test('rulesBody is plugin/rules.md, the one English rules file', () => {

@@ -75,7 +75,7 @@ function repoRoot(): string {
   throw new Error('nod: could not find plugin/rules.md relative to src/core/agents.ts')
 }
 
-/** The short rules Claude's plugin injects every session — same text other harnesses get in their `AGENTS.md`. English in every interface language. */
+/** The short rules the plugin injects every session — same text other harnesses get in their `AGENTS.md`. English in every interface language. */
 export function rulesBody(): string {
   return readFileSync(join(repoRoot(), 'plugin', 'rules.md'), 'utf8').trim()
 }

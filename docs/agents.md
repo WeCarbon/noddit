@@ -77,7 +77,7 @@ mechanism both of them read and that a script can safely edit.
   `--env`, OAuth flags, etc. — not used by nod (nod is a CLI, not an MCP
   server).
 - **`nod setup`'s approach**: write the `decs` section into the project's
-  `AGENTS.md`, same content Claude's plugin injects (`plugin/rules.md`, English in every
+  `AGENTS.md`, same content the plugin injects (`plugin/rules.md`, English in every
   interface language).
   No hook is installed, for the trust-prompt reason above — a hook a script
   drops in place is dead weight until a human clicks through `/hooks` anyway,
