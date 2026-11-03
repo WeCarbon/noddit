@@ -332,5 +332,7 @@ export const zhHans: Strings = {
   ctxStartSession: '开一个会话…',
   listening: '{{who}} 在听',
   notListening: '没有 AI 在听',
+  ctxGotoSession: '转到会话',
+  sessionGone: '会话已不在',
   keyQuick: '派给 AI',
 }

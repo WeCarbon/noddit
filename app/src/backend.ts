@@ -135,6 +135,12 @@ export const useNativeMenus = async (): Promise<boolean> => (inDesktop ? !(await
 
 export const isDebugBuild = async (): Promise<boolean> => (inDesktop ? invoke<boolean>('is_debug').catch(() => false) : true)
 
+/** iTerm2 or macOS Terminal, when a monitor's heartbeat could tell which session/tab it runs in. */
+export interface SessionTerminal {
+  type: 'mac-iterm2' | 'mac-terminal'
+  id: string
+}
+
 export interface Session {
   pid: number
   author: string | null
@@ -142,6 +148,7 @@ export interface Session {
   role: 'lead' | 'teammate'
   started_at: string
   last_seen: string
+  terminal?: SessionTerminal
 }
 
 export interface ProjectSessions {
@@ -200,6 +207,18 @@ export async function startSession(root: string, agent: AgentKind): Promise<Sess
     return JSON.parse(out.stdout) as SessionStart
   } catch {
     throw new DecsError((out.stderr || out.stdout).replace(/^nod [a-z]+: /, '').trim())
+  }
+}
+
+/** Brings the project's main session's terminal window/tab to the front. `false` (never a thrown
+ *  error) when it is no longer there — iTerm2/Terminal closed, or nothing was ever recorded. */
+export async function gotoSession(root: string): Promise<boolean> {
+  if (!inDesktop) return true
+  const out = await run(['session', 'goto', '--dir', root, '--json'])
+  try {
+    return Boolean((JSON.parse(out.stdout) as { ok: boolean }).ok)
+  } catch {
+    return false
   }
 }
 

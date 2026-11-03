@@ -332,5 +332,7 @@ export const zhHant: Strings = {
   ctxStartSession: '開一個工作階段…',
   listening: '{{who}} 在聽',
   notListening: '沒有 AI 在聽',
+  ctxGotoSession: '前往工作階段',
+  sessionGone: '工作階段已不在',
   keyQuick: '派給 AI',
 }

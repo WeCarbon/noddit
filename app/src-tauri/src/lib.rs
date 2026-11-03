@@ -262,8 +262,8 @@ pub(crate) fn decs_command(env: &ShellEnv, args: &[String], cwd: Option<&str>) -
 async fn decs(app: AppHandle, state: State<'_, AppState>, args: Vec<String>, cwd: Option<String>, stdin: Option<String>) -> Result<RunOutput, String> {
     let env = cached_env(&app, &state).unwrap_or_else(|| refresh_env(&app, &state));
     let mut args = args;
-    // In background (test) mode nothing opens a terminal: the CLI only reports what it would run.
-    if background() && args.len() >= 2 && args[0] == "session" && args[1] == "start" && !args.iter().any(|a| a == "--dry-run") {
+    // In background (test) mode nothing opens a terminal or raises a window: the CLI only reports what it would run.
+    if background() && args.len() >= 2 && args[0] == "session" && (args[1] == "start" || args[1] == "goto") && !args.iter().any(|a| a == "--dry-run") {
         args.push("--dry-run".into());
     }
     let fault = state.faults.lock().unwrap().clone().filter(|f| args.first() == Some(&f.command));

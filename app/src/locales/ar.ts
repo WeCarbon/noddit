@@ -332,5 +332,7 @@ export const ar: Strings = {
   ctxStartSession: 'بدء جلسة…',
   listening: '{{who}} يستمع',
   notListening: 'لا وكيل يستمع',
+  ctxGotoSession: 'الانتقال إلى الجلسة',
+  sessionGone: 'لم تعد الجلسة موجودة',
   keyQuick: 'مهمة جديدة لوكيل',
 }

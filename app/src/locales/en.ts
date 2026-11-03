@@ -330,6 +330,8 @@ export const en = {
   ctxStartSession: 'Start a session…',
   listening: '{{who}} is listening',
   notListening: 'No AI listening',
+  ctxGotoSession: 'Go to session',
+  sessionGone: 'Session is gone',
   keyQuick: 'New for an AI',
 }
 
