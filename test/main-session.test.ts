@@ -124,7 +124,7 @@ test('the main session’s monitor takes briefs where no lead listens, and leave
   fakeHeartbeat(w.home, 'alpha-lead', [w.alpha], 'lead')
 
   const env = { ...process.env, NO_COLOR: '1', DECS_LANG: 'en', CLAUDECODE: '1', DECS_HOME: w.home, NODDIT_ROLE: 'main', DECS_AUTHOR: 'main-session' }
-  const mon = spawn(process.execPath, [BIN, 'monitor', '--here', '--interval', '200', '--no-sources'], { cwd: w.code, env })
+  const mon = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--here', '--interval', '200', '--no-sources'], { cwd: w.code, env })
   t.after(() => killAndWait(mon))
   let out = ''
   mon.stdout.on('data', (b) => (out += b))

@@ -144,7 +144,7 @@ test('decs monitor --updates: an agent writing progress is a line, which plain m
   t.after(() => rmScratch(home))
   decs(root, ['add', 'long job', '--task'])
   decs(root, ['start', '1'])
-  const child = spawn(process.execPath, [BIN, 'monitor', '--updates', '--json', '--interval', '200', '--idle-exit', '0'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--updates', '--json', '--interval', '200', '--idle-exit', '0'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })

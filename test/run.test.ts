@@ -5,9 +5,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { BIN, decs, decsResult, scratch } from './helpers.ts'
-
-const sleep = (ms: number) => new Promise((resolveP) => setTimeout(resolveP, ms))
+import { BIN, decs, decsResult, scratch, waitFor } from './helpers.ts'
 
 /**
  * A tiny cross-platform "test runner" controlled by its first argv: writes
@@ -49,12 +47,15 @@ if (mode === 'success') {
   for (let i = 0; i < 30; i++) console.log('line ' + i)
   process.exit(1)
 } else if (mode === 'slow-start') {
+  // Long enough that even a loaded machine's own process-spawn overhead (this
+  // fixture, "nod get" polling it back) can't eat the whole window before the
+  // in-progress check below gets to look.
   setTimeout(() => {
     emit({ type: 'start', total: 1, label: 'slow' })
     emit({ type: 'progress', done: 1, total: 1 })
     emit({ type: 'finish', ok: true, summary: 'done' })
     process.exit(0)
-  }, 400)
+  }, 2000)
 } else {
   console.error('unknown mode ' + mode)
   process.exit(2)
@@ -207,21 +208,37 @@ test('nod run: with no --events, a generated events file is passed to the child 
 
 test('nod run: --wait-label shows as the progress message until the first event arrives', async (t) => {
   const root = scratch()
+  // nod start/run also touch $DECS_HOME/session-nodes.json under a file lock;
+  // left on the default it's the real, shared ~/.decs — contended by every
+  // other agent on the machine running nod commands at the same time, which
+  // is exactly what turned the gap below from a microsecond race into a real
+  // one (N260). Pinning it to a scratch dir isolates the test from that.
+  const home = scratch()
+  const env = { DECS_HOME: home }
   t.after(() => rmSync(root, { recursive: true, force: true }))
-  decs(root, ['init', '--no-register'])
-  decs(root, ['add', 't', '--task'])
+  t.after(() => rmSync(home, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'], env)
+  decs(root, ['add', 't', '--task'], env)
   const script = writeFixture(root)
 
-  const proc = spawnRun(root, ['1', '--wait-label', 'warming up', '--', process.execPath, script, 'slow-start'])
+  const proc = spawnRun(root, ['1', '--wait-label', 'warming up', '--', process.execPath, script, 'slow-start'], env)
   t.after(() => proc.kill())
-  await sleep(150) // well before the fixture's own 400ms delay
 
-  const mid = JSON.parse(decs(root, ['get', '1', '--json']))
+  // `nod run` writes status (store.start) and the wait-label (store.progress)
+  // as two separate file writes, with that session bookkeeping in between —
+  // poll for the actual label rather than just the status, in case a slow
+  // machine still stretches the gap enough to catch it (N260: polling for
+  // status alone once caught it mid-gap, label still null). Both writes land
+  // well before the fixture's own first event either way.
+  let mid: { status: string; progress_msg: string | null } = { status: '', progress_msg: null }
+  await waitFor(() => {
+    mid = JSON.parse(decs(root, ['get', '1', '--json'], env))
+    return mid.progress_msg === 'warming up'
+  }, 'the wait-label to show as the progress message', 15_000, 20)
   assert.equal(mid.status, 'in_progress')
-  assert.equal(mid.progress_msg, 'warming up')
 
   await new Promise((resolveP) => proc.once('exit', resolveP))
-  const final = JSON.parse(decs(root, ['get', '1', '--json']))
+  const final = JSON.parse(decs(root, ['get', '1', '--json'], env))
   assert.equal(final.status, 'completed')
   assert.equal(final.progress_msg, 'done')
 })

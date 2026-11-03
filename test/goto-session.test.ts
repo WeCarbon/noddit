@@ -83,7 +83,7 @@ test('nod session goto --json: a recorded iTerm2 lead session is found and the A
   decs(root, ['init', '--no-register'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--json'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--json'], {
     cwd: root,
     env: {
       ...process.env,
@@ -132,7 +132,7 @@ test('nod session goto: a teammate-only heartbeat (no lead) is still "nothing to
   decs(root, ['init', '--no-register'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--mine', '--interval', '150', '--json'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--mine', '--interval', '150', '--json'], {
     cwd: root,
     env: {
       ...process.env,

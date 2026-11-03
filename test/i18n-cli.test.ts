@@ -55,7 +55,7 @@ for (const lng of LANGUAGES) {
 // ---------------------------------------------------------------------------
 
 function spawnMonitor(root: string, args: string[], env: Record<string, string>): { child: ReturnType<typeof spawn>; out: () => string } {
-  const child = spawn(process.execPath, [BIN, 'monitor', ...args], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), ...args], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', CLAUDECODE: '1', ...env },
   })

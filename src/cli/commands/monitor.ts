@@ -188,6 +188,23 @@ function alive(pid: number): boolean {
   }
 }
 
+/**
+ * Whether `--with-parent <parent>` means we should exit right now. When
+ * `parent` is our own OS parent (`startPpid`, read once at startup — true of
+ * every caller in this codebase, which always passes its own pid), a changed
+ * `ppid` is unambiguous proof that parent is gone: the kernel only reparents
+ * us (to init, or a subreaper) once it has actually exited. `aliveFn` (real
+ * liveness check swapped out in tests) is the fallback for an indirect
+ * ancestor, but on a long-running, busy machine the OS can recycle that exact
+ * pid number onto an unrelated new process in the meantime — `aliveFn` then
+ * says "yes" about an impostor, and the window never closes (N260: a
+ * 31-minute orphan from exactly this; see identity.test.ts's parentIsGone tests).
+ */
+export function parentIsGone(parent: number, startPpid: number, currentPpid: number, aliveFn: (pid: number) => boolean = alive): boolean {
+  if (parent <= 0) return false
+  return parent === startPpid ? currentPpid !== startPpid : !aliveFn(parent)
+}
+
 /** The backstop poll, when nothing nudges a pass sooner (N257). */
 export const DEFAULT_INTERVAL_MS = 30_000
 
@@ -679,13 +696,14 @@ export async function run(args: Args): Promise<number> {
   })
   process.on('exit', stopWatching)
   const parent = Number(one(args, 'with-parent') ?? 0)
+  const startPpid = process.ppid
   setInterval(() => {
     if (heartbeat && Date.now() - lastBeat >= HEARTBEAT_MS) {
       lastBeat = Date.now()
       beat()
     }
     // A window that started this monitor and then died (or was killed) takes it along.
-    if (parent > 0 && !alive(parent)) process.exit(0)
+    if (parentIsGone(parent, startPpid, process.ppid)) process.exit(0)
     runSyncs()
     pass()
     if (idleExitMs > 0 && Date.now() - lastEventAt >= idleExitMs) {

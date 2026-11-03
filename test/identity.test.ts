@@ -9,7 +9,7 @@ import { agentNameOf, currentIdentity, currentSession } from '../src/core/identi
 import { parseNotes } from '../src/core/parse.ts'
 import { appendSection, noteHeading } from '../src/core/serialize.ts'
 import { ownedBy } from '../src/core/store.ts'
-import { teammateFromTeamConfig, teammateName } from '../src/cli/commands/monitor.ts'
+import { parentIsGone, teammateFromTeamConfig, teammateName } from '../src/cli/commands/monitor.ts'
 import { BIN, decs, killAndWait, scratch } from './helpers.ts'
 
 // ---------------------------------------------------------------------------
@@ -193,6 +193,35 @@ test('teammateName: the --agent-name a teammate\'s own process was started with;
 })
 
 // ---------------------------------------------------------------------------
+// N260: --with-parent must not be fooled by PID reuse on a long-running,
+// busy machine — a pid still "alive" can be a different process entirely by
+// then. When --with-parent names our actual OS parent (every caller in this
+// codebase passes its own pid), a changed ppid is the unambiguous signal
+// instead; alive() stays the fallback for an indirect ancestor, where ppid
+// comparison does not apply.
+// ---------------------------------------------------------------------------
+
+test('parentIsGone: --with-parent 0 (not given) never says to exit', () => {
+  assert.equal(parentIsGone(0, 111, 111), false)
+  assert.equal(parentIsGone(0, 111, 999), false)
+})
+
+test('parentIsGone: --with-parent names our own ppid — a changed ppid alone is reparenting, regardless of what alive() would say about the old number', () => {
+  // The exact N260 bug: the original parent pid got recycled onto an
+  // unrelated process, so a plain alive(parent) still reports true. With the
+  // ppid comparison this is never even consulted for the direct-parent case.
+  const aliveSaysYesToAnImpostor = () => true
+  assert.equal(parentIsGone(111, 111, 111, aliveSaysYesToAnImpostor), false, 'ppid unchanged: still our real parent, no ambiguity')
+  assert.equal(parentIsGone(111, 111, 1, aliveSaysYesToAnImpostor), true, 'reparented to init — gone, however alive() answers')
+  assert.equal(parentIsGone(111, 111, 222, aliveSaysYesToAnImpostor), true, 'reparented to a subreaper — gone')
+})
+
+test('parentIsGone: --with-parent names an indirect ancestor (not our own ppid) — falls back to alive()', () => {
+  assert.equal(parentIsGone(50, 111, 111, () => true), false, 'alive() says the ancestor is still there')
+  assert.equal(parentIsGone(50, 111, 111, () => false), true, 'alive() says it is gone')
+})
+
+// ---------------------------------------------------------------------------
 // nod monitor: project scope by default, --all-projects to widen it (N41)
 // ---------------------------------------------------------------------------
 
@@ -200,9 +229,10 @@ test('a bare nod monitor watches only the project under cwd; another registered 
   const a = scratch()
   const b = scratch()
   const home = scratch()
-  t.after(() => rmSync(a, { recursive: true, force: true }))
-  t.after(() => rmSync(b, { recursive: true, force: true }))
-  t.after(() => rmSync(home, { recursive: true, force: true }))
+  // Registered below, after both monitors' own t.after(killAndWait) — hooks
+  // run in the order they were added, and these monitors write under `home`
+  // (and watch `a`) while alive, so deleting those trees first races a still
+  // -live process and can throw ENOTEMPTY under load (N260, same as N257's).
   decs(a, ['init', '--no-register'], { DECS_HOME: home })
   decs(b, ['init', '--no-register'], { DECS_HOME: home })
   // `nod init` skips registering a scratch/tmp path; `projects add` doesn't, so the
@@ -212,7 +242,7 @@ test('a bare nod monitor watches only the project under cwd; another registered 
   decs(b, ['add', 'something in project b', '-o', '1=ok'], { DECS_HOME: home })
 
   const { spawn } = await import('node:child_process')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--json'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--json'], {
     cwd: a,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: undefined, CLAUDECODE: '1', DECS_HOME: home },
   })
@@ -228,13 +258,16 @@ test('a bare nod monitor watches only the project under cwd; another registered 
   await new Promise((r) => setTimeout(r, 800))
   assert.equal(out, '', 'project b is not even registered to this bare monitor\'s own project')
 
-  const allProjects = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--json', '--all-projects'], {
+  const allProjects = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--json', '--all-projects'], {
     cwd: a,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: undefined, CLAUDECODE: '1', DECS_HOME: home },
   })
   let out2 = ''
   allProjects.stdout.on('data', (b2) => (out2 += b2))
   t.after(() => killAndWait(allProjects))
+  t.after(() => rmSync(a, { recursive: true, force: true }))
+  t.after(() => rmSync(b, { recursive: true, force: true }))
+  t.after(() => rmSync(home, { recursive: true, force: true }))
   await until(() => out2.includes('"event":"answered"') || out2.includes('X1'), '--all-projects to see project b')
 })
 

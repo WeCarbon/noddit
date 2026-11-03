@@ -133,7 +133,7 @@ test('a command written into a committed source.md is never run — only the mac
   assert.deepEqual(runs(), [])
 
   // The same through a real lead monitor.
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--idle-exit', '0'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--idle-exit', '0'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })
@@ -151,7 +151,7 @@ test('nod monitor (lead) runs a registered sync command while alive; a failure i
   assert.ok(!readFileSync(join(root, 'decisions', 'sources', 'ado', 'source.md'), 'utf8').includes('run.cjs'))
   assert.match(decs(root, ['source', 'list'], env), /syncs every 1s/)
 
-  const mine = spawn(process.execPath, [BIN, 'monitor', '--mine', '--interval', '150', '--idle-exit', '0'], {
+  const mine = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--mine', '--interval', '150', '--idle-exit', '0'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })
@@ -161,7 +161,7 @@ test('nod monitor (lead) runs a registered sync command while alive; a failure i
   assert.deepEqual(runs(), [], 'a lane monitor leaves sync commands to the lead')
   await killAndWait(mine)
 
-  const lead = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--idle-exit', '0'], {
+  const lead = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--idle-exit', '0'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })

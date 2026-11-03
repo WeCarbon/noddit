@@ -62,6 +62,12 @@ export function decsAsync(cwd: string, args: string[]): Promise<void> {
  * has reaped the process; an orphan left running past the last test is what
  * keeps `node --test` itself from exiting. Closing stdin first unblocks a
  * child that might otherwise be waiting on it.
+ *
+ * A SIGTERM that a loaded machine is too busy to act on in time escalates to
+ * SIGKILL rather than giving up — a process this never actually kills is an
+ * orphan that holds `node --test`'s own event loop open long after the test
+ * that spawned it is gone (the exact N260 hang: --test-timeout marks the test
+ * failed but never touches the process it spawned).
  */
 export function killAndWait(child: ChildProcess, timeoutMs = 5000): Promise<void> {
   return new Promise((resolve) => {
@@ -70,11 +76,21 @@ export function killAndWait(child: ChildProcess, timeoutMs = 5000): Promise<void
       return
     }
     const done = () => {
-      clearTimeout(timer)
+      clearTimeout(escalate)
+      clearTimeout(giveUp)
       resolve()
     }
-    const timer = setTimeout(done, timeoutMs)
     child.once('exit', done)
+    const escalate = setTimeout(() => {
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        /* already gone */
+      }
+    }, timeoutMs)
+    // SIGKILL cannot be ignored — this is only a backstop in case the 'exit'
+    // event itself never arrives (e.g. a zombie stuck in uninterruptible I/O).
+    const giveUp = setTimeout(done, timeoutMs + 5000)
     try {
       child.stdin?.end()
     } catch {
@@ -82,4 +98,11 @@ export function killAndWait(child: ChildProcess, timeoutMs = 5000): Promise<void
     }
     child.kill()
   })
+}
+
+/** Polls `ok`, failing with `what` after `ms` — for state that settles asynchronously (another process starting, a file appearing) rather than on a fixed clock a loaded machine can blow past. Checks immediately, so a condition already true never waits at all. */
+export async function waitFor(ok: () => boolean | Promise<boolean>, what: string, ms = 10_000, intervalMs = 50): Promise<void> {
+  for (const end = Date.now() + ms; !(await ok()); await new Promise((r) => setTimeout(r, intervalMs))) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`)
+  }
 }

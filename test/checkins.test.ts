@@ -144,7 +144,7 @@ test('a check-in ask rides along the next monitor line when there is one, but st
   decs(root, ['start', '1'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--json'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--json'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })
@@ -181,7 +181,7 @@ test('a bare (lead) monitor nags about stale (not_started, not deferred) tasks o
   decs(root, ['add', 'newer one', '--task', '--stale-after', '2s'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--json'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--json'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', CLAUDECODE: '1', DECS_HOME: home },
   })

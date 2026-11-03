@@ -336,7 +336,7 @@ test('decs monitor prints one line per owner reply or answer, never an agent rec
   decs(root, ['add', 'should we ship', '-o', '1=ship', '2=hold off', '--default', '1'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '200'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '200'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })
@@ -359,7 +359,7 @@ test('decs monitor prints one line per owner reply or answer, never an agent rec
   const since = lines[0].split('since=')[1]
   await killAndWait(child)
   decs(root, ['note', '1', '--human', 'ship it after all'], { DECS_AUTHOR: undefined })
-  const replay = spawn(process.execPath, [BIN, 'monitor', '--since', since, '--interval', '200'], {
+  const replay = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--since', since, '--interval', '200'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })
@@ -379,7 +379,7 @@ test('decs monitor --mine still reports an answer nobody collected on a node fil
   decs(root, ['add', 'check the mail', '--author', 'mail-deliv · check delivery', '-o', '1=check', '2=skip it'])
   decs(root, ['push', '1', '1'], { CLAUDECODE: undefined })
   const { spawn } = await import('node:child_process')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--mine', '--unclaimed-after', '0s', '--interval', '200'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--mine', '--unclaimed-after', '0s', '--interval', '200'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'lead · collect the answer', CLAUDECODE: '1', DECS_HOME: join(root, 'home') },
   })
@@ -414,7 +414,7 @@ test('a bare decs monitor re-armed after a gap picks up what happened in between
   const { spawn } = await import('node:child_process')
   const env = { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'lead · x', CLAUDECODE: '1', DECS_HOME: join(root, 'home') }
   const start = () => {
-    const c = spawn(process.execPath, [BIN, 'monitor', '--interval', '200', '--no-sources'], { cwd: root, env })
+    const c = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '200', '--no-sources'], { cwd: root, env })
     let out = ''
     c.stdout.on('data', (b) => (out += b))
     t.after(() => killAndWait(c))
@@ -435,7 +435,6 @@ test('a bare decs monitor re-armed after a gap picks up what happened in between
 
 test('decs monitor notices a file changed on disk (not through decs) well before the next --interval tick (N257)', async (t) => {
   const root = scratch()
-  t.after(() => rmSync(root, { recursive: true, force: true }))
   decs(root, ['init', '--no-register'])
   decs(root, ['add', 'edited from outside', '--task'])
   const activeDir = join(root, 'decisions', 'active')
@@ -444,7 +443,7 @@ test('decs monitor notices a file changed on disk (not through decs) well before
   const { spawn } = await import('node:child_process')
   // A long interval: if the update still shows up quickly, it can only be the
   // file-system watch — the poll fallback alone would not fire for 10s.
-  const child = spawn(process.execPath, [BIN, 'monitor', '--updates', '--json', '--interval', '10000', '--no-sources', '--idle-exit', '0'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--updates', '--json', '--interval', '10000', '--no-sources', '--idle-exit', '0'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'lead · x', CLAUDECODE: '1', DECS_HOME: join(root, 'home') },
   })
@@ -452,7 +451,12 @@ test('decs monitor notices a file changed on disk (not through decs) well before
   let err = ''
   child.stdout.on('data', (b) => (out += b))
   child.stderr.on('data', (b) => (err += b))
+  // Registered before the rmSync below — t.after hooks run in the order they
+  // were added, so the monitor (still writing under root/home while alive)
+  // is dead before its directory is deleted out from under it. The other
+  // order around is exactly how the ENOTEMPTY in N260 happened under load.
   t.after(() => killAndWait(child))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
   await waitFor(() => err.includes('nod monitor: watching'), 'the monitor to start')
   await new Promise((r) => setTimeout(r, 300))
   assert.equal(out, '', 'nothing on start: the first pass only takes stock')
@@ -473,7 +477,7 @@ test('decs monitor goes offline by itself after --idle-exit with no events, sayi
   t.after(() => rmSync(root, { recursive: true, force: true }))
   decs(root, ['init', '--no-register'])
   const { spawn } = await import('node:child_process')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--idle-exit', '1s', '--interval', '200', '--no-sources'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--idle-exit', '1s', '--interval', '200', '--no-sources'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'lead · x', CLAUDECODE: '1', DECS_HOME: join(root, 'home') },
   })
@@ -486,7 +490,7 @@ test('decs monitor goes offline by itself after --idle-exit with no events, sayi
   // The line carries the exact call to arm it again.
   assert.match(out, /Monitor\(\{ command: "nod monitor", description: "nod", timeout_ms: 1800000 \}\)/)
 
-  const mine = spawn(process.execPath, [BIN, 'monitor', '--mine', '--idle-exit', '1s', '--interval', '200', '--no-sources'], {
+  const mine = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--mine', '--idle-exit', '1s', '--interval', '200', '--no-sources'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'lane-a · x', CLAUDECODE: '1', DECS_HOME: join(root, 'home') },
   })
@@ -538,7 +542,7 @@ async function monitorAs(teammate: string, args: string[], act: (root: string) =
   decs(root, ['add', 'theirs', '--task', '--author', 'lane-b · y'])
   decs(root, ['push', '2', '--note', 'answered long ago'], { CLAUDECODE: undefined })
   const { spawn } = await import('node:child_process')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '200', '--no-sources', '--unclaimed-after', '0s', ...args], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '200', '--no-sources', '--unclaimed-after', '0s', ...args], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_TEAMMATE: teammate, DECS_LANG: 'en', CLAUDECODE: '1', DECS_HOME: join(root, 'home') },
   })
@@ -611,7 +615,7 @@ test('nod monitor --updates --json flags owner_facing refs for the desktop app',
   decs(root, ['start', '1'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--updates', '--json', '--interval', '150'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--updates', '--json', '--interval', '150'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })

@@ -198,7 +198,7 @@ test('decs monitor tells the lane "owner Deferred", and nothing is queued', asyn
   decs(root, ['add', 'run the gate', '--task'])
   decs(root, ['start', '1'])
   const { spawn } = await import('node:child_process')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '200', '--unclaimed-after', '0s'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '200', '--unclaimed-after', '0s'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })

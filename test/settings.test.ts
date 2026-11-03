@@ -1,12 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SETTINGS } from '../src/core/settings.ts'
 import { LANGUAGES, loadResources } from '../src/i18n/index.ts'
-import { BIN, decs, decsResult, scratch } from './helpers.ts'
+import { BIN, decs, decsResult, killAndWait, scratch } from './helpers.ts'
 
 const home = () => mkdtempSync(join(tmpdir(), 'decs-home-'))
 const stored = (h: string) => JSON.parse(readFileSync(join(h, 'config.json'), 'utf8')) as Record<string, unknown>
@@ -66,15 +66,19 @@ test('decs config lang keeps the folder registry and the other settings', () => 
   assert.deepEqual(stored(h), { mouse: 'off' })
 })
 
-test('the monitor takes idle-exit from decs config when no flag says otherwise', async () => {
+test('the monitor takes idle-exit from decs config when no flag says otherwise', async (t) => {
   const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
   const h = join(root, 'home')
   decs(root, ['init', '--no-register'])
   decs(root, ['config', 'idle-exit', '1s'], { DECS_HOME: h })
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '200', '--no-sources'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '200', '--no-sources'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_LANG: 'en', DECS_HOME: h, CLAUDECODE: '1' },
   })
+  // This test's whole premise is the monitor exiting on its own — but if that
+  // ever regresses, nothing here must be left to hang the rest of the suite.
+  t.after(() => killAndWait(child))
   let out = ''
   child.stdout.on('data', (b) => (out += b))
   const code = await new Promise<number | null>((resolve) => child.once('exit', resolve))

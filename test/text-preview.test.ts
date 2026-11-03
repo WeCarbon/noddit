@@ -28,7 +28,11 @@ test('o on a markdown attachment reads it in the bench; ←→ goes to the next 
   await b.press('o')
   await b.until(has(b, /Press a digit/))
   await b.press('1')
-  await b.until(has(b, /schema\.md/))
+  // Not /schema\.md/: that's already on screen in the attachment footer before
+  // the preview even opens, so it can't tell "picker" from "preview" apart —
+  // under load the picker frame was still showing when this read, failing fast
+  // on the assert right below (N260). The heading text only exists once loaded.
+  await b.until(has(b, /Schema notes/))
   assert.ok(b.frame().some((l) => /^Schema notes/.test(l.trim())), 'the heading, without its #')
   assert.ok(b.frame().some((l) => /users: id, email/.test(l)))
   await b.press(KEY.right)

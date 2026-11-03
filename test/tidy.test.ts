@@ -232,7 +232,7 @@ test('tidy.json is gitignored the first time anything is actually recorded', (t)
 // ---------------------------------------------------------------------------
 
 function spawnMonitor(root: string, env: Record<string, string>) {
-  const child = spawn(process.execPath, [BIN, 'monitor', '--json', '--no-sources', '--interval', '150'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--json', '--no-sources', '--interval', '150'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', CLAUDECODE: '1', ...env },
   })
@@ -284,11 +284,14 @@ test('nod tidy acks and resets nod monitor’s own clock', async (t) => {
   const root = scratch()
   decs(root, ['init', '--no-register'])
   const home = join(root, 'home')
-  const { child, lines } = spawnMonitor(root, { DECS_HOME: home, NODDIT_TIDY_AFTER: '1s', NODDIT_TIDY_PUSH_AFTER: '1s' })
+  // A span generous enough that the ack below — a real `nod tidy` process,
+  // which can take a while to even start on a loaded machine — reliably lands
+  // inside it; a 1s span left ~no margin against that spawn overhead (N260).
+  const { child, lines } = spawnMonitor(root, { DECS_HOME: home, NODDIT_TIDY_AFTER: '4s', NODDIT_TIDY_PUSH_AFTER: '4s' })
   t.after(() => killAndWait(child))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
-  await waitFor(() => lines().some((l) => l.event === 'tidy'), 'the first push')
+  await waitFor(() => lines().some((l) => l.event === 'tidy'), 'the first push', 20_000)
   const firstCount = lines().filter((l) => l.event === 'tidy').length
   assert.equal(firstCount, 1, 'spaced — not one per poll while still overdue')
 
@@ -298,7 +301,7 @@ test('nod tidy acks and resets nod monitor’s own clock', async (t) => {
   assert.equal(lines().filter((l) => l.event === 'tidy').length, firstCount, 'acked — quiet until the span passes again')
 
   // But the ack does not silence it forever: once another full span has passed, it's due again.
-  await waitFor(() => lines().filter((l) => l.event === 'tidy').length > firstCount, 'due again after another full tidy-push-after span')
+  await waitFor(() => lines().filter((l) => l.event === 'tidy').length > firstCount, 'due again after another full tidy-push-after span', 20_000)
 })
 
 // ---------------------------------------------------------------------------

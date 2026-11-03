@@ -190,8 +190,8 @@ test('nod monitor: DECS-BRIEF for every unclaimed brief, a reminder once, a hear
   p.run(['add', 'already waiting'], OWNER)
   p.run(['add', 'a lane node', '--task'], { DECS_AUTHOR: 'lane-m · mine' })
   const env = { ...process.env, NO_COLOR: '1', DECS_LANG: 'en', CLAUDECODE: '1', DECS_AUTHOR: 'lead · watch', DECS_HOME: p.home }
-  const lead = spawn(process.execPath, [BIN, 'monitor', '--interval', '200', '--unclaimed-after', '2s', '--no-sources'], { cwd: p.root, env })
-  const mine = spawn(process.execPath, [BIN, 'monitor', '--mine', '--interval', '200', '--no-sources'], { cwd: p.root, env: { ...env, DECS_AUTHOR: 'lane-m · mine' } })
+  const lead = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '200', '--unclaimed-after', '2s', '--no-sources'], { cwd: p.root, env })
+  const mine = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--mine', '--interval', '200', '--no-sources'], { cwd: p.root, env: { ...env, DECS_AUTHOR: 'lane-m · mine' } })
   let out = ''
   let mineOut = ''
   lead.stdout.on('data', (b) => (out += b))
@@ -326,7 +326,7 @@ test('a window\'s --updates monitor, or one with --no-heartbeat, is not a listen
   const p = project(t)
   const env: NodeJS.ProcessEnv = { ...process.env, NO_COLOR: '1', DECS_LANG: 'en', DECS_HOME: p.home }
   delete env.CLAUDECODE
-  const kids = [['--updates', '--json', '--all'], ['--no-heartbeat']].map((extra) => spawn(process.execPath, [BIN, 'monitor', '--interval', '200', '--no-sources', ...extra], { cwd: p.root, env }))
+  const kids = [['--updates', '--json', '--all'], ['--no-heartbeat']].map((extra) => spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '200', '--no-sources', ...extra], { cwd: p.root, env }))
   const outs = kids.map(() => ({ s: '' }))
   kids.forEach((k, i) => k.stderr.on('data', (b) => (outs[i].s += b)))
   for (const k of kids) t.after(() => killAndWait(k))

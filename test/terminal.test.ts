@@ -70,7 +70,7 @@ test('a monitor running as if under iTerm2 records the terminal in its heartbeat
   decs(root, ['init', '--no-register'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--json'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--json'], {
     cwd: root,
     env: {
       ...process.env,
@@ -109,7 +109,7 @@ test('a monitor running as if under an untracked terminal leaves the terminal fi
   decs(root, ['init', '--no-register'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
-  const child = spawn(process.execPath, [BIN, 'monitor', '--interval', '150', '--json'], {
+  const child = spawn(process.execPath, [BIN, 'monitor', '--with-parent', String(process.pid), '--interval', '150', '--json'], {
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', CLAUDECODE: '1', DECS_HOME: home, TERM_PROGRAM: 'vscode', ITERM_SESSION_ID: '' },
   })
