@@ -109,6 +109,9 @@ test('App: a file the editor left unchanged is never written', async (t) => {
   assert.equal(store.get(d.id)!.updatedAt, before)
 })
 
+// The fake editor runs a real `nod note` — a whole CLI start, several seconds on a Windows runner.
+const SPAWNS_NOD_MS = 20_000
+
 test("App: a node changed by someone else while the editor was open asks to overwrite or drop — Esc drops the editor's text, o keeps it", async (t) => {
   const { store, root } = tmpStore(t)
   const d = store.create({ title: 'racing edit', author: A, task: true, body: 'base text' })
@@ -128,7 +131,7 @@ test("App: a node changed by someone else while the editor was open asks to over
   const b = bench(t, store, { view: 'all' })
   await b.until(has(b, /racing edit/))
   await b.press('E')
-  await b.until(has(b, /changed since the editor opened/))
+  await b.until(has(b, /changed since the editor opened/), SPAWNS_NOD_MS)
 
   await b.press('\x1b') // drop the editor's text
   await b.until(() => !has(b, /changed since the editor opened/)())
@@ -137,9 +140,9 @@ test("App: a node changed by someone else while the editor was open asks to over
   assert.match(fresh.body, /a concurrent reply landed first/)
 
   await b.press('E')
-  await b.until(has(b, /changed since the editor opened/))
+  await b.until(has(b, /changed since the editor opened/), SPAWNS_NOD_MS)
   await b.press('o') // overwrite anyway
-  await b.until(has(b, /edited/))
+  await b.until(has(b, /edited/), SPAWNS_NOD_MS)
   fresh = store.get(d.id)!
   assert.match(descriptionOf(fresh.body), /my careful rewrite/)
   assert.match(fresh.body, /a concurrent reply landed first/, 'the concurrent reply is still there — only the description was replaced')

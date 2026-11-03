@@ -100,9 +100,9 @@ export function bench(
         inp.emit('readable')
       }
     },
-    /** Polls for the screen to match, rather than a fixed sleep; fails the test after 3s. */
-    async until(ok: () => boolean) {
-      for (let waited = 0; waited < 3000; waited += 20) {
+    /** Polls for the screen to match, rather than a fixed sleep; fails the test after `ms` (3s). */
+    async until(ok: () => boolean, ms = 3000) {
+      for (let waited = 0; waited < ms; waited += 20) {
         if (ok()) return
         await sleep(20)
       }
