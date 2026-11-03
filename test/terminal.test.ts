@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync, rmSync } from 'node:fs'
+import { readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { detectTerminal, findTty, parseTtyLine, type ProcessTty, type TtyLookup } from '../src/core/terminal.ts'
@@ -66,7 +66,7 @@ test('detectTerminal: any other terminal (or none at all) records nothing', () =
 })
 
 test('a monitor running as if under iTerm2 records the terminal in its heartbeat, seen in `nod sessions --json`', async (t) => {
-  const root = scratch()
+  const root = realpathSync.native(scratch())
   decs(root, ['init', '--no-register'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')
@@ -105,7 +105,7 @@ test('a monitor running as if under iTerm2 records the terminal in its heartbeat
 })
 
 test('a monitor running as if under an untracked terminal leaves the terminal field off entirely', async (t) => {
-  const root = scratch()
+  const root = realpathSync.native(scratch())
   decs(root, ['init', '--no-register'])
   const { spawn } = await import('node:child_process')
   const home = join(root, 'home')

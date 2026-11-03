@@ -83,7 +83,12 @@ test('nod session start --main: opens in the projects’ parent with NODDIT_ROLE
   assert.equal(dry.ok, true)
   assert.equal(dry.started, false)
   assert.equal(dry.plan.root, w.code)
-  assert.match(dry.plan.command, /NODDIT_ROLE='main' NODDIT_AUTHOR='main-session' 'claude' 'nod: you are the main session/)
+  assert.match(
+    dry.plan.command,
+    process.platform === 'win32'
+      ? /set "NODDIT_ROLE=main"&& set "NODDIT_AUTHOR=main-session"&& claude "nod: you are the main session/
+      : /NODDIT_ROLE='main' NODDIT_AUTHOR='main-session' 'claude' 'nod: you are the main session/,
+  )
   assert.ok(!existsSync(record), '--dry-run opens nothing')
   assert.ok(existsSync(join(w.home, 'main', 'decisions', 'active')), 'its own store is ready')
 

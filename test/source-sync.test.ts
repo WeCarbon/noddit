@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -10,9 +10,21 @@ import { createSourceSyncRunner, setSourceSync, sourceSyncOf, syncRunStateOf } f
 import { BIN, decs, killAndWait, scratch } from './helpers.ts'
 
 /** A project plus a machine-local home of its own, and a script that logs each run's start and end. */
-function setup(t: { after: (fn: () => void) => void }): { root: string; home: string; layout: Layout; cmd: (args?: string) => string; runs: () => string[][] } {
+function setup(t: { after: (fn: () => void | Promise<void>) => void }): {
+  root: string
+  home: string
+  layout: Layout
+  cmd: (args?: string) => string
+  runs: () => string[][]
+  monitors: ChildProcess[]
+} {
   const root = scratch()
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  // A test's monitors die before their cwd goes: Windows won't remove a live process's cwd.
+  const monitors: ChildProcess[] = []
+  t.after(async () => {
+    await Promise.all(monitors.map((m) => killAndWait(m)))
+    rmSync(root, { recursive: true, force: true })
+  })
   const home = join(root, '.home')
   mkdirSync(home)
   const layout = initLayout(root)
@@ -33,7 +45,7 @@ setTimeout(() => {
     const p = join(root, 'runs.txt')
     return existsSync(p) ? readFileSync(p, 'utf8').trim().split('\n').map((l) => l.split(' ')) : []
   }
-  return { root, home, layout, cmd, runs }
+  return { root, home, layout, cmd, runs, monitors }
 }
 
 const until = async (ok: () => boolean, what: string, ms = 10_000) => {
@@ -123,7 +135,7 @@ test('a failing command is reported with its last stderr line and remembered; th
 })
 
 test('a command written into a committed source.md is never run — only the machine-local setting is', async (t) => {
-  const { root, home, layout, cmd, runs } = setup(t)
+  const { root, home, layout, cmd, runs, monitors } = setup(t)
   registerSource(layout, { name: 'ado', title: 'ADO' })
   const file = join(layout.root, 'sources', 'ado', 'source.md')
   writeFileSync(file, readFileSync(file, 'utf8').replace('---\n', `---\nsync_cmd: ${JSON.stringify(cmd())}\nsync_every: 1s\n`))
@@ -137,14 +149,14 @@ test('a command written into a committed source.md is never run — only the mac
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })
-  t.after(() => killAndWait(child))
+  monitors.push(child)
   await until(() => existsSync(join(home, 'monitor')), 'the monitor to start')
   await new Promise((r) => setTimeout(r, 600))
   assert.deepEqual(runs(), [])
 })
 
 test('nod monitor (lead) runs a registered sync command while alive; a failure is a DECS-ERROR and the watch goes on; --mine never runs it', async (t) => {
-  const { root, home, cmd, runs } = setup(t)
+  const { root, home, cmd, runs, monitors } = setup(t)
   const env = { DECS_HOME: home }
   const out = decs(root, ['source', 'register', 'ado', '--title', 'ADO', '--sync-cmd', cmd('0 2'), '--every', '1s'], env)
   assert.match(out, /this machine only/)
@@ -155,7 +167,7 @@ test('nod monitor (lead) runs a registered sync command while alive; a failure i
     cwd: root,
     env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'cli-test · lane', CLAUDECODE: '1', DECS_HOME: home },
   })
-  t.after(() => killAndWait(mine))
+  monitors.push(mine)
   await until(() => existsSync(join(home, 'monitor')), 'the --mine monitor to start')
   await new Promise((r) => setTimeout(r, 600))
   assert.deepEqual(runs(), [], 'a lane monitor leaves sync commands to the lead')
@@ -167,7 +179,7 @@ test('nod monitor (lead) runs a registered sync command while alive; a failure i
   })
   let stdout = ''
   lead.stdout.on('data', (b) => (stdout += b))
-  t.after(() => killAndWait(lead))
+  monitors.push(lead)
   await until(() => /DECS-ERROR .*"ado".*Azure DevOps answered HTML/.test(stdout), 'the failure to surface')
   await until(() => runs().filter((r) => r[0] === 'start').length >= 2, 'a second run after --every')
   assert.equal(lead.exitCode, null, 'a failed sync does not end the monitor')
