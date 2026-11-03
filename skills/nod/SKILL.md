@@ -3,7 +3,7 @@ name: nod
 description: nod 的完整用法（`decs` 仍是别名）——建节点/子节点、依赖与时序、nod progress/steps 汇报进度、nod ask 请 owner 拍板、子问题、发出去之前的内容批准（--approval-content/--approve-on/approved --check）、外部来源（nod source）、附件、迁移。要写 nod 节点、要 owner 决定或验收、要汇报进度、要接外部通知时加载。
 ---
 
-规则（每个 session 开头已经注入）是底线；这里是完整用法。`decs` 仍然可以用，是 `nod` 的别名。先读：
+规则（每个 session 开头已经注入，英文）是底线；命令自己的输出、报错和 monitor 每一行都会告诉你下一步；这里是完整用法。`decs` 仍然可以用，是 `nod` 的别名。先读：
 
 - `${CLAUDE_PLUGIN_ROOT}/AGENTS.md` —— 给 agent 的全部规矩和示例
 - `${CLAUDE_PLUGIN_ROOT}/adapters/README.md` —— 外部来源的同步脚本怎么写
@@ -15,17 +15,20 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 
 | 想做的事 | 命令 |
 |---|---|
-| 新建节点 / 子节点 | `nod add "<标题>" [--task] [--parent <id>] [--after <id>]` |
+| 还没有 `decisions/` | `nod init` |
+| 新建节点 / 子节点 | `nod add "<标题>" [--task] [--parent <id>] [--after <id>] [--est 30m]`；计划里还没开始的步骤都建成子节点 |
 | 补一条记录 / 转记 owner 的话 | `nod note <id> --agent "…"` / `nod note <id> --human --by "owner（对话里说，<你> 转记）" "…"` |
 | 开始 / 做完 / 不做了 | `nod start` / `nod done --note` / `nod close --reason` |
-| 要 owner 拍板 / 再看一眼 | `nod ask <id> -o 1="…" 2="…"` / `nod ask <id>` |
-| 等外部（同事、客户、供应商、服务恢复） | `nod hold <id> --on "<谁/什么>"`，恢复用 `nod start` |
+| 要 owner 拍板 / 再看一眼 | `nod ask <id> -o 1="…" 2="…"` / `nod ask <id>`；每个选项写清选了会怎样（花多久、谁来做、放弃什么、风险、能不能反悔）和推荐哪个、为什么——`-o` 只放短标签，说明用 heredoc 写在正文里，每个选项一节 `### 1 · <标签>`（app 把它挪到选项卡片上） |
+| 等外部（同事、客户、供应商、服务恢复） | `nod hold <id> --on "<谁/什么>" --until <日期>`（必须给回头看的那天；状态是「等待」，不是卡住），到日子 monitor 打 `NODDIT-CHECK-BACK`；恢复用 `nod start` |
 | owner 延迟了 / 解除 | owner 可以把节点延迟（bench 里按 d / `nod defer`）：它从可用/活动/需要人类里消失，状态不变；你收到「owner 延迟」就先停手，解除前别动它（`nod undefer` 解除，`nod show deferred` 列出）。`nod defer <id> --until 周五`（3d、15 nov、下周一……，`nod date "<文字>"` 先看是哪天）到那天自己回来，monitor 打 `NODDIT-UNDEFERRED <id>` |
 | owner 自己的事 | `assignee: human`，bench 上「你来做」，列在「需要人类」里：**不要开始、接走、展开或去做**，也不会有 check-in 和催办。需要 owner 亲手做的事替他记：`nod add --for me "给供应商打电话" --parent <id>`，等它的活 `--after` 它；`nod assign <id> me` 交给 owner，交回 AI（`--force`）只在他说了时 |
-| 进度 | `nod progress <pct> "…"` / `nod steps` / `nod step`；还在做但没新内容时回 check-in 用 `nod beat <id>` |
+| 进度 | `nod start <id>` 之后它就是本会话的当前节点，`nod progress <pct> "…"` / `nod note "…"` / `nod beat` / `nod steps` / `nod step <n>` 都可以不写 id（`NODDIT_NODE` 设了以它为准；同一会话里的几个子 agent 会互相覆盖，各自写 id 或设 `NODDIT_IDENTITY`）。长命令直接管道：`pytest … \| nod progress --parse pytest`；`nod progress --from-file x.jsonl` 自动认 noddit JSONL 事件；或者 `nod run <id> -- <命令…>` 一条包办：开始、跟进度（替你设 `NODDIT_EVENTS`）、成功 `nod done`、失败 `nod hold` 带上输出末尾。超过 check-in 间隔（默认 30m，`nod config checkin-after`）没更新会收到 `NODDIT-CHECKIN`；还在做但没新内容就 `nod beat`，问满 3 次没回 bench 上标红 |
 | 等 owner 答复、等外部来源 | 主 session：plugin 自动启动的 decs monitor；DECS-IDLE 之后或子 agent：用 Monitor 挂 `nod monitor`（子 agent 加 --mine） |
-| 附件 / 改标题 / 挪位置 | 和介绍它的消息一起：`nod note/ask … --attach 文件`；补附件 `nod attach`（`--move 文件 --to 段落` 挪位置）/ `nod retitle` / `nod move` |
-| 负责人派的活（`DECS-BRIEF`、看板里的 ✎） | `nod claim <id>` → `nod expand <id> <<EOF` → 子节点 `--parent --after --est` → `nod ask <id> -o 1="按计划开始" 2="要改（回复里写怎么改）"`；`nod briefs` / `nod sessions` |
+| 附件 / 改标题 / 挪位置 | 和介绍它的消息一起：`nod note/ask … --attach 文件`；补附件 `nod attach`——不给 `--to` 落在你自己最新那条，owner 写过之后再单独 attach 会另起一小节；`--to body\|last\|<n>` 指定段落（`--move 文件 --to 段落` 挪位置）/ `nod retitle` / `nod move` |
+| 要发出去的内容（邮件、帖子、给同事的信） | 发之前 `nod attach <id> draft.md --approval-content --approve-on <选项>`（或 `nod ask … --attach`），owner 选了那个选项才算批准；发之前 `nod approved <id> --check draft.md` 必须通过（内容改过就不算） |
+| 外部来源（issue、邮箱、反馈表） | lead 用 `nod source register` 登记，同步脚本只同步 id 和标题；新条目由 monitor 推来，处理完 `nod source ack <源> <id>` |
+| 负责人派的活（`DECS-BRIEF`、看板里的 ✎） | `nod claim <id>` → `nod expand <id> <<EOF` → 子节点 `--parent --after --est` → `nod ask <id> -o 1="按计划开始" 2="要改（回复里写怎么改）"`；答 1 照常开工，答 2 改了再问；`nod briefs` / `nod sessions`。owner 在对话里让你把他写的一个短节点当派活处理：`nod claim <id>` 然后同样几步 |
 
 命令做不到的，记一个节点说清楚缺什么（或者到 noddit 仓库提 issue）——不要绕过去手改。
 
@@ -38,7 +41,8 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
   `NODDIT-CHECKIN` → 马上在那个节点上用 `nod progress`、`nod note`，或者没有新内容就 `nod beat <id>`
   回报——问满 3 次没回 bench 上会标出来（多数搭着别的消息一起来，静默够久也可能自己单独出现）；
   `NODDIT-STALE` → 有些既不待决策、也没人在做的节点放太久了，逐个 `nod start`、`nod defer`、`nod close`
-  或重新规划；`DECS-ERROR` → 看一眼，monitor 会继续。
+  或重新规划；`NODDIT-TIDY` → `nod tidy` 看哪里节点树和状态对不上，逐个修；`DECS-ERROR` → 看一眼，monitor 会继续。
+  每一行末尾都写了下一步，照着做就行。
 - **`DECS-IDLE`**：连续 2 小时没有事件，monitor 自己下线了。之后又有要等 owner 回复的事，自己挂：
   `Monitor({ command: "nod monitor", description: "nod", timeout_ms: 1800000 })`，到期原样重挂（它自己记得看到哪）。
 - **裸的 `nod monitor` 只盯 cwd 所在的项目**——跟 `--here` 一样，只是没项目时不会退出。要盯所有登记过的

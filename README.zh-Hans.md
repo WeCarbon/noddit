@@ -213,8 +213,8 @@ nod                                  # the bench (same as nod bench); q to quit
 
 
 
-可用代码：`en`、`zh-Hans`、`zh-Hant`、`fr`、`ar`。插件的会话开头
-规则和提示提醒遵循同一套解析逻辑（`plugin/rules.<code>.md`）。
+可用代码：`en`、`zh-Hans`、`zh-Hant`、`fr`、`ar`。插件的提示提醒遵循同一套
+解析逻辑；会话开头注入的规则（`plugin/rules.md`）不论界面语言都是英文。
 
 阿拉伯语是从右往左排的。`NODDIT_BIDI=visual|terminal`（老名字 `DECS_BIDI`
 也还认，或者 `nod config bidi visual|terminal`，`--off` 取消）决定怎么排：`visual`

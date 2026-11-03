@@ -242,9 +242,9 @@ CLI calls, so any agent with a shell can follow them.
 6. otherwise, English — also where a locale nod has no translation for
    ends up
 
-Codes: `en`, `zh-Hans`, `zh-Hant`, `fr`, `ar`. The plugin's
-session-start rules and prompt reminder follow the same resolution
-(`plugin/rules.<code>.md`).
+Codes: `en`, `zh-Hans`, `zh-Hant`, `fr`, `ar`. The plugin's prompt
+reminder follows the same resolution; the session-start rules
+(`plugin/rules.md`) are English in every language.
 
 Arabic is laid out right to left. `NODDIT_BIDI=visual|terminal` (`DECS_BIDI`
 still works, or `nod config bidi visual|terminal`, `--off` to remove) picks how: `visual`

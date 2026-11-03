@@ -50,16 +50,21 @@ test('detectAgents reports each of claude/codex/kimi independently', (t) => {
 })
 
 // ---------------------------------------------------------------------------
-// rulesBody — the same text the Claude plugin injects, picked by language
+// rulesBody — the same text the Claude plugin injects, English in every language
 // ---------------------------------------------------------------------------
 
-test('rulesBody returns a non-empty, language-specific block for every supported language', () => {
-  const en = rulesBody('en')
-  const zh = rulesBody('zh-Hans')
-  assert.ok(en.length > 100)
-  assert.ok(zh.length > 100)
-  assert.notEqual(en, zh)
-  assert.ok(zh.includes('decs'))
+test('rulesBody is plugin/rules.md, the one English rules file', () => {
+  const body = rulesBody()
+  assert.ok(body.startsWith('## nod:'))
+  assert.match(body, /nod <command> --help/)
+})
+
+const RULES_TARGET = 3500
+const RULES_LIMIT = 5000
+
+test(`the injected rules stay short: under ${RULES_LIMIT} characters (aim for ${RULES_TARGET}) — the commands teach the rest`, () => {
+  const length = [...rulesBody()].length
+  assert.ok(length <= RULES_LIMIT, `plugin/rules.md is ${length} characters; move what a command's output, --help or the nod skill can teach out of it`)
 })
 
 // ---------------------------------------------------------------------------

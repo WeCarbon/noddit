@@ -227,9 +227,9 @@ nod                                  # the bench (same as nod bench); q to quit
 6. وإلا، فالإنجليزية — وهي أيضًا ما تنتهي إليه أي لغة لا تتوفّر لها ترجمة
    في nod
 
-الرموز: `en`، `zh-Hans`، `zh-Hant`، `fr`، `ar`. تتبع قواعد بداية الجلسة
-وتذكير الموجّه في الإضافة نفس هذا الترتيب
-(`plugin/rules.<code>.md`).
+الرموز: `en`، `zh-Hans`، `zh-Hant`، `fr`، `ar`. يتبع تذكير الموجّه في الإضافة
+نفس هذا الترتيب؛ أما قواعد بداية الجلسة (`plugin/rules.md`) فبالإنجليزية
+أيًّا كانت اللغة.
 
 العربية تُكتب من اليمين إلى اليسار. يحدّد `NODDIT_BIDI=visual|terminal`
 (الاسم القديم `DECS_BIDI` لا يزال يعمل، أو `nod config bidi visual|terminal`،

@@ -53,7 +53,7 @@ export function detectAgents(pathEnv: string = process.env.PATH ?? ''): Record<A
 }
 
 // ---------------------------------------------------------------------------
-// The repo root — so `plugin/rules.<lang>.md` resolves whether this file is
+// The repo root — so `plugin/rules.md` resolves whether this file is
 // running as source (`src/core/agents.ts`) or compiled (`dist/src/core/agents.js`),
 // without hard-coding how many `..` that takes in either layout.
 // ---------------------------------------------------------------------------
@@ -75,11 +75,9 @@ function repoRoot(): string {
   throw new Error('nod: could not find plugin/rules.md relative to src/core/agents.ts')
 }
 
-/** The short rules Claude's plugin injects every session, for the language in use — same text other harnesses get in their `AGENTS.md`. */
-export function rulesBody(lng: Lang): string {
-  const localized = join(repoRoot(), 'plugin', `rules.${lng}.md`)
-  const path = existsSync(localized) ? localized : join(repoRoot(), 'plugin', 'rules.md')
-  return readFileSync(path, 'utf8').trim()
+/** The short rules Claude's plugin injects every session — same text other harnesses get in their `AGENTS.md`. English in every interface language. */
+export function rulesBody(): string {
+  return readFileSync(join(repoRoot(), 'plugin', 'rules.md'), 'utf8').trim()
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +127,7 @@ export function agentsMdPath(dir: string): string {
 
 export function setupViaAgentsMd(dir: string, lng: Lang, opts: { dryRun?: boolean } = {}): AgentOutcome {
   const path = agentsMdPath(dir)
-  const { action } = upsertSection(path, rulesBody(lng), opts)
+  const { action } = upsertSection(path, rulesBody(), opts)
   return { detected: true, action, detail: 'AGENTS.md', file: path }
 }
 

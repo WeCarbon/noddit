@@ -1,7 +1,7 @@
 # agent 怎么用 nod
 
 这份是给 AI agent 的完整用法。可以整段贴进项目的 `AGENTS.md` / `CLAUDE.md`；装了
-Claude Code 插件的话，精简版规则（`plugin/rules.md`）会在每个 session 开头自动注入，
+Claude Code 插件的话，精简版规则（`plugin/rules.md`，只有英文一份）会在每个 session 开头自动注入，
 这里是细节和示例。`decs` 仍然可以用，是 `nod` 的别名。
 
 ---
@@ -301,9 +301,13 @@ owner 看不到你在干什么，只能看 `decisions/` 里写了什么——一
 **lane/任务开始时：**
 
 ```sh
-nod add "跑全量测试" --task --author "<lane> · 在做什么"   # 打印它的 <id>，记下来
-export NODDIT_NODE=<上面打印的 id>                            # 后面的 nod progress 不用再写 id
+nod add "跑全量测试" --task --author "<lane> · 在做什么"   # 打印它的 <id>
+nod start <上面打印的 id>                                     # 它成为本会话的当前节点：后面的 nod progress / note / beat 不用再写 id
 ```
+
+当前节点存在本机（`$NODDIT_HOME/session-nodes.json`），按会话区分（`NODDIT_IDENTITY`，没有就按
+智能体程序自己的会话）。同一个会话里的几个子 agent 会互相覆盖，各自写明 id 或者设 `NODDIT_IDENTITY`。
+`NODDIT_NODE` 仍然可用，设了就以它为准。
 
 一个节点一次只代表一件正在做的事——不要把整条 lane 的所有工作塞进一个节点的
 `progress`，一个阶段性任务换一个节点，用 `--after <上一个 id>` 接上，bench 才能
@@ -321,7 +325,7 @@ nod progress --count-lines run.log --total 23              # 逐节重算：读�
 
 内置解析器：`pytest`（`[ NN%]`）、`percent`（任意 `NN%`）、`fraction`（任意
 `N/M`）；不给 `--parse`/`--regex` 时三个都试一遍。节流到最多每 5 秒写一次文件，
-但管道结束/文件读完时最后一次值一定落地。**没设 `NODDIT_NODE`/`DECS_NODE` 也没给 `--node`，
+但管道结束/文件读完时最后一次值一定落地。**没给 `--node`、没设 `NODDIT_NODE`/`DECS_NODE`、本会话也没 `nod start` 过，
 这条命令直接报错退出，不会静默地什么都不做。**
 
 **`--from-file` 会自动识别 noddit 的 JSONL 事件文件**（Python 包 `noddit`

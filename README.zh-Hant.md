@@ -213,8 +213,8 @@ nod                                  # the bench (same as nod bench); q to quit
    PowerShell）就沒有這些變數，nod 會依 Node 的 `Intl` 讀到的結果來決定
 6. 否則就是英語——nod 沒有對應翻譯的語言，也會落到英語
 
-可用代碼：`en`、`zh-Hans`、`zh-Hant`、`fr`、`ar`。外掛在工作階段
-開頭注入的規則和提示提醒，遵循同一套解析邏輯（`plugin/rules.<code>.md`）。
+可用代碼：`en`、`zh-Hans`、`zh-Hant`、`fr`、`ar`。外掛的提示提醒遵循同一套
+解析邏輯；工作階段開頭注入的規則（`plugin/rules.md`）不論介面語言都是英文。
 
 阿拉伯語是從右往左排的。`NODDIT_BIDI=visual|terminal`（舊名字 `DECS_BIDI`
 也還認，或 `nod config bidi visual|terminal`，`--off` 移除）決定怎麼排：`visual`

@@ -175,8 +175,8 @@ for (const lng of LANGUAGES) {
     setLang('en')
     const text = hook('session-start.mjs', '', { DECS_LANG: lng }, dir)
     assert.ok(text.includes(`· ${label} · Ship the login page`), text.slice(-400))
-    const rules = readFileSync(join(PLUGIN, lng === 'en' ? 'rules.md' : `rules.${lng}.md`), 'utf8')
-    assert.ok(text.startsWith(rules.split('\n')[0]), `${lng} rules first`)
+    const rules = readFileSync(join(PLUGIN, 'rules.md'), 'utf8')
+    assert.ok(text.startsWith(rules.split('\n')[0]), `the English rules first, under ${lng} too`)
     assert.doesNotMatch(text, /\{\{|plugin\.sessionStart/)
   })
 }

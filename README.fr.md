@@ -252,9 +252,9 @@ avec un terminal peut les suivre.
 6. sinon, l’anglais — c’est aussi là qu’aboutit une locale que nod ne
    traduit pas
 
-Codes : `en`, `zh-Hans`, `zh-Hant`, `fr`, `ar`. Les règles de début de
-session et le rappel d’invite du plugin suivent la même
-résolution (`plugin/rules.<code>.md`).
+Codes : `en`, `zh-Hans`, `zh-Hant`, `fr`, `ar`. Le rappel d’invite du
+plugin suit la même résolution ; les règles de début de session
+(`plugin/rules.md`) sont en anglais quelle que soit la langue.
 
 L’arabe s’écrit de droite à gauche. `NODDIT_BIDI=visual|terminal`
 (l’ancien nom `DECS_BIDI` marche toujours, ou

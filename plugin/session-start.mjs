@@ -2,16 +2,16 @@
 // the model thinks it's relevant) and list this project's open nodes so a
 // resumed session picks its own work back up.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { modulePath, moduleUrl } from './resolve.mjs'
 
-const { lang, t } = await import(moduleUrl('src', 'i18n', 'index.ts'))
+const { t } = await import(moduleUrl('src', 'i18n', 'index.ts'))
 
+// The rules are English whatever the interface language; the lines added below follow it.
 const here = dirname(fileURLToPath(import.meta.url))
-const localized = join(here, `rules.${lang()}.md`)
-let text = readFileSync(existsSync(localized) ? localized : join(here, 'rules.md'), 'utf8')
+let text = readFileSync(join(here, 'rules.md'), 'utf8')
 
 try {
   const raw = execFileSync(process.execPath, [modulePath('bin', 'decs.ts'), 'show', 'active', '--json'], {
