@@ -5,11 +5,12 @@ import { layoutFor, type Layout } from '../core/paths.ts'
 import { addProject, readProjects, removeProject } from '../core/config.ts'
 import { DEFAULT_LETTER, readProjectConfig, writeProjectConfig } from '../core/project.ts'
 import { agentArg, describeGoto, describeStart, gotoSession, startSession } from '../cli/commands/session.ts'
-import { spawn } from 'node:child_process'
-import { existsSync, realpathSync, watch, type FSWatcher } from 'node:fs'
-import { resolve as resolvePath } from 'node:path'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync, readFileSync, realpathSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve as resolvePath } from 'node:path'
 import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Text, useApp, useInput, useStdout } from 'ink'
+import { Box, Text, useApp, useInput, useStdin, useStdout } from 'ink'
 import { targetPath } from '../cli/commands/open.ts'
 import { openerFor } from '../core/opener.ts'
 import { buildOverview, type Overview } from '../core/overview.ts'
@@ -22,6 +23,7 @@ import { splitWhen, untilDay } from '../core/fuzzy-date.ts'
 import { dayText } from '../i18n/time.ts'
 import { nowStamp, type Store } from '../core/store.ts'
 import { assertTitleFits } from '../core/title.ts'
+import { descriptionOf } from '../core/edit.ts'
 import { type Decision } from '../core/types.ts'
 import { isRtl, t } from '../i18n/index.ts'
 import { bidiMode, isolateLtr, reorderRuns, type BidiMode } from '../i18n/bidi.ts'
@@ -98,7 +100,7 @@ const MIN_PANEL_COLS = 12
 type Line = Segment[]
 export type Mode =
   | 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother'
-  | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project' | 'projects' | 'projectName' | 'projectAdd' | 'attachPaths'
+  | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project' | 'projects' | 'projectName' | 'projectAdd' | 'attachPaths' | 'editConflict'
 /** Modes where keystrokes go into the prompt-line draft. */
 const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay', 'projectName', 'projectAdd', 'attachPaths']
 
@@ -200,6 +202,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const { exit } = useApp()
   // Ink's own stream (process.stdout in bench), so the picture goes where the frame goes.
   const { stdout } = useStdout()
+  // For E / e: Ink's own setRawMode, not the bare stream's — it also tracks Ink's Ctrl-C handling.
+  const { setRawMode } = useStdin()
   const { cols, rows } = useSize()
   const width = Math.max(20, cols - 1)
 
@@ -220,6 +224,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const [attachPaths, setAttachPaths] = useState<string[]>([])
   /** The reply/answer draft, set aside while `attachPaths` mode borrows the one shared draft buffer. */
   const [composeStash, setComposeStash] = useState<{ mode: Mode; draft: string; caret: number } | null>(null)
+  /** E / e: the editor closed with a change, but the node moved since it opened — asks overwrite or drop. */
+  const [editConflict, setEditConflict] = useState<{ d: Decision; text: string; note?: number } | null>(null)
   /** 派活 (`p` / `P`): where the new brief goes, and — once filed with nobody listening — which project to offer a session for. */
   const [briefAt, setBriefAt] = useState<{ parent?: Decision; layout: Layout; kind: BriefKind } | null>(null)
   const [sessionFor, setSessionFor] = useState<{ layout: Layout; project: string } | null>(null)
@@ -584,6 +590,74 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     setMode('browse')
     setDraft('')
     reload()
+  }
+
+  /** E / e: shells out to $VISUAL / $EDITOR / vi on a temp file, same as a git commit message —
+   *  not a second rich-text editor rebuilt in the terminal. Returns the edited text, or null
+   *  when the file came back byte-for-byte the same (nothing worth writing). */
+  const runInEditor = (initial: string): string | null => {
+    const tmp = join(tmpdir(), `nod-edit-${process.pid}-${Date.now()}.md`)
+    writeFileSync(tmp, initial)
+    const [cmd, ...args] = (process.env.VISUAL || process.env.EDITOR || 'vi').trim().split(/\s+/)
+    setRawMode(false)
+    stdout.write('\x1b[?25h')
+    try {
+      spawnSync(cmd, [...args, tmp], { stdio: 'inherit' })
+    } finally {
+      setRawMode(true)
+      // The editor drew its own screen over Ink's last frame; wipe it so the next one starts clean.
+      stdout.write('\x1b[2J\x1b[3J\x1b[H')
+    }
+    let text: string
+    try {
+      text = readFileSync(tmp, 'utf8')
+    } finally {
+      try {
+        unlinkSync(tmp)
+      } catch {
+        /* best effort — a leftover temp file is harmless */
+      }
+    }
+    return text === initial ? null : text
+  }
+
+  /** Writes an editor's result through `store.edit` — the same `expect` conflict check `nod edit`
+   *  (and the app's own editor) use: a change since the editor opened refuses rather than
+   *  silently overwrites it. `expect` omitted means the owner already chose to overwrite. */
+  const saveEdited = (d: Decision, text: string, note: number | undefined, expect: string | undefined) => {
+    // Re-read fresh: `d` may be the snapshot from when the editor opened, and `expect` is
+    // only meaningful compared against what is on disk right now, not against itself.
+    const fresh = store.get(d.id, d.project) ?? d
+    try {
+      const next = store.edit(fresh, { text, note, expect, by: 'owner', role: 'human' })
+      say(next === fresh ? t('bench.toast.editUnchanged', { ref: refOf(next) }) : t('bench.toast.edited', { ref: refOf(next) }))
+      setEditConflict(null)
+      setMode('browse')
+    } catch (e) {
+      if (expect) {
+        setEditConflict({ d: fresh, text, note })
+        return setMode('editConflict')
+      }
+      say((e as Error).message)
+    }
+    reload()
+  }
+
+  /** `E`: the description (everything above the first note). */
+  const editBody = () => {
+    if (!current) return
+    const text = runInEditor(descriptionOf(current.body))
+    if (text !== null) saveEdited(current, text, undefined, current.updatedAt)
+  }
+
+  /** `e`: the owner's own latest reply — editing an agent's own note needs `--force` on `nod edit`
+   *  too, and there is no note picker in bench to aim at one on purpose. */
+  const editLatestNote = () => {
+    if (!current) return
+    const idx = current.notes.findLastIndex((n) => n.role === 'human')
+    if (idx === -1) return say(t('bench.toast.noOwnNote', { ref: refOf(current) }))
+    const text = runInEditor(current.notes[idx].text)
+    if (text !== null) saveEdited(current, text, idx + 1, current.updatedAt)
   }
 
   /** `;`, on a project row: another registered project already showing `letter`, by its display name. */
@@ -1115,6 +1189,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         : undefined,
     projectIndex,
     attachCount: attachPaths.length || undefined,
+    editConflictRef: editConflict ? refOf(editConflict.d) : undefined,
   }
   const geom = useMemo(
     () => geometry(frameInput),
@@ -1240,6 +1315,17 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (mode === 'session') {
       if (input === 'y' || input === 'Y') return answerSession(true)
       if (input === 'n' || input === 'N' || key.escape || key.return) return answerSession(false)
+      return
+    }
+
+    if (mode === 'editConflict') {
+      const conflict = editConflict
+      if (!conflict) return setMode('browse')
+      if (input === 'o' || input === 'O') return saveEdited(conflict.d, conflict.text, conflict.note, undefined)
+      if (input === 'n' || input === 'N' || key.escape) {
+        setEditConflict(null)
+        return setMode('browse')
+      }
       return
     }
 
@@ -1465,6 +1551,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     }
     if (input === 'n' || input === 'N') return startText('note')
     if (input === 'T') return startText('retitle', current.title)
+    if (input === 'E') return editBody()
+    if (input === 'e') return editLatestNote()
     if (input === 'a' || input === 'A') return archive()
     if (input === '!' && markedNodes.length) {
       const on = !markedNodes.every((d) => d.urgency === 'high')
@@ -1503,7 +1591,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     [
       list, index, current, view, items, overview, now, backlinks, rows, width, listTop, offset, condensed, mode, draft, caret,
       imageSel, pendingKey, banner, geom, zoom, imgMeta, detailFocus, pickToOpen, qIndex, qPicks, qNotes, settingIndex, settingsVersion,
-      briefAt, sessionFor, textView, projectIndex, attachPaths,
+      briefAt, sessionFor, textView, projectIndex, attachPaths, editConflict,
     ],
   )
   frameRef.current = frame
@@ -1581,6 +1669,8 @@ export interface FrameInput {
   projectIndex?: number
   /** Ctrl-A on a reply/answer draft: how many files are staged to attach once it's sent. */
   attachCount?: number
+  /** `editConflict` mode: the node the editor's text is waiting to land on. */
+  editConflictRef?: string
 }
 
 /** Below this, the full hint line (natural truncation aside) crowds out too
@@ -2443,6 +2533,7 @@ function promptLine(s: FrameInput): Line {
     return [{ text: t('bench.prompt.questionsMode'), color: 'cyan', bold: true }]
   }
   if (s.mode === 'session') return [{ text: t('bench.prompt.startSession', { project: s.sessionProject ?? '' }), color: 'yellow', bold: true }]
+  if (s.mode === 'editConflict') return [{ text: t('bench.prompt.editConflict', { ref: s.editConflictRef ?? '' }), color: 'red', bold: true }]
   if (s.mode === 'attach') {
     return [{ text: s.pickToOpen ? t('bench.prompt.attachPickOpen') : t('bench.prompt.attachPickView'), color: 'cyan' }]
   }
