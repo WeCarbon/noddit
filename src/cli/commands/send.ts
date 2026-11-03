@@ -56,9 +56,10 @@ export async function run(args: Args): Promise<number> {
   const forWho = one(args, 'for') ?? (bool(args, 'human-task') ? 'me' : meta.assignee !== undefined ? String(meta.assignee) : undefined)
   const assignee = forWho !== undefined ? assigneeArg(forWho) : undefined
   if (assignee && (bool(args, 'brief') || cliOptions.length || questions.length || bool(args, 'fyi'))) throw new Error(t('cli.send.humanTaskIsTask'))
-  const brief = !assignee && isBrief(args, { options: cliOptions.length > 0, questions: questions.length > 0, meta, body: piped.body })
   const milestone = bool(args, 'milestone')
-  if (milestone && !one(args, 'due')) throw new Error(t('cli.send.milestoneNeedsDue'))
+  if (milestone && assignee) throw new Error(t('cli.send.milestoneNotAssignee'))
+  if (milestone && (bool(args, 'brief') || cliOptions.length || questions.length || bool(args, 'fyi'))) throw new Error(t('cli.send.milestoneIsTask'))
+  const brief = !assignee && !milestone && isBrief(args, { options: cliOptions.length > 0, questions: questions.length > 0, meta, body: piped.body })
 
   const title = brief && words ? briefTitle(words) : words || piped.title
   if (!title) throw new Error(`${t('cli.send.titleRequired')}\n\n${help()}`)
@@ -66,7 +67,7 @@ export async function run(args: Args): Promise<number> {
 
   const input: NewDecision = {
     title: oneLine(title),
-    author: one(args, 'author', 'a') ?? (meta.author ? String(meta.author) : (brief || assignee === HUMAN) && shellRole() === 'human' ? 'owner' : resolveAuthor(args)),
+    author: one(args, 'author', 'a') ?? (meta.author ? String(meta.author) : (brief || assignee === HUMAN || milestone) && shellRole() === 'human' ? 'owner' : resolveAuthor(args)),
     body: brief ? [words, piped.body].filter(Boolean).join('\n\n') : piped.body,
     options: cliOptions,
     questions,
@@ -79,7 +80,7 @@ export async function run(args: Args): Promise<number> {
     ifNoAnswer: one(args, 'if-no-answer') ?? (meta.if_no_answer !== undefined ? String(meta.if_no_answer) : undefined),
     reversible: yesNo(one(args, 'reversible') ?? (meta.reversible !== undefined ? String(meta.reversible) : undefined), 'reversible'),
     kind: bool(args, 'fyi') || meta.kind === 'fyi' ? 'fyi' : undefined,
-    task: brief || Boolean(assignee) || bool(args, 'task'),
+    task: brief || Boolean(assignee) || milestone || bool(args, 'task'),
     intake: brief || undefined,
     parent: one(args, 'parent'),
     after: many(args, 'after').flatMap((s) => s.split(/[,\s]+/)).filter(Boolean),

@@ -68,7 +68,7 @@ test('flagged nodes sort first: important or a milestone before normal, the near
   assert.deepEqual(order, ['milestone soon', 'milestone later', 'important', 'plain'])
 })
 
-test('bench: ★ after the ref, flagged siblings first — a milestone still sorts first but N250 dropped its ⚑', (t) => {
+test('bench: ★ after the ref, flagged siblings first — N283 brings ⚑ back as the milestone glyph', (t) => {
   const root = scratch()
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const store = new Store([initLayout(root)])
@@ -83,9 +83,11 @@ test('bench: ★ after the ref, flagged siblings first — a milestone still sor
   assert.deepEqual(rows.filter((r) => r.node).map((r) => r.node!.title).slice(1), ['important child', 'milestone child', 'plain child'], 'a milestone still sorts ahead of a plain node')
   const line = (title: string, at = now) => nodeRowSegments(rows.find((r) => r.node?.title === title)!, items, 110, at).map((s) => s.text).join('')
   assert.match(line('important child'), /X3 ★ important child/)
-  assert.doesNotMatch(line('milestone child'), /[★⚑]/, 'the milestone data is read (it still sorted first above), just not shown as a flag')
+  assert.match(line('milestone child'), /⚑ X4 milestone child/, 'N283: the glyph itself is the flag, not a suppressed mark')
   assert.doesNotMatch(line('plain child'), /[★⚑]/)
-  assert.doesNotMatch(line('milestone child', Date.parse('2026-11-05T12:00:00+08:00')), /⚑/, 'even overdue, no countdown shows')
+  const overdue = line('milestone child', Date.parse('2026-11-05T12:00:00+08:00'))
+  assert.match(overdue, /⚑ X4 milestone child/, 'the glyph stays a flag whatever the due date does')
+  assert.match(overdue, /Overdue/, 'a due date still shows the normal way, same as any other node')
 })
 
 test('milestoneDue reads a date, a time or a span', () => {

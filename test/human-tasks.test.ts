@@ -177,14 +177,17 @@ test('nod defer --until reads loose dates, refuses a day already begun, and unde
   assert.equal(json(decs(root, ['get', '1', '--json'])).deferred_until, null, 'plain defer is still indefinitely')
 })
 
-test('nod add --important / --milestone --due fri reach the owner\'s marks; flag --due reads loose dates', (t) => {
+test('nod add --important reaches the owner\'s mark; --milestone is the third kind, no --due required', (t) => {
   const root = project(t)
   const a = json(decs(root, ['add', 'Pay the invoice', '--for', 'me', '--important', '--json'], owner))
   assert.equal(a.important, true)
-  const b = json(decs(root, ['add', 'Launch day', '--for', 'me', '--milestone', '--due', 'fri', '--json'], owner))
+  const b = json(decs(root, ['add', 'Launch day', '--milestone', '--due', 'fri', '--json'], owner))
   assert.equal(b.milestone, true)
   assert.match(String(b.due), /T23:59:59/)
-  assert.notEqual(decsResult(root, ['add', 'No date', '--milestone'], owner).code, 0)
+  const c = json(decs(root, ['add', 'No date', '--milestone', '--json'], owner))
+  assert.equal(c.milestone, true)
+  assert.equal(c.due, null)
+  assert.notEqual(decsResult(root, ['add', 'Mixed', '--for', 'me', '--milestone'], owner).code, 0, 'not anyone\'s to-do either')
   decs(root, ['flag', '1', 'milestone', '--due', 'next mon'], owner)
   assert.match(String(json(decs(root, ['get', '1', '--json'])).due), /T23:59:59/)
 })

@@ -16,7 +16,7 @@ import { join } from 'node:path'
 import { ensureGitignoreLines } from './gitignore.ts'
 import { withFileLock, writeFileAtomic } from './lock.ts'
 import type { Layout } from './paths.ts'
-import { isHumanTask } from './assignee.ts'
+import { isHumanTask, isMilestone } from './assignee.ts'
 import { checkinThresholdMs } from './staleness.ts'
 import { isDeferred, isStartable } from './status.ts'
 import type { Decision } from './types.ts'
@@ -129,10 +129,10 @@ export function waitsOnlyOnOwner(d: Pick<Decision, 'id' | 'project'>, items: Pic
  */
 export function askIfDue(
   l: Layout,
-  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt' | 'deferredUntil' | 'assignee'>,
+  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt' | 'deferredUntil' | 'assignee' | 'milestone'>,
   now = Date.now(),
 ): CheckinStatus | undefined {
-  if (d.state !== 'in_progress' || isDeferred(d) || isHumanTask(d)) return undefined
+  if (d.state !== 'in_progress' || isDeferred(d) || isHumanTask(d) || isMilestone(d)) return undefined
   const lastWrite = Date.parse(d.activeAt || d.updatedAt || d.created || '')
   return dueAndRecord(l, d.id, lastWrite, checkinThresholdMs(d.staleAfter), now)
 }
@@ -145,10 +145,10 @@ export function askIfDue(
  */
 export function staleNagDue(
   l: Layout,
-  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt' | 'deferredUntil' | 'assignee'>,
+  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt' | 'deferredUntil' | 'assignee' | 'milestone'>,
   now = Date.now(),
 ): CheckinStatus | undefined {
-  if (d.state !== 'not_started' || isDeferred(d) || isHumanTask(d)) return undefined
+  if (d.state !== 'not_started' || isDeferred(d) || isHumanTask(d) || isMilestone(d)) return undefined
   const lastWrite = Date.parse(d.activeAt || d.updatedAt || d.created || '')
   return dueAndRecord(l, d.id, lastWrite, checkinThresholdMs(d.staleAfter), now)
 }
@@ -159,6 +159,6 @@ export function staleNagDue(
  *  `stale_count` in the bench/JSON) surfaces what's sat longest. */
 export function staleTasksOf<T extends Decision>(items: T[]): T[] {
   return items
-    .filter((d) => d.state === 'not_started' && !isDeferred(d) && !isHumanTask(d) && isStartable(d, items))
+    .filter((d) => d.state === 'not_started' && !isDeferred(d) && !isHumanTask(d) && !isMilestone(d) && isStartable(d, items))
     .sort((a, b) => Date.parse(a.created) - Date.parse(b.created))
 }

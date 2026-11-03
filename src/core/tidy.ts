@@ -16,7 +16,7 @@
  */
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { isHumanTask } from './assignee.ts'
+import { isHumanTask, isMilestone } from './assignee.ts'
 import { parseDuration } from './duration.ts'
 import { ensureGitignoreLines } from './gitignore.ts'
 import { agentNameOf } from './identity.ts'
@@ -45,8 +45,11 @@ export interface TidyFinding {
 /** Whether some live monitor in `d`'s project is signed under `authorName` (the bare name before `·`). */
 export type IsAuthorLive = (d: Decision, authorName: string) => boolean
 
-/** The owner's own to-dos and anything deferred are never a tidy finding's subject — matches `core/checkins.ts`. */
-const skip = (d: Pick<Decision, 'assignee' | 'deferredAt' | 'state'>) => isHumanTask(d) || isDeferred(d)
+/** The owner's own to-dos, anything deferred, and a milestone itself are never a tidy
+ *  finding's subject — matches `core/checkins.ts`. A milestone isn't started or finished
+ *  on its own, so its children all finishing is its normal end state, not a mismatch to
+ *  nag about; its children's own findings are unaffected. */
+const skip = (d: Pick<Decision, 'assignee' | 'deferredAt' | 'state' | 'milestone'>) => isHumanTask(d) || isDeferred(d) || isMilestone(d)
 
 /**
  * Everywhere a node's state and its tree disagree right now. `items` is the

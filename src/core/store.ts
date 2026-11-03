@@ -1125,10 +1125,23 @@ export class Store {
     return { ...written, queued: true }
   }
 
-  /** Who does it: `human` (the owner's to-do) or undefined (an AI). */
+  /** Who does it: `human` (the owner's to-do) or undefined (an AI). Takes it
+   *  out of being a milestone too — `nod assign <id> ai|me` is how one goes back. */
   assign(d: Decision, assignee: string | undefined): Decision {
-    if ((d.assignee ?? undefined) === assignee) return d
-    return this.mutate(d, (d) => ({ next: { ...d, assignee } }))
+    if ((d.assignee ?? undefined) === assignee && !d.milestone) return d
+    return this.mutate(d, (d) => ({ next: { ...d, assignee, milestone: undefined } }))
+  }
+
+  /**
+   * `nod assign <id> milestone`: the third kind, alongside human/AI — a goal,
+   * never started or finished by itself (core/checkins.ts, core/tidy.ts skip
+   * it). No `due` required, unlike `nod flag`'s own mark on the same field.
+   * Turning it on clears whatever it was assigned to; `assign(d, …)` turns it
+   * back off.
+   */
+  setMilestone(d: Decision, on: boolean): Decision {
+    if (Boolean(d.milestone) === on) return d
+    return this.mutate(d, (d) => ({ next: { ...d, milestone: on || undefined, assignee: on ? undefined : d.assignee } }))
   }
 
   /**

@@ -55,7 +55,7 @@ export interface Cond {
 export const COND_FIELDS = ['state', 'assignee', 'flag', 'kind', 'project', 'author', 'tag', 'is', 'due', 'updated', 'title'] as const
 export type CondField = (typeof COND_FIELDS)[number]
 /** What `is:` can test. */
-export const IS_VALUES = ['startable', 'deferred', 'delayed', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'] as const
+export const IS_VALUES = ['startable', 'deferred', 'delayed', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent', 'milestone'] as const
 
 export const LAYOUTS = ['tree', 'list'] as const
 export const GROUPS = ['project', 'state', 'assignee', 'none'] as const
@@ -69,14 +69,16 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     layout: 'tree',
     // 延迟 stays in sight: a passive one grey, an active one (waiting on someone) purple.
     deferred: 'show',
-    filter: parseFilter('state:in_progress,waiting,needs_decision,decided or state:not_started is:startable'),
+    // A milestone never matches on its own — never started or finished by itself — so it
+    // only shows (dim, as the tree's ancestor-context) when something under it does.
+    filter: parseFilter('state:in_progress,waiting,needs_decision,decided -is:milestone or state:not_started is:startable -is:milestone'),
   },
   // 活动 = 可用 minus everything waiting or put off, the owner's own included; a waiting parent still shows, dim, above what moves under it.
   {
     id: 'active',
     icon: 'activity',
     layout: 'tree',
-    filter: parseFilter('state:in_progress,needs_decision,decided or state:not_started is:startable'),
+    filter: parseFilter('state:in_progress,needs_decision,decided -is:milestone or state:not_started is:startable -is:milestone'),
   },
   {
     id: 'decide',
@@ -84,7 +86,8 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     layout: 'list',
     group: 'project',
     sort: ['blocks_ai', 'flag', 'bench'],
-    filter: parseFilter('state:needs_decision or assignee:human state:in_progress,waiting,decided or assignee:human state:not_started is:startable'),
+    // A milestone is never the owner's to-do or a decision — it never lists here.
+    filter: parseFilter('state:needs_decision -is:milestone or assignee:human state:in_progress,waiting,decided or assignee:human state:not_started is:startable'),
   },
   { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['check_back', 'flag', 'waiting_since'], deferred: 'show', filter: parseFilter('state:waiting or is:delayed') },
   {

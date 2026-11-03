@@ -1,4 +1,4 @@
-import { isHumanTask } from '../core/assignee.ts'
+import { isHumanTask, isMilestone } from '../core/assignee.ts'
 import { untilDay } from '../core/fuzzy-date.ts'
 import { isUnclaimedBrief } from '../core/intake.ts'
 import { benchOrder, isFlagged, manualRank, untilDue, urgencyRank } from '../core/order.ts'
@@ -131,7 +131,7 @@ function condHolds(field: CondField, v: string, d: Item, items: Item[], now: num
       return low === 'human' || low === 'me' ? isHumanTask(d) : low === 'ai' ? !isHumanTask(d) : d.assignee === v
     case 'flag':
       if (low === 'important') return d.urgency === 'high'
-      if (low === 'milestone') return Boolean(d.milestone && d.due)
+      if (low === 'milestone') return isMilestone(d)
       if (low === 'flagged') return isFlagged(d)
       return low === 'none' && !isFlagged(d)
     case 'kind':
@@ -177,6 +177,8 @@ function isHolds(what: string, d: Item, items: Item[], now: number): boolean {
       return d.parent === undefined
     case 'parent':
       return Boolean(d.children?.length)
+    case 'milestone':
+      return isMilestone(d)
     default:
       return false
   }
@@ -190,9 +192,11 @@ const spanMs = (v: string) => {
   }
 }
 
-/** The owner's own to-do that can be done now: started, held up outside, or startable. */
+/** The owner's own to-do that can be done now: started, held up outside, or startable.
+ *  A milestone is never this, whatever its `assignee` — the two never overlap, but this
+ *  stays explicit rather than relying on that. */
 export function isOpenHumanTask(d: Item, items: Item[]): boolean {
-  if (!isHumanTask(d) || isTerminal(d.state)) return false
+  if (isMilestone(d) || !isHumanTask(d) || isTerminal(d.state)) return false
   return d.state === 'in_progress' || d.state === 'waiting' || d.state === 'decided' || (d.state === 'not_started' && isStartable(d, items))
 }
 
@@ -873,17 +877,30 @@ export const HUMAN_GLYPH = '◇'
  *  between HUMAN_GLYPH (not started) and a decision's solid ◆ (blocking an AI). */
 export const HUMAN_DOING_GLYPH = '⬖'
 
+/** The third kind, alongside human/AI — a goal, never started or finished by
+ *  itself, so it keeps this shape whatever `state` says (N283 brings the
+ *  flag back as a node kind; N250's countdown stays retired, see `dueMark`). */
+export const MILESTONE_GLYPH = '⚑'
+
+/** `d`'s direct children — the milestone badge's `done/total`, and whether to dim its glyph. */
+export function milestoneProgress(d: Item, items: Item[]): { done: number; total: number } {
+  const kids = items.filter((i) => i.project === d.project && i.parent === d.id)
+  return { done: kids.filter((k) => isTerminal(k.state)).length, total: kids.length }
+}
+
 /** The glyph text for `d`, whatever its state. */
 export const glyphText = (d: Item, items: Item[]) =>
-  isUnclaimedBrief(d)
-    ? BRIEF_GLYPH
-    : isOpenHumanTask(d, items)
-      ? d.state === 'in_progress'
-        ? HUMAN_DOING_GLYPH
-        : HUMAN_GLYPH
-      : d.state === 'decided'
-        ? decidedShape(d)
-        : GLYPH[d.state]
+  isMilestone(d)
+    ? MILESTONE_GLYPH
+    : isUnclaimedBrief(d)
+      ? BRIEF_GLYPH
+      : isOpenHumanTask(d, items)
+        ? d.state === 'in_progress'
+          ? HUMAN_DOING_GLYPH
+          : HUMAN_GLYPH
+        : d.state === 'decided'
+          ? decidedShape(d)
+          : GLYPH[d.state]
 
 /**
  * ◆ is yellow, bold while an AI is stuck on it, dim if answerable early.
@@ -892,9 +909,15 @@ export const glyphText = (d: Item, items: Item[]) =>
  * also yellow) is that same to-do once started (in_progress). Green is
  * 已答待取 (owner answered, AI hasn't picked up), keeping its task shape. ◐
  * goes red once a check-in has gone unanswered 3 times (core/checkins.ts).
+ * ⚑ is a milestone — dim once every child is finished, the owner's own cue
+ * that it's ready to archive (never automatic; see `core/tidy.ts`).
  */
 export function glyphOf(d: Item, items: Item[], now = Date.now()): Glyph {
   const text = glyphText(d, items)
+  if (isMilestone(d)) {
+    const { done, total } = milestoneProgress(d, items)
+    return { text, dim: total > 0 && done === total }
+  }
   if (isUnclaimedBrief(d)) return { text, color: 'blue', bold: true }
   if (isOpenHumanTask(d, items)) return { text, color: 'yellow' }
   switch (d.state) {
@@ -968,6 +991,13 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
     }
     if (since) forms.push([...fold, ...ai, { text: t('bench.badge.deferredSince', { since }), dim: true }])
     forms.push([...fold, ...ai, { text: t('bench.badge.deferred'), dim: true }])
+    return forms
+  }
+  if (isMilestone(d)) {
+    // Due, if any, is already the row's own lead segment (`suffixOf`'s `countdown`,
+    // the same `dueMark` every node gets) — this is only the children done/total.
+    const { done, total } = milestoneProgress(d, items)
+    if (total) forms.push([...fold, { text: `${done}/${total}`, dim: done === total }])
     return forms
   }
   if (isUnclaimedBrief(d)) {

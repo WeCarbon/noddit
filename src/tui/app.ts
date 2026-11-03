@@ -1,4 +1,4 @@
-import { HUMAN, isHumanTask } from '../core/assignee.ts'
+import { HUMAN, isHumanTask, isMilestone } from '../core/assignee.ts'
 import { briefTitle } from '../core/intake.ts'
 import { isListening } from '../core/listeners.ts'
 import { layoutFor, type Layout } from '../core/paths.ts'
@@ -908,6 +908,24 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     reload()
   }
 
+  /** `m`: flips whether a node is a milestone — the third kind, alongside human/AI
+   *  (N283). Turning it on clears whatever it was assigned to; off is the same as
+   *  `nod assign <id> ai` — never started or finished by itself either way. */
+  const toggleMilestone = () => {
+    if (markedNodes.length) {
+      const on = !markedNodes.every(isMilestone)
+      return onMarked(t(on ? 'bench.toast.batchMilestoned' : 'bench.toast.batchUnmilestoned'), (d) => {
+        live(d)
+        store.setMilestone(d, on)
+      })
+    }
+    if (!current) return
+    const on = !isMilestone(current)
+    const next = store.setMilestone(current, on)
+    say(t(on ? 'bench.toast.milestoned' : 'bench.toast.unmilestoned', { ref: refOf(next) }))
+    reload()
+  }
+
   /** 「延迟 R 天」 (`D`): to today + the node's R; a wait keeps its who. */
   const delayEvery = () => {
     if (markedNodes.length)
@@ -1724,6 +1742,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (input === 'D') return delayEvery()
     if (input === 's' || input === 'S') return startNode()
     if (input === '@') return reassign()
+    if (input === 'm') return toggleMilestone()
     if (input === 'H') {
       const idx = firstHtmlAttachmentIndex(current)
       if (idx === -1) return say(t('bench.toast.noHtmlAttachment'))
