@@ -571,8 +571,13 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (!raw) return
     const from = current ?? items[0]
     const target = from ? findRef(raw, from, items) : undefined
-    if (!target) return say(t('bench.toast.notFound', { ref: raw }))
-    reveal(target)
+    if (target) return reveal(target)
+    // Not a ref, or not one that resolves: fall back to a title match, same as the app's own ⌘-K palette.
+    const query = raw.toLowerCase()
+    const matches = items.filter((d) => `${refOf(d)} ${d.title}`.toLowerCase().includes(query))
+    if (!matches.length) return say(t('bench.toast.notFound', { ref: raw }))
+    reveal(matches[0])
+    if (matches.length > 1) say(t('bench.toast.gotoAlsoMatches', { refs: matches.slice(1, 5).map(refOf).join(' ') }))
   }
 
   const commitQNote = () => {
