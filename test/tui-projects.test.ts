@@ -12,6 +12,9 @@ import { bench, has, KEY } from './tui-harness.ts'
 
 const A = 'lead · tui projects test'
 
+/** A Windows path's backslashes would otherwise read as regex escapes. */
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 /*
  * Rename and the letter live in the project's own decisions/decs.json (core/project.ts).
  * Add/unlink go through core/config.ts's addProject/removeProject, which write the shared
@@ -110,7 +113,7 @@ test('App: "+ Add project" registers a real folder (one with decisions/), same a
   await b.press('\r')
   await b.until(has(b, /Add a project/))
   await b.press(...toAdd.split(''), '\r')
-  await b.until(has(b, new RegExp(`added ${toAdd}`)))
+  await b.until(has(b, new RegExp(`added ${escapeRe(toAdd)}`)))
   assert.ok(readProjects().some((p) => p.root === toAdd))
 })
 
@@ -127,7 +130,7 @@ test('App: "+ Add project" refuses a folder with no decisions/, same as nod proj
   await b.press('\r')
   await b.until(has(b, /Add a project/))
   await b.press(...bare.split(''), '\r')
-  await b.until(has(b, new RegExp(`${bare} has no decisions/`)))
+  await b.until(has(b, new RegExp(`${escapeRe(bare)} has no decisions/`)))
   assert.ok(!readProjects().some((p) => p.root === bare))
 })
 

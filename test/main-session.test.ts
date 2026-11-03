@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { launchPlan, type LaunchEnv } from '../src/core/launch.ts'
@@ -15,7 +15,7 @@ const PLUGIN = fileURLToPath(new URL('../plugin/', import.meta.url))
 
 /** A folder of projects (`code/alpha` lettered A, `code/beta` lettered B) registered in a home of its own. */
 function workspace(t: { after: (fn: () => void) => void }) {
-  const base = realpathSync(scratch())
+  const base = realpathSync.native(scratch())
   t.after(() => rmSync(base, { recursive: true, force: true }))
   const home = join(base, '.home')
   const code = join(base, 'code')
@@ -56,9 +56,9 @@ test('main session detection: NODDIT_ROLE=main, or a cwd in no project with regi
 })
 
 test('commonParent: the deepest shared folder; home when they share only the root', () => {
-  assert.equal(commonParent(['/w/code/a', '/w/code/b']), '/w/code')
-  assert.equal(commonParent(['/w/code/a', '/w/code/b/c']), '/w/code')
-  assert.equal(commonParent(['/w/code/a']), '/w/code')
+  assert.equal(commonParent(['/w/code/a', '/w/code/b']), resolve('/w/code'))
+  assert.equal(commonParent(['/w/code/a', '/w/code/b/c']), resolve('/w/code'))
+  assert.equal(commonParent(['/w/code/a']), resolve('/w/code'))
   assert.equal(commonParent(['/a/x', '/b/y']), homedir())
   assert.equal(commonParent([]), null)
 })

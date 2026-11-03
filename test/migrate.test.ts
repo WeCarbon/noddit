@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative } from 'node:path'
+import { basename, dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { parseLegacyActive, parseLegacyArchive, toDecision } from '../src/migrate/legacy.ts'
@@ -287,7 +287,7 @@ function scratchStore(): { store: Store; root: string } {
  *  from the node file's own directory (same as a real `nod attach` would). */
 function withLegacyAttachmentsBlock(store: Store, d: import('../src/core/types.ts').Decision, file: string) {
   const target = relative(dirname(d.file), file).replace(/\\/g, '/')
-  const label = file.split('/').pop()!
+  const label = basename(file)
   return store.rewriteBody(d, () => `${d.body.trimEnd()}\n\n## 附件\n\n- ![${label}](${target})\n`)
 }
 
