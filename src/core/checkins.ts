@@ -114,6 +114,15 @@ function dueAndRecord(l: Layout, id: number, lastWrite: number, thresholdMs: num
 }
 
 /**
+ * A parent whose unfinished children are all waiting on the owner — a decision, or the
+ * owner's own to-do: the tree itself says it is waiting, so nobody should be asked for news.
+ */
+export function waitsOnlyOnOwner(d: Pick<Decision, 'id' | 'project'>, items: Pick<Decision, 'id' | 'project' | 'parent' | 'state' | 'assignee'>[]): boolean {
+  const open = items.filter((c) => c.project === d.project && c.parent === d.id && c.state !== 'completed' && c.state !== 'closed')
+  return open.length > 0 && open.every((c) => c.state === 'needs_decision' || isHumanTask(c))
+}
+
+/**
  * Whether `d` is due for another status-update ask right now: `in_progress`,
  * not deferred, idle past its span. When due, records the ask and returns
  * the new count; otherwise undefined, and nothing is written.

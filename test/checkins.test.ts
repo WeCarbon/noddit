@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { askIfDue, checkinOf, resetCheckin, staleNagDue, staleTasksOf, UNANSWERED_AFTER } from '../src/core/checkins.ts'
+import { askIfDue, checkinOf, resetCheckin, staleNagDue, staleTasksOf, UNANSWERED_AFTER, waitsOnlyOnOwner } from '../src/core/checkins.ts'
 import { initLayout, type Layout } from '../src/core/paths.ts'
 import type { Decision } from '../src/core/types.ts'
 import { BIN, decs, killAndWait, scratch } from './helpers.ts'
@@ -202,4 +202,13 @@ test('a bare (lead) monitor nags about stale (not_started, not deferred) tasks o
   const seenRefs = () => new Set(lines().filter((l) => l.event === 'stale_tasks').flatMap((l) => l.refs as string[]))
   await until(() => seenRefs().has('X1') && seenRefs().has('X3'), 'both stale tasks nagged, over one or more events')
   assert.equal(seenRefs().has('X2'), false, 'the needs_decision node is never "stale"')
+})
+
+test('a parent whose open children all wait on the owner is not asked for news', () => {
+  const kid = (id: number, state: string, assignee?: string) => ({ id, project: 'p', parent: 1, state, assignee }) as never
+  const parent = { id: 1, project: 'p' }
+  assert.equal(waitsOnlyOnOwner(parent, [kid(2, 'needs_decision'), kid(3, 'completed')]), true)
+  assert.equal(waitsOnlyOnOwner(parent, [kid(2, 'needs_decision'), kid(3, 'not_started', 'human')]), true)
+  assert.equal(waitsOnlyOnOwner(parent, [kid(2, 'needs_decision'), kid(3, 'in_progress')]), false, 'an AI child still moving')
+  assert.equal(waitsOnlyOnOwner(parent, []), false, 'no children: the node itself is the work')
 })

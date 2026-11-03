@@ -7,7 +7,7 @@ import { DECS_HOME } from '../../core/config.ts'
 import { nodditEnv } from '../../core/env.ts'
 import { many, bool, one, type Args } from '../args.ts'
 import { resolveAuthor, resolveStore } from '../context.ts'
-import { askIfDue, staleNagDue, staleTasksOf } from '../../core/checkins.ts'
+import { askIfDue, staleNagDue, staleTasksOf, waitsOnlyOnOwner } from '../../core/checkins.ts'
 import { parseDuration, parseSince } from '../../core/duration.ts'
 import { currentIdentity } from '../../core/identity.ts'
 import { findLayout, layoutFor, type Layout } from '../../core/paths.ts'
@@ -531,8 +531,10 @@ export async function run(args: Args): Promise<number> {
     // once per span either way (askIfDue/staleNagDue's own spacing).
     if (checkinAuthor) {
       try {
-        for (const d of store.all()) {
+        const all = store.all()
+        for (const d of all) {
           if (!ownedBy(d, checkinAuthor)) continue
+          if (waitsOnlyOnOwner(d, all)) continue
           const asked = askIfDue(store.layoutOf(d), d)
           if (!asked) continue
           lastEventAt = Date.now()
