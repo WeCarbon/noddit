@@ -407,3 +407,13 @@ agent，第一句话让它去接派活。已经有 lead 在线就不开。agent 
 
 `$NODDIT_BRIEF_CMD`（老名字 `DECS_BRIEF_CMD` 也认）：没人在线时派活，会在后台跑这条命令（环境里有 `NODDIT_REF` / `NODDIT_TITLE` /
 `NODDIT_PROJECT_ROOT` 等，老名字 `DECS_REF` / `DECS_TITLE` / `DECS_PROJECT_ROOT` 也设），由 owner 决定它做什么（通知、或者自己起一个 agent）。没设就什么都不做。
+
+---
+
+## 改桌面 app 或终端看板（TUI）的功能：两边一起改（MUST FOLLOW）
+
+这个仓库自己就有两套界面——桌面 app（`app/src`）和终端看板（`src/tui`，`nod` 不带参数打开）——两边
+功能应该基本一致，只有界面专属的可以不同（托盘、全局热键、系统通知、拖拽手势、图片缩放手势、HTML
+渐进渲染……这类在 `docs/app-tui-parity.md` 里标了「UI-only」）。改一边的功能（新增、改行为、改入口）
+要在同一处改动里把另一边也改掉；只改一边有正当理由时，PR 描述里写清楚为什么。改完同步更新
+`docs/app-tui-parity.md` 里对应的一行——新功能加一行，不要让它漏在表外。

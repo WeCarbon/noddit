@@ -439,6 +439,10 @@ npm run typecheck   # tsc --noEmit
 node scripts/render-screenshot.ts --out docs/screenshot.en   # regenerate docs/screenshot.<lng>.svg/.png (mock data)
 ```
 
+The desktop app (`app/src`) and the terminal board (`src/tui`) are meant to stay at feature
+parity — [`docs/app-tui-parity.md`](docs/app-tui-parity.md) tracks where each feature lives in
+both, and gets a new row whenever one changes.
+
 ## License
 
 [MIT](LICENSE) © 2026 WeCarbon
