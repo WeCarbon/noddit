@@ -3249,3 +3249,9 @@ figcaption {
   margin: 8px 10px 4px;
   background: var(--line, rgba(127, 127, 127, 0.18));
 }
+
+/* Sidebar rows: the icon or letter leads; the live light sits at the end of the row. */
+nav .project .live-dot {
+  order: 10;
+  margin-inline: 0 2px;
+}
