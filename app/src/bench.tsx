@@ -10,7 +10,7 @@ import { ViewEditor, ViewIcon } from './views.tsx'
 import {
   Archive, ArrowRight, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, FileText,
   FolderSearch, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
-  Bot, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, StickyNote, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
+  Bot, Flag, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, StickyNote, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -426,6 +426,17 @@ export function Bench(props: {
     ),
     write: () => api.assign(rootOf(n), n.id, to),
   })
+  /** N283: the third kind, alongside human/AI — a goal, never started or finished by
+   *  itself. Turning it on clears whatever it was assigned to; off is the same as
+   *  assigning it to an AI (nod assign <id> ai). */
+  const milestoneItem = (n: Node, on: boolean): BatchItem => ({
+    ref: n.ref,
+    patch: both(
+      patchNode(n.key, (x) => ({ ...x, milestone: on, assignee: 'ai', human_task: false })),
+      patchRows(n.key, (r) => ({ ...r, assignee: 'ai', human_task: false })),
+    ),
+    write: () => api.assign(rootOf(n), n.id, on ? 'milestone' : 'ai'),
+  })
   const startItem = (n: Node): BatchItem => ({
     ref: n.ref,
     patch: both(
@@ -730,6 +741,12 @@ export function Bench(props: {
     const it = assignItem(node, to)
     optimistic(it.patch, it.write, to === 'me' ? s('assignedMe') : s('assignedAi'))
   }
+  const toggleMilestone = () => {
+    if (!node) return
+    const on = !node.milestone
+    const it = milestoneItem(node, on)
+    optimistic(it.patch, it.write, on ? s('milestoned') : s('unmilestoned'))
+  }
   const [newOpen, setNewOpen] = useState(false)
   const [viewEditor, setViewEditor] = useState<{ start?: string } | null>(null)
   /** The description (`body`) or a note (its index) being edited, on which node. */
@@ -783,7 +800,7 @@ export function Bench(props: {
   const isMac = /Mac/.test(navigator.platform)
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
-  latest.current = { startAnswer, archive, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, reassign, setDeferFor, delayEvery } as never
+  latest.current = { startAnswer, archive, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, reassign, toggleMilestone, setDeferFor, delayEvery } as never
   const batchRef = useRef(batch)
   batchRef.current = batch
   const [deferMany, setDeferMany] = useState<Node[] | null>(null)
@@ -838,6 +855,7 @@ export function Bench(props: {
       startAnswer: (k: string) => void
       toggleImportant: () => void
       reassign: () => void
+      toggleMilestone: () => void
       setDeferFor: (n: Node) => void
       delayEvery: (n: Node) => void
       archive: () => void
@@ -886,6 +904,7 @@ export function Bench(props: {
         ],
       })
       items.push({ label: n.assignee === 'human' ? s('assignAi') : s('assignMe'), icon: n.assignee === 'human' ? I(Bot) : I(User), run: () => L().reassign() })
+      items.push({ label: n.milestone ? s('ctxUnmilestone') : s('ctxMilestone'), icon: I(Flag), checked: n.milestone, run: () => L().toggleMilestone() })
       items.push({ label: s('ctxArchive'), icon: I(Archive), shortcut: 'A', run: () => L().archive() })
     }
     items.push({ kind: 'separator' })

@@ -210,7 +210,7 @@ export function NodeHeader({
             {s(n.est_who === 'human' ? 'estHuman' : 'estAi', { est: n.est })}
           </Chip>
         )}
-        {n.due && !n.milestone && (
+        {n.due && (
           <Chip icon={<Timer {...ICON} />} title={fullTime(n.due)} tone={Date.parse(n.due) < Date.now() ? 'c-red' : ''}>
             {ago(n.due)}
           </Chip>
