@@ -43,7 +43,7 @@ function held(id: number, heldAt: string, on: string, updatedAt = heldAt): Decis
   } as unknown as Decision
 }
 
-test('the tabs are Available Active Needs-you All Waiting Live, with counts on all but All and Live', (t) => {
+test('the tabs are Available Active Human-work Waiting Live All, with counts on all but Live and All', (t) => {
   const store = tmpStore(t)
   store.create({ title: 'needs a call', author: 'a · x', options: [{ key: '1', label: 'ok' }], default: '1' })
   const running = store.create({ title: 'running', author: 'a · x', task: true })
@@ -53,9 +53,9 @@ test('the tabs are Available Active Needs-you All Waiting Live, with counts on a
   const w2 = store.create({ title: 'waiting on the service', author: 'a · x', task: true })
   store.hold(w2, 'ADO to recover', 'a · x', { until: '2099-01-01T00:00:00+00:00' })
 
-  assert.deepEqual(VIEWS.map((v) => VIEW_LABEL[v]), ['Available', 'Active', 'Needs you', 'All', 'Waiting', 'Live'])
+  assert.deepEqual(VIEWS.map((v) => VIEW_LABEL[v]), ['Available', 'Active', 'Human work', 'Waiting', 'Live', 'All'])
   const header = text(buildFrame(input(store, 'available'))[0])
-  assert.match(header, /^decs +Available 4 +Active 2 +Needs you 1 +All +Waiting 2 +Live *$/)
+  assert.match(header, /^decs +Available 4 +Active 2 +Human work 1 +Waiting 2 +Live +All *$/)
   assert.doesNotMatch(header, /waiting for you|finished|working|timeline/)
   assert.equal(viewFromArg('waiting'), 'waiting')
 })

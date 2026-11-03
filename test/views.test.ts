@@ -86,11 +86,11 @@ test('Active: running and needs-decision only — not answered-for-AI, not to-do
   assert.deepEqual(rows.filter((r) => r.context).map((r) => r.node!.title[0]).sort(), ['Q', 'U'])
 })
 
-test('Needs you: needs_decision (and to-dos for the owner), a header per project, AI-stuck before can-decide-early', (t) => {
+test('Human work: needs_decision (and to-dos for the owner), a header per project, AI-stuck before can-decide-early', (t) => {
   const { store, ids } = fixture(t)
   const rows = rowsFor('decide', store.all())
   assert.equal(rows[0].kind, 'header')
-  assert.match(rows[0].text!, /Needs you 2/)
+  assert.match(rows[0].text!, /Human work 2/)
   assert.deepEqual(rows.filter((r) => r.kind === 'node').map((r) => r.node!.id), [ids.c, ids.d])
   assert.ok(!rows.some((r) => r.kind === 'header' && /Answered/.test(r.text ?? '')), 'no answered group')
 })
@@ -148,12 +148,12 @@ test('a jump lands in the current view when it lists the node, else Available, e
 // The App
 // ---------------------------------------------------------------------------
 
-test('App: opens in Available, Tab walks Available Active Decide All Waiting Live, and c does nothing', async (t) => {
+test('App: opens in Available, Tab walks Available Active Decide Waiting Live All, and c does nothing', async (t) => {
   const { store } = fixture(t)
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a startable/))
   const header = () => b.frame()[0]
-  assert.match(header(), /^decs +Available 8 +Active 5 +Needs you 2 +All +Waiting 1/)
+  assert.match(header(), /^decs +Available 8 +Active 5 +Human work 2 +Waiting 1/)
   const before = b.frame().join('\n')
   await b.press('c')
   await b.quiet()
@@ -173,7 +173,7 @@ test('App: opens in Available, Tab walks Available Active Decide All Waiting Liv
       : /P parent task/.test(left) ? 'active' : '?'
     seen.push(which)
   }
-  assert.deepEqual(seen, ['active', 'decide', 'all', 'waiting', 'live', 'available'])
+  assert.deepEqual(seen, ['active', 'decide', 'waiting', 'live', 'all', 'available'])
 })
 
 /** Whether the right pane (what the cursor is on) mentions `re`. */

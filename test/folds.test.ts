@@ -133,7 +133,9 @@ test('App: ← folding is remembered too; - on a leaf or outside the tree views 
   await b.press('\x1b[B', '-')
   await b.until(has(b, /has no sub-nodes/))
   assert.match(b.frame().join('\n'), /has no sub-nodes/)
-  await b.press('\t', '-')
+  // All (the default here) is now last in tab order, so it takes three Tabs to
+  // reach a non-tree view (Available, Active, then Decide).
+  await b.press('\t', '\t', '\t', '-')
   await b.until(has(b, /Collapsing only works in Available, Active, All/))
   assert.match(b.frame().join('\n'), /Collapsing only works in Available, Active, All/)
 })

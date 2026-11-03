@@ -26,7 +26,7 @@ how? `nod <command> --help`; for the details, load the nod skill.
   runs `nod tree <parent>` and checks every child, including ones
   sub-agents created.
 - **Hands off what the owner kept or paused**: never work on the owner's
-  own to-dos (「For you」); a node the owner deferred waits until it comes
+  own to-dos (in Human work); a node the owner deferred waits until it comes
   back.
 - **Relay what the owner says in chat** about a node before replying:
   `nod note <id> --human --by "owner (said in chat, relayed by <you>)"

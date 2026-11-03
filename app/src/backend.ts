@@ -579,7 +579,7 @@ const DEMO_VIEWS: ViewsList = {
   file: '~/.decs/views.json',
   views: [
     { id: 'available', icon: 'list-todo', layout: 'tree', label: 'Available', filter_text: 'state:in_progress,waiting,needs_decision,decided or state:not_started is:startable', builtin: true, pristine: true },
-    { id: 'decide', icon: 'hand', layout: 'list', group: 'project', sort: ['blocks_ai', 'flag', 'bench'], label: 'Needs you', filter_text: 'state:needs_decision or assignee:human', builtin: true, pristine: true },
+    { id: 'decide', icon: 'hand', layout: 'list', group: 'project', sort: ['blocks_ai', 'flag', 'bench'], label: 'Human work', filter_text: 'state:needs_decision or assignee:human', builtin: true, pristine: true },
     { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['flag', 'waiting_since'], deferred: 'fold', label: 'Waiting', filter_text: 'state:waiting', builtin: true, pristine: true },
   ],
   schema: {
@@ -590,7 +590,7 @@ const DEMO_VIEWS: ViewsList = {
     sort: ['bench', 'blocks_ai', 'flag', 'manual', 'urgency', 'due', 'created', 'updated', 'waiting_since', 'touched', 'changed', 'id', 'title', 'state'],
     filter_fields: ['state', 'assignee', 'flag', 'kind', 'project', 'author', 'tag', 'is', 'due', 'updated', 'title'],
     is_values: ['startable', 'deferred', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'],
-    builtin: ['available', 'active', 'decide', 'all', 'waiting', 'live'],
+    builtin: ['available', 'active', 'decide', 'waiting', 'live', 'all'],
   },
 }
 

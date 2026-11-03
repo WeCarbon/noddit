@@ -187,7 +187,7 @@ export const zhHans: Strings = {
   whoMe: '我',
   whoAi: 'AI',
   whoBrief: 'AI 展开',
-  whoMeHint: '你自己的待办：出现在「需要人类」里，AI 不会去接。',
+  whoMeHint: '你自己的待办：出现在「人类工作」里，AI 不会去接。',
   whoAiHint: 'AI 照着写的直接去做。',
   whoBriefHint: '几个字交给 AI，它先展开写清楚（和 ⌘K 一样）。',
   newStartNow: '现在开始',

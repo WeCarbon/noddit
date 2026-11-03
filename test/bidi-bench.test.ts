@@ -193,14 +193,14 @@ test('en and zh-Hans frames are byte-identical to before the right-to-left work'
 
   const en = render('en')
   assert.doesNotMatch(en, BIDI_CONTROLS, 'left-to-right frames never carry a bidi control')
-  assert.match(en, /decs {2}Available 1 {2}Active 1 {2}Needs you 1 {2}All {2}Waiting/)
+  assert.match(en, /decs {2}Available 1 {2}Active 1 {2}Human work 1 {2}Waiting/)
   assert.match(en, /◆ X1 Ship release 2\.4 {10,}Decide │/)
   assert.match(en, /│ 1 Ship it \(⏎\) {2}2 Hold/)
   assert.match(en, /↑↓ pick {2}⇥ view {2}1-9 answer {2}⏎ default {2}\? help {2}q quit/)
 
   const zh = render('zh-Hans')
   assert.doesNotMatch(zh, BIDI_CONTROLS)
-  assert.match(zh, /decs {2}可用 1 {2}活动 1 {2}需要人类 1 {2}全部 {2}等待/)
+  assert.match(zh, /decs {2}可用 1 {2}活动 1 {2}人类工作 1 {2}等待/)
   assert.match(zh, /◆ X1 Ship release 2\.4 {10,}待决 │/)
   assert.match(zh, /↑↓ 选 {2}⇥ 换视图 {2}1-9 答 {2}⏎ 默认 {2}\? 帮助 {2}q 退出/)
 })
@@ -307,7 +307,7 @@ test('ar (visual): tab clicks hit exactly the reversed, individually mirrored ta
     // user — mirroring put it at the rightmost span, not the leftmost.
     const byColumn = [...g.tabSpans].sort((a, b) => a.from - b.from)
     assert.equal(byColumn[byColumn.length - 1].view, 'available')
-    assert.equal(byColumn[0].view, 'live')
+    assert.equal(byColumn[0].view, 'all')
   })
 })
 

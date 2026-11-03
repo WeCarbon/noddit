@@ -188,7 +188,7 @@ export const fr: Strings = {
   whoMe: 'Moi',
   whoAi: 'IA',
   whoBrief: 'L’IA le développe',
-  whoMeHint: 'Votre propre tâche : elle apparaît dans « Pour vous » et les IA n’y touchent pas.',
+  whoMeHint: 'Votre propre tâche : elle apparaît dans « Travail humain » et les IA n’y touchent pas.',
   whoAiHint: 'Une tâche qu’une IA fait telle qu’écrite.',
   whoBriefHint: 'Quelques mots qu’une IA reprend et développe d’abord (comme ⌘K).',
   newStartNow: 'Commencer maintenant',

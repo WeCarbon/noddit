@@ -139,7 +139,7 @@ test('views: a deferred node and its subtree leave Available/Active/Decide; Wait
   assert.deepEqual(open.slice(2).map((r) => r.node!.title), ['P parent', 'x needs decision', 'H waiting and deferred'], 'every deferred node, longest-deferred first')
   assert.equal(open.filter((r) => r.node?.id === ids.H).length, 1, 'a deferred Waiting node is listed once, under Deferred')
 
-  assert.deepEqual(VIEWS, ['available', 'active', 'decide', 'all', 'waiting', 'live'], 'no Deferred tab')
+  assert.deepEqual(VIEWS, ['available', 'active', 'decide', 'waiting', 'live', 'all'], 'no Deferred tab')
   const counts = Object.fromEntries(VIEWS.map((v) => [v, viewCount(v, items)]))
   assert.deepEqual(counts, { available: 3, active: 2, decide: 1, all: undefined, waiting: 1, live: undefined })
   const ov = buildOverview(items)
@@ -242,7 +242,7 @@ test('App: d in Available defers the cursor node — it leaves, the cursor moves
   store.start(store.create({ title: 'b second one', author: A, task: true }))
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a first one/))
-  assert.match(b.frame()[0], /^decs +Available 2 +Active 2 +Needs you +All +Waiting +Live *$/)
+  assert.match(b.frame()[0], /^decs +Available 2 +Active 2 +Human work +Waiting +Live +All *$/)
   await b.press('d')
   await b.until(has(b, /deferred \(undo it in Waiting → Deferred\)/))
   const f = b.frame().join('\n')
@@ -274,7 +274,7 @@ test('App: Waiting → + opens "Deferred N", d un-defers from there, - folds it;
   assert.equal(store.get(a.id)!.deferredAt, undefined)
   assert.equal(store.get(a.id)!.state, 'needs_decision')
   await b.until(has(b, /Deferred 1  - collapse/))
-  assert.match(b.frame()[0], /Needs you 1/, 'back in its views')
+  assert.match(b.frame()[0], /Human work 1/, 'back in its views')
   await b.press('-')
   await b.until(has(b, /Deferred 1  \+ expand/))
 

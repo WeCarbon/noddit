@@ -36,7 +36,7 @@ const writtenAt = (s: Store, id: number, iso: string) => {
 }
 
 test('Live sits after Waiting; recent still names it', () => {
-  assert.deepEqual(VIEWS, ['available', 'active', 'decide', 'all', 'waiting', 'live'])
+  assert.deepEqual(VIEWS, ['available', 'active', 'decide', 'waiting', 'live', 'all'])
   assert.equal(viewFromArg('live'), 'live')
   assert.equal(viewFromArg('recent'), 'live')
 })

@@ -98,7 +98,7 @@ test('a to-do for the owner is never checked in on, nagged about as stale, or of
   assert.equal(isUnclaimedBrief({ ...running, intake: true }), false)
 })
 
-test('Needs you lists decisions and the owner\'s startable to-dos; AI-blocking first, then ★/⚑, then the rest', (t) => {
+test('Human work lists decisions and the owner\'s startable to-dos; AI-blocking first, then ★/⚑, then the rest', (t) => {
   const store = tmpStore(t)
   const early = store.create({ title: 'Early question', author: A, options: [{ key: '1', label: 'a' }, { key: '2', label: 'b' }], after: ['99'] })
   const todo = store.create({ title: 'Plain to-do', author: 'owner', task: true, assignee: 'human' })
@@ -116,7 +116,7 @@ test('Needs you lists decisions and the owner\'s startable to-dos; AI-blocking f
   assert.ok(!ids.includes(later.id), 'a to-do still waiting on other work is not listed yet')
   assert.ok(inView('available', items.find((d) => d.id === todo.id)!, items), 'it is live work in Available too')
   const rows = rowsFor('decide', items)
-  assert.match(rows[0].text ?? '', /Needs you 5/)
+  assert.match(rows[0].text ?? '', /Human work 5/)
   const todoRow = rows.find((r) => r.node?.id === todo.id)!
   assert.match(text(nodeRowSegments(todoRow, items, 80, Date.now())), /For you/)
   const decisionRow = rows.find((r) => r.node?.id === stuck.id)!
@@ -218,7 +218,7 @@ test('bench --json: rows say who does it and when a deferral ends; a project vie
     back_from_deferral: unknown[]
   }
   const decide = out.views.find((v) => v.view === 'decide')!
-  assert.equal(decide.label, 'Needs you')
+  assert.equal(decide.label, 'Human work')
   const row = decide.rows.find((r) => r.title === 'Call the vendor')!
   assert.equal(row.assignee, 'human')
   assert.equal(row.human_task, true)

@@ -69,7 +69,13 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     layout: 'tree',
     filter: parseFilter('state:in_progress,waiting,needs_decision,decided or state:not_started is:startable'),
   },
-  { id: 'active', icon: 'activity', layout: 'tree', filter: parseFilter('state:in_progress,needs_decision') },
+  // 人类工作 ⊆ 活动: a decision (any assignee) or a human task — in progress, waiting, decided or startable.
+  {
+    id: 'active',
+    icon: 'activity',
+    layout: 'tree',
+    filter: parseFilter('state:in_progress,needs_decision or assignee:human state:waiting,decided or assignee:human state:not_started is:startable'),
+  },
   {
     id: 'decide',
     icon: 'hand',
@@ -78,7 +84,6 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     sort: ['blocks_ai', 'flag', 'bench'],
     filter: parseFilter('state:needs_decision or assignee:human state:in_progress,waiting,decided or assignee:human state:not_started is:startable'),
   },
-  { id: 'all', icon: 'list-tree', layout: 'tree', finished: 'fold', deferred: 'show', count: false },
   { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['check_back', 'flag', 'waiting_since'], deferred: 'fold', filter: parseFilter('state:waiting') },
   {
     id: 'live',
@@ -91,6 +96,7 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     window: { days: 30, max: 200 },
     count: false,
   },
+  { id: 'all', icon: 'list-tree', layout: 'tree', finished: 'fold', deferred: 'show', count: false },
 ]
 
 export const BUILTIN_IDS = BUILTIN_VIEWS.map((v) => v.id)

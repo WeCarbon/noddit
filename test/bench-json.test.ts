@@ -40,7 +40,7 @@ test('decs bench --json: every view with its rows, glyphs and badges, without a 
   const j = benchJson(root)
   assert.equal(j.lang, 'en')
   assert.equal(j.projects.length, 1)
-  assert.deepEqual(j.views.map((v) => v.view), ['available', 'active', 'decide', 'all', 'waiting', 'live'])
+  assert.deepEqual(j.views.map((v) => v.view), ['available', 'active', 'decide', 'waiting', 'live', 'all'])
   assert.equal(view(j, 'decide').count, 1)
 
   const rows = view(j, 'available').rows

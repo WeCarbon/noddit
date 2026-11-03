@@ -22,17 +22,18 @@ import { fit, padToWidth, stringWidth } from './width.ts'
  * taken by answering, so switch with Tab):
  * - 可用 (default): executing, startable, waiting on owner, or answered and
  *   awaiting an AI — as the tree.
- * - 活动: executing or waiting on the owner — as the tree.
- * - 需要人类 (key `decide`): everything waiting on a person — what the owner must
+ * - 活动: executing, waiting on a decision, or any live human work — as the
+ *   tree; a superset of 人类工作.
+ * - 人类工作 (key `decide`): everything waiting on a person — what the owner must
  *   rule on and the human-assigned tasks that can be done now — AI-blocking first,
  *   then ★/⚑, then the rest.
- * - 全部: every node; finished ones fold into 「✓ 已完成/已结束 N」.
  * - 等待: held up outside, longest first, plus a 「延迟 N」 fold row.
- * - 最近: what the owner answered, replied to, filed or deferred, latest first —
+ * - 实时: what the owner answered, replied to, filed or deferred, latest first —
  *   finished and archived nodes included.
+ * - 全部: every node; finished ones fold into 「✓ 已完成/已结束 N」.
  *
  * 延迟 keeps its state (not archived); it and its subtree are out of
- * 可用/活动/待决/等待 proper, and dim in 全部.
+ * 可用/活动/人类工作/等待 proper, and dim in 全部.
  */
 export type View = string
 /** The built-in tabs, in their shipped order. The user's own list: `viewIds()`. */
@@ -1067,7 +1068,7 @@ function nodeRowParts(row: Row, items: Item[], width: number, now: number, opts:
 }
 
 /**
- * Order of 需要人类: what holds an AI up first (a question it is stuck on, or the
+ * Order of 人类工作: what holds an AI up first (a question it is stuck on, or the
  * owner's to-do that other work is `after`), then what the owner flagged ★/⚑,
  * then the rest (to-dos, questions answerable early); bench order within each.
  */
