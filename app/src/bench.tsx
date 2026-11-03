@@ -1257,7 +1257,7 @@ export function Bench(props: {
         <nav>
           <MainAgentEntry onToast={showToast} />
           <div class="nav-sep" />
-          <NodMeter nods={bench.nods} />
+          {bench.nods && <NodMeter nods={bench.nods} />}
           <div class="section-label with-tool">
             {s('views')}
             <button class="section-tool" onClick={() => setViewEditor({})} title={s('viewEditorTitle')} aria-label={s('viewEditorTitle')}>
