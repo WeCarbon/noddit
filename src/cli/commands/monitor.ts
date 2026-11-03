@@ -17,7 +17,8 @@ import { DEFERRAL_CLOCK, isLatestNoteOwnerFacing, nowStamp, ownedBy, sameAgent, 
 import { isUnclaimedBrief, originalWords } from '../../core/intake.ts'
 import { HEARTBEAT_MS, harnessOf, removeHeartbeat, writeHeartbeat } from '../../core/listeners.ts'
 import { currentTerminal } from '../../core/terminal.ts'
-import { isAuthorListening, recordTidySent, tidyDue, tidyFindings } from '../../core/tidy.ts'
+import { harnessPid, imageName, locateSession, parsePsLine, parseWinProcessLine, sessionPid } from '../../core/session-process.ts'
+import { isNodeListened, recordTidySent, tidyDue, tidyFindings } from '../../core/tidy.ts'
 import type { Decision } from '../../core/types.ts'
 import { refOf as refOfNode } from '../../core/ref.ts'
 import { NOTE_KIND, noteKindKey } from '../../core/format.ts'
@@ -27,75 +28,7 @@ import { t } from '../../i18n/index.ts'
 
 const help = () => t('cli.help.monitor')
 
-interface ProcInfo {
-  ppid: number
-  /** POSIX: the image name only (`ps -o comm=`). Windows: the full command
-   *  line — CIM gives us that directly, so there's no second lookup. */
-  comm: string
-}
-
-/** `ps -o ppid=,comm=` for one pid, as `ps` prints it: `1234 node`. */
-export function parsePsLine(line: string): ProcInfo | null {
-  const m = /^(\d+)\s+(.+)$/.exec(line.trim())
-  return m ? { ppid: Number(m[1]), comm: m[2].trim() } : null
-}
-
-/** The one line `WIN_PROCESS_SCRIPT` prints: `1234|C:\...\node.exe --agent-name lane-a`. */
-export function parseWinProcessLine(line: string): ProcInfo | null {
-  const i = line.indexOf('|')
-  if (i === -1) return null
-  const ppid = Number(line.slice(0, i))
-  return Number.isInteger(ppid) ? { ppid, comm: line.slice(i + 1).trim() } : null
-}
-
-/** Windows PowerShell (always present, unlike `wmic` on 24H2+) via CIM —
- *  the closest cross-version equivalent to `ps -o ppid=,comm=,command=`. */
-function winProcessScript(pid: number): string {
-  return `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if ($p) { "$($p.ParentProcessId)|$($p.CommandLine)" }`
-}
-
-/** The image name only, no path or args — approximates `ps`'s `comm=` from
- *  a Windows command line's own first (possibly quoted) token. */
-export function imageName(comm: string): string {
-  const trimmed = comm.trim()
-  if (trimmed.startsWith('"')) return trimmed.slice(1, trimmed.indexOf('"', 1))
-  return trimmed.split(/\s+/)[0] ?? trimmed
-}
-
-/** One ancestor's parent pid + command, or null if it can't be read — no
- *  `ps` on this POSIX box, no PowerShell on this Windows one, pid is gone. */
-function processInfo(pid: number, platform: NodeJS.Platform = process.platform): ProcInfo | null {
-  try {
-    if (platform === 'win32') {
-      const out = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', winProcessScript(pid)], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim()
-      return out ? parseWinProcessLine(out) : null
-    }
-    const out = execFileSync('ps', ['-o', 'ppid=,comm=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-    return out ? parsePsLine(out) : null
-  } catch {
-    return null
-  }
-}
-
-/** The Claude Code process this monitor runs under — walks up to the first `claude` in the process tree. */
-function locateSession(): { pid: number; info?: ProcInfo } {
-  let pid = process.ppid
-  // No `ps`/PowerShell reachable: the loop gives up and the session counts as the lead.
-  for (let i = 0; i < 8 && pid > 1; i++) {
-    const info = processInfo(pid)
-    if (!info) break
-    if (/(^|[\\/])claude(\.exe|\.cmd)?$/i.test(imageName(info.comm))) return { pid, info }
-    pid = info.ppid
-  }
-  return { pid: process.ppid }
-}
-
-function sessionPid(): number {
-  return locateSession().pid
-}
+export { imageName, parsePsLine, parseWinProcessLine }
 
 /** The `--agent-name` a teammate session's agent process was started with; undefined for a lead. */
 export function teammateName(command: string): string | undefined {
@@ -234,7 +167,14 @@ function nodeLine(e: ChangeEvent): string {
         ? t('cli.monitor.ownerReopened')
         : t('cli.monitor.ownerKind', { kind: kindLabel(e.kind) })
   const text = flat(e.text)
-  return `${e.ref} ${t('cli.monitor.line', { what, title: e.title })}${text ? ` —— ${text}` : ''}  since=${e.at}`
+  return `${e.ref} ${t('cli.monitor.line', { what, title: e.title })}${text ? ` —— ${text}` : ''} ${nextStepFor(e)}  since=${e.at}`
+}
+
+/** What the agent does about an owner event — every line carries its own next step. */
+function nextStepFor(e: Pick<ChangeEvent, 'event' | 'kind' | 'ref'>): string {
+  if (e.kind === NOTE_KIND.deferred) return t('cli.monitor.nextDeferred', { ref: e.ref })
+  if (e.kind === NOTE_KIND.undeferred) return t('cli.monitor.nextUndeferred', { ref: e.ref })
+  return t('cli.monitor.nextRead', { ref: e.ref })
 }
 
 function alive(pid: number): boolean {
@@ -443,7 +383,7 @@ export async function run(args: Args): Promise<number> {
         for (const e of sourceEventsSince(store, cursor)) {
           if (e.kind === 'gone' || !mySource(e.project, e.source)) continue
           const what = e.kind === 'new' ? t('cli.monitor.sourceNew') : t('cli.monitor.sourceChanged')
-          const text = `${e.projectLetter}·${e.source}#${e.id} ${t('cli.monitor.line', { what, title: flat(e.title) })}${e.state ? ` [${e.state}]` : ''}${e.url ? ` ${e.url}` : ''}  since=${e.at}`
+          const text = `${e.projectLetter}·${e.source}#${e.id} ${t('cli.monitor.line', { what, title: flat(e.title) })}${e.state ? ` [${e.state}]` : ''}${e.url ? ` ${e.url}` : ''} ${t('cli.monitor.nextSource', { source: e.source, id: e.id })}  since=${e.at}`
           emit(`s|${e.project}|${e.source}|${e.id}|${e.kind}|${e.at}`, e.at, text, { ...e, event: `source_${e.kind}`, since: e.at })
         }
       }
@@ -469,7 +409,7 @@ export async function run(args: Args): Promise<number> {
         process.stdout.write(
           asJson
             ? `${JSON.stringify({ event: 'unclaimed', ref: refOfNode(d), id: d.id, project: d.project, title: d.title, author: d.author, minutes: mins })}\n`
-            : `DECS-UNCLAIMED ${t('cli.monitor.unclaimed', { ref: refOfNode(d), duration: durationText(age), title: d.title, author: d.author })}\n`,
+            : `DECS-UNCLAIMED ${t('cli.monitor.unclaimed', { ref: refOfNode(d), duration: durationText(age), title: d.title, author: d.author })} ${t('cli.monitor.nextUnclaimed', { ref: refOfNode(d) })}\n`,
         )
       }
     } catch (err) {
@@ -505,7 +445,7 @@ export async function run(args: Args): Promise<number> {
           process.stdout.write(
             asJson
               ? `${JSON.stringify({ event: 'checkin', ref: refOfNode(d), id: d.id, project: d.project, asked: asked.asked, unanswered: asked.unanswered })}\n`
-              : `NODDIT-CHECKIN ${refOfNode(d)} ${t('cli.monitor.checkin', { duration: durationText(sinceMs) })}\n`,
+              : `NODDIT-CHECKIN ${refOfNode(d)} ${t('cli.monitor.checkin', { duration: durationText(sinceMs), ref: refOfNode(d) })}\n`,
           )
         }
       } catch (err) {
@@ -543,7 +483,7 @@ export async function run(args: Args): Promise<number> {
     // before the push span.
     try {
       const items = store.all()
-      const findings = tidyFindings(items, (d, name) => isAuthorListening(store.layoutOf(d).projectRoot, name))
+      const findings = tidyFindings(items, (d, name) => isNodeListened(store.layoutOf(d).projectRoot, d, name))
       const byKey = new Map(items.map((d) => [`${d.project}#${d.id}`, d]))
       const findingsOf = (l: Layout) => {
         const project = store.projectName(l)
@@ -598,7 +538,7 @@ export async function run(args: Args): Promise<number> {
   try {
     for (const d of store.queue({ author })) {
       const text = t('cli.monitor.notCollected', { what: d.answer?.choice ? t('cli.monitor.repliedChoice', { choice: d.answer.choice }) : t('cli.monitor.hasReply') })
-      emit(`q|${d.project}|${d.id}`, nowStamp(), `${t('cli.monitor.queued', { ref: refOfNode(d), title: d.title, text })}  since=${cursor}`, {
+      emit(`q|${d.project}|${d.id}`, nowStamp(), `${t('cli.monitor.queued', { ref: refOfNode(d), title: d.title, text })} ${t('cli.monitor.nextRead', { ref: refOfNode(d) })}  since=${cursor}`, {
         event: 'queued', ref: refOfNode(d), id: d.id, project: d.project, title: d.title, choice: d.answer?.choice ?? null, since: cursor,
       })
     }
@@ -610,9 +550,11 @@ export async function run(args: Args): Promise<number> {
   // Computed once: the terminal a monitor runs in doesn't change over its life, and finding
   // Terminal.app's tty walks the process tree, which is wasted work on every 30s heartbeat.
   const terminal = currentTerminal()
+  const harness = harnessPid()
   const beat = () =>
     writeHeartbeat(listenerKey, {
       pid: process.pid,
+      ...(harness ? { session_pid: harness } : {}),
       roots: store.layouts.map((l) => l.projectRoot),
       author: author ?? nodditEnv('AUTHOR') ?? null,
       harness: harnessOf(),
@@ -655,7 +597,7 @@ export async function run(args: Args): Promise<number> {
     runSyncs()
     pass()
     if (idleExitMs > 0 && Date.now() - lastEventAt >= idleExitMs) {
-      process.stdout.write(`DECS-IDLE ${t('cli.monitor.idle', { duration: durationText(idleExitMs) })}\n`)
+      process.stdout.write(`DECS-IDLE ${t('cli.monitor.idle', { duration: durationText(idleExitMs), command: bool(args, 'mine') || one(args, 'author') ? 'nod monitor --mine' : 'nod monitor' })}\n`)
       process.exit(0)
     }
   }, interval)

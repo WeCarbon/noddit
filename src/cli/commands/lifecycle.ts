@@ -2,9 +2,9 @@ import { deferUntil } from './defer.ts'
 import { untilDay } from '../../core/fuzzy-date.ts'
 import { nowStamp } from '../../core/store.ts'
 import { dayText } from '../../i18n/time.ts'
-import { statusLabel } from '../../core/status.ts'
+import { isDeferred, statusLabel } from '../../core/status.ts'
 import { bool, many, one, optionsAndDefault, questionsFromArgs, type Args } from '../args.ts'
-import { guardOtherAuthor, readStdin, requireDecision, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
+import { guardOtherAuthor, readStdin, rememberStarted, requireDecision, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
 import { isHumanTask } from '../../core/assignee.ts'
 import { refOf } from '../../core/ref.ts'
 import { dim, toJSON } from '../../core/render.ts'
@@ -61,6 +61,7 @@ export async function run(args: Args, verb = ''): Promise<number> {
     }
     warnOtherAuthor(next.author, refOf(next), next.claimedBy)
     report(args, next, t('cli.lifecycle.waitingOnOwner', { count: next.options.length }))
+    if (!bool(args, 'json') && shellRole() === 'agent') console.log(dim(t('cli.lifecycle.askNext')))
     return 0
   }
 
@@ -71,9 +72,15 @@ export async function run(args: Args, verb = ''): Promise<number> {
     if (verb === 'start') {
       // The owner's own to-do: an agent doesn't work on it (`--force` when the owner said so).
       if (isHumanTask(d) && shellRole() === 'agent' && !force) throw new Error(t('cli.lifecycle.humanTask', { ref: refOf(d) }))
+      // The owner put it aside: an agent leaves it until it comes back.
+      if (isDeferred(d) && shellRole() === 'agent' && !force) throw new Error(t('cli.lifecycle.deferredByOwner', { ref: refOf(d) }))
+      const author = shellRole() === 'agent' ? resolveAuthor(args) : undefined
       // Starting a brief is taking it: the same atomic claim as `nod claim`.
-      const node = d.intake ? store.claim(d, resolveAuthor(args), { force }).node : d
-      report(args, store.start(node, { force }), t('cli.lifecycle.started'))
+      const node = d.intake ? store.claim(d, author ?? resolveAuthor(args), { force }).node : d
+      const started = store.start(node, { force })
+      report(args, started, t('cli.lifecycle.started'))
+      if (author && rememberStarted(store, started, author) && !bool(args, 'json') && ref === args._.at(-1))
+        console.log(dim(t('cli.lifecycle.currentNode', { ref: refOf(started) })))
     }
     else if (verb === 'hold' && bool(args, 'off')) {
       const role = shellRole()

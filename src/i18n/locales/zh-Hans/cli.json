@@ -22,16 +22,16 @@
   },
   "help": {
     "approved": "nod approved <id> --check <path>\n\n检查 <path> 现在的内容，和负责人批准这个节点时记下的哈希是否一致。\n发送任何用 `nod attach --approval-content` 标过的内容之前，先跑这个——\n不一致，或者从没被批准过，就不要发。\n\n  --json\n\n退出码：0 = 一致；2 = 这个节点没有名字匹配的待批准附件、还没被批准过，\n或者负责人的答复不是算批准的那个选项；\n1 = 内容变了，和批准时不一致。原因打在 stderr（或 --json 的 reason 里）。",
-    "steps": "nod steps <id> \"a\" \"b\" \"c\"          定义这个节点的步骤（替换掉已有的）\n\n同一次把所有步骤给全，顺序就是做的顺序。没有哪一步算完成；\n用 nod step <id> <n> 把前 n 步标成完成，并按 n/总数 算百分比。",
-    "step": "nod step <id> <n>                   第 1..n 步算完成了，按 n/总数 换算百分比\n\n  --note \"...\"   补一句这步做了什么（智能体补充，记进正文）\n\n没有 steps 时先 nod steps <id> \"a\" \"b\" … 设置。",
-    "progress": "nod progress <0-100> [\"msg\"]                一次性设定（用 NODDIT_NODE 绑定的节点）\nnod progress --parse pytest                             从 stdin 识别 \"[ 37%]\"，同时把 stdin 原样传到 stdout\nnod progress --regex '(\\d+)/(\\d+)'                      自定义正则，从 stdin 按 N/M 换算成百分比；\n                                                           只有一个捕获组时当成字面百分比\nnod progress --from-file run.log [--parse NAME|--regex R] [--until-exit <pid>] [--idle <ms>]\n                                                           跟着文件增长（像 tail -f），\n                                                           给了 --until-exit 就等那个进程退出，\n                                                           没给就等 --idle 毫秒（默认 5000）没有新内容\nnod progress --count-lines log.txt --total 23            读一次文件当前行数，按 行数/23 算百分比，不跟随增长\n\n  --node <id>     不设就读 NODDIT_NODE（NODDIT_TASK 也认，老名字）；两者都没有就报清楚的错，非零退出\n  --msg \"...\"\n\n内置解析器（--parse）：{{parsers}}；不给 --parse/--regex 时按顺序都试一遍。\n节流：同一个节点最多每 5 秒写一次文件，但最后一次值一定落地（进程退出/文件读完时 flush）。\nstdin 模式按行处理——用 \\r 原地刷新、不换行的进度条不会被实时 tee 出来，只有换行后的那一行会被看到。\n数字一到，待开始的节点自动变执行中——管进 pytest 之前不用再专门 `nod start`。\n给了 --from-file、--parse 和 --regex 都没给时，会自动识别 noddit 的 JSONL\n事件文件（python/docs/progress-events.md——{\"type\":\"start\"|\"progress\"|\"finish\",…}）：\nstart 设定总数/标题，progress 显示 \"3823/10011 · 2 failed\"，finish 落在 100%。",
+    "steps": "nod steps <id> \"a\" \"b\" \"c\"          定义这个节点的步骤（替换掉已有的）\n\n同一次把所有步骤给全，顺序就是做的顺序。没有哪一步算完成；\n用 nod step <id> <n> 把前 n 步标成完成，并按 n/总数 算百分比。\n\n本会话 nod start <id> 之后可以不写 <id>。",
+    "step": "nod step <id> <n>                   第 1..n 步算完成了，按 n/总数 换算百分比\n\n  --note \"...\"   补一句这步做了什么（智能体补充，记进正文）\n\n没有 steps 时先 nod steps <id> \"a\" \"b\" … 设置。\n\n只写 nod step <n> 时，用本会话最近一次 nod start 的节点。",
+    "progress": "nod progress <0-100> [\"msg\"]                一次性设定（用 NODDIT_NODE 绑定的节点）\nnod progress --parse pytest                             从 stdin 识别 \"[ 37%]\"，同时把 stdin 原样传到 stdout\nnod progress --regex '(\\d+)/(\\d+)'                      自定义正则，从 stdin 按 N/M 换算成百分比；\n                                                           只有一个捕获组时当成字面百分比\nnod progress --from-file run.log [--parse NAME|--regex R] [--until-exit <pid>] [--idle <ms>]\n                                                           跟着文件增长（像 tail -f），\n                                                           给了 --until-exit 就等那个进程退出，\n                                                           没给就等 --idle 毫秒（默认 5000）没有新内容\nnod progress --count-lines log.txt --total 23            读一次文件当前行数，按 行数/23 算百分比，不跟随增长\n\n  --node <id>     不设就读 NODDIT_NODE（NODDIT_TASK 也认，老名字）；两者都没有就报清楚的错，非零退出\n  --msg \"...\"\n\n内置解析器（--parse）：{{parsers}}；不给 --parse/--regex 时按顺序都试一遍。\n节流：同一个节点最多每 5 秒写一次文件，但最后一次值一定落地（进程退出/文件读完时 flush）。\nstdin 模式按行处理——用 \\r 原地刷新、不换行的进度条不会被实时 tee 出来，只有换行后的那一行会被看到。\n数字一到，待开始的节点自动变执行中——管进 pytest 之前不用再专门 `nod start`。\n给了 --from-file、--parse 和 --regex 都没给时，会自动识别 noddit 的 JSONL\n事件文件（python/docs/progress-events.md——{\"type\":\"start\"|\"progress\"|\"finish\",…}）：\nstart 设定总数/标题，progress 显示 \"3823/10011 · 2 failed\"，finish 落在 100%。\n\n没给 --node、也没设 NODDIT_NODE 时：用本会话最近一次 nod start 的节点（见 nod start --help）。",
     "move": "nod move <id> --parent <id>     挂到另一个节点下面（连同它的整棵子树）\nnod move <id> --root            变成根节点\n\n编号不变，所有引用照常有效；文件和子节点文件夹一起改名挪过去，\n正文里指向附件的相对链接会跟着改。",
     "search": "nod search <词>... [--all] [--json]     在节点里找字\n\n搜标题、正文（含追问、补充、答复）和附件文件名，不分大小写。几个词都要出现。\n默认只搜 active/；--all 连 archived/ 一起。",
     "supersede": "nod supersede <旧 id> --by <新 id>     旧节点被新节点取代\n\n旧的 → 已关闭（原因 superseded），收进 archived/，正文记一句「被 W304 取代」；\n两边文件头都记下链接（superseded_by / supersedes），get 时双向显示。",
     "tree": "nod tree [<id>] [--all] [--json]     节点树\n\n不给 id：active/ 里的每棵树（--all 连 archived/ 一起）。给 id：以它为根的子树。\n每行：编号 · 状态 · 标题；「等前置」是排在没完成的节点后面，「◆」是这棵子树里有待决策。\n\n  --json   嵌套结构：{ ref, id, status, title, ..., children: [...] }\n\n子节点是一条工作线规划时细化出来的：nod add \"<标题>\" --parent W305。\n挪位置：nod move <id> --parent <id> 或 nod move <id> --root。",
     "monitor": "nod monitor                给 Claude Code 的 Monitor 工具跑——标准用法只有这一条\n\n  Monitor({ command: \"nod monitor\", description: \"nod\", timeout_ms: 1800000 })\n\n  - 开工就挂，不要等到「要等答复」才挂。\n  - 30 分钟到期（或进程退出）后，**原样再挂一次同一条命令**，不用带任何参数：\n    它记得这个会话上次看到哪，中间发生的会先补出来。\n  - 主控会话：只用 `nod monitor`，**不加 --mine**（你替工作线提的节点署的是工作线的名字）。\n  - 子智能体 / 队友只管自己的节点：一律 `nod monitor --mine`。\n    不是自己的节点不处理，那是主控会话的事。\n\n每一行是一件要处理的事：\n  - 负责人的答复、回复（智能体自己写的记录不算）；被回复从归档拉回的节点\n  - 启动时先列出「已答待取」的节点\n  - 外部来源（nod source）新出现、有变化的条目\n  - DECS-UNCLAIMED …：答复超过 5 分钟没人取走（不管 --mine）\n  - DECS-BRIEF …：负责人新派了活——nod claim 接走，展开、拆分，nod ask 请负责人确认；过了 --unclaimed-after 还没人接会再提醒一次（主控会话收到所有派活，--mine 只收自己节点下面的）\n  - NODDIT-TIDY …：这个会话自己的树跟状态对不上，或者只是有一阵子没查了——用 `nod tidy` 看看\n    怎么对不上（nod done / nod close / nod move / 重新规划），或者记一句为什么其实没问题\n  - DECS-ERROR …：读出错，继续盯，不退出\n\n  --mine / --author <s>    只看某个智能体提的（按 · 前面的名字）——只给子智能体用\n                           队友会话（智能体带 --agent-name 启动）不加也自动只看自己的；--all 强制看全部\n  --since <ISO|时长>        从指定时间开始（一般不用：默认接着这个会话上次的位置）\n  --no-sources             不看外部来源\n  --no-sync                不跑来源的同步命令（主控的监听按各自 --every 跑；--mine、--updates\n                           的监听从来不跑；失败记成 DECS-ERROR）\n  --unclaimed-after <时长>  默认 5m\n  --here                   只盯当前目录所在的项目；不在 nod 项目里就直接退出（plugin 自动启动用）\n  --idle-exit <时长>       连续这么久没有任何事件就自己下线（默认 2h，0 = 不下线）\n  --interval <毫秒>        默认 2000\n  --updates                每次写入也报一行——AI 的进度、新建或归档的节点——\n                           格式 DECS-UPDATED <编号>（JSON：event \"updated\"）；给要重画的窗口用\n  --with-parent <pid>      那个进程没了就退出（启动这个监听的窗口）\n  --no-heartbeat           不算在线会话（--updates 的监听本来就不算）\n  --json                   一行一个 JSON",
     "defer": "nod defer <id>...          延迟：后面再做，先从可用/活动/待决里拿掉\nnod defer <id>... --off    解除延迟（同 nod undefer <id>...）\nnod defer <id>... --until 周五  延迟到那天，到了自己回到列表里\n\n不是归档——没做完，只是现在不做。节点的状态（执行中、待决策、等待……）不变，\n解除延迟后原样回来。延迟一个父节点，它下面的整棵子树都不出现在工作列表里。\n看板里按 d 也是这个；「延迟」tab 列出所有延迟的节点。\n\n负责人自己终端里跑算 `human`，Claude Code 的终端里算智能体；\n--human / --agent 改。工作线收到「负责人延迟」就先停手，解除前别动它。\n\n  --until <日期>  到那天开始时自己回来：明天、周五、下周一、3天后、11月15日、\n                  2026-11-15、tomorrow、fri、3d（见 nod date）\n  --off      解除延迟\n  --by <名>  署名（默认负责人 / $NODDIT_AUTHOR）\n  --json",
-    "start": "nod start <id>...              AI 开始做这个节点 → 执行中\n\n  --force   节点还在待决策、或排在没完成的节点后面，也开始",
+    "start": "nod start <id>...              AI 开始做这个节点 → 执行中\n\n  --force   节点还在待决策、或排在没完成的节点后面，也开始\n\n由智能体运行时，最近开始的节点成为本会话的当前节点：之后 nod progress / beat / note /\nsteps / step 不给编号就默认用它，不用 export（设了 NODDIT_NODE 的话仍以它为准）。\n会话按 NODDIT_IDENTITY 区分，没有就按智能体程序自己的会话——共用同一个会话的子智能体\n要写明编号或者设 NODDIT_IDENTITY。只存在本机（$NODDIT_HOME/session-nodes.json），\n同时记下每个节点是哪个会话开始的，nod tidy 靠它分辨还有人在听的节点和没人管的节点。\n\n智能体不能开始负责人自己的事，也不能开始负责人延迟了的节点（负责人让你做的话加 --force）。",
     "done": "nod done <id>... [--note \"…\"]   做完了 → 已完成，收进 archived/\n\n  --note    记一句做了什么（智能体补充）\n  --force   连还在待决策的节点也算做完（很少是对的）\n\n做完以后，排在它后面、早就答复并取走了的节点会自动进入执行中。",
     "close": "nod close <id>... --reason <原因>   不做了 → 已关闭，收进 archived/\n\n  --reason  superseded | obsolete | merged-into:W15 | 任意一句话",
     "hold": "nod hold <编号> --on \"<谁/什么>\" --until <日期>    卡在外部 → 等待\nnod hold <编号> --until <日期>                    已经在等：只改回来看的日子\nnod hold <编号> --off                          其实不是在等外部 → 回到待开始\n\n等同事、客户、供应商，或者等某个服务恢复。等负责人拍板用 nod ask，\n等别的节点用 --after，都不是这个。等待中的节点不算卡住；恢复用 nod start。\n\n每个等待都要有回来看的日子（--until：明天、周五、下周、3天后、11月15日、\n2026-11-15、next week…）。到了那天就「到期」：排在「等待」最上面并标出来，\nnod monitor 会提醒做这个节点的 AI 去问一次。这个规则之前就在等的节点没有日期，算到期。\n\n  nod hold 305 --on \"Carol 回信确认账单金额\" --until 周五",
@@ -40,7 +40,7 @@
     "migrate": "nod migrate —— 把旧的 DECISIONS.md / DECISIONS.old.md 拆进 decisions/\n\n  nod migrate [--dir <项目根>] [--dry-run] [--force]\n  nod migrate --upgrade [--dry-run]         status: open/answered → 节点状态，写回文件；\n                                             老式编号列表的选项（1. 标签：代价）改写成 ### 1 · 标签\n  nod migrate --strip-prefix [--dry-run]    D305-….md → 305-….md，attachments/D305 → 305，改正文链接\n  nod migrate --attachments [--dry-run]     把一个旧的全局 ## 附件 块拆回每条记录真正该\n                                             在的段落（正文或某条追问）——看正文里有没有\n                                             直接提到，没有就看时间，还是看不出来就留在正文下面\n\n  --dir <路径>   从哪个项目根读 DECISIONS.md / DECISIONS.old.md（默认：当前目录）\n  --dry-run      只打印会写什么，什么都不动\n  --force        那个编号的节点文件已经存在时覆盖它\n\n旧文件不会被改动或删除——这里只读它们。",
     "source": "nod source <verb> ...        外部来源：智能体接进来的通知系统\n\nAI 写一个适配器（通常是后台跑的 python，轮询 issue tracker / 邮箱 / 反馈表单……），\n把「有什么」同步进 nod —— 只有 id + title（可选 url/state/from），不同步正文。\n目的是知道外部有哪些来源存在、什么时候有更新，并实时处理，而不是让负责人\n反复问「issues/mail/feedback 是不是都清了」。\n\n给适配器用（也可以从 python 用 subprocess 调）：\n  nod source register <name> --title \"...\" [--kind github|mail|feedback|...]\n                        [--adapter \"python3 ~/…/sync.py\"] [--owner-agent \"...\"]\n                        [--stale-after 15m]\n  nod source register <name> --sync-cmd \"<单次同步命令>\" [--every 10m]\n                                                主控的 nod monitor 开着时按 --every（默认\n                                                10m）跑它——所以只在有会话开着时跑。只存\n                                                在本机（~/.decs/source-sync.json），不进\n                                                decisions/：克隆来的仓库不会执行任何命令。\n                                                --no-sync-cmd 删掉\n  nod source sync <name> < items.jsonl        全量快照：diff 出 new/changed/gone\n  nod source push <name> --id X --title \"...\" [--url] [--state] [--from]\n  nod source heartbeat <name>                 只报活，不带数据\n\nsync/push 的 stdin/参数是同一套 JSON-lines 协议，一行一个对象：\n  {\"id\":\"123\",\"title\":\"...\", \"url\":\"...\", \"state\":\"open\", \"from\":\"someone\"}\n只有 id/title 必填。\n\n给智能体用：\n  nod source list [--json] [--stale]          每个来源：未处理数、卡在谁手上、\n                                                心跳多久前、适配器是不是像挂了\n  nod source items <name> [--unhandled] [--json]\n  nod source ack <name> <id>... [--note \"...\"] [--waiting-on owner|us|<人>|W304]\n                                                处理掉，或者记下现在卡在谁手上\n                                                （W304 这种是节点编号——nod 里决策和\n                                                任务现在统一叫「节点」，共用一套编号，\n                                                前缀是项目字母；裸的 D304/304 也认，\n                                                当老格式处理）\n  nod source wait [<name>] [--timeout <秒>] [--json]\n                                                阻塞到有未处理的 new/changed，打印后退出\n                                                （和 nod wait 一个哲学：不常驻）\n  nod source events [<name>] [--since <ISO>] [--json]\n                                                since 之后的变化（wait 退出时会打印一个 since 游标）\n\n\"清空\"（cleared）= 没有未处理的条目，也没有条目卡在 `owner`/`us`/一个还开着的节点（如 W304）上。\n卡在别人（比如 Bob）名下不算挡着 cleared —— 那是交出去了，不是还欠我们的。",
     "attach": "nod attach <id> <路径或 URL>...\n\n  --link              只记路径，不复制进 decisions/attachments/\n  --name              自定义链接文字（只在附一个东西时有意义）\n  --replace           同名文件直接覆盖最新版，旧版本挪进 .history/，\n                      正文里的链接永远指向最新版；不给这个 flag 时同名\n                      文件会变成 name-2.ext，两个都保留\n  --label \"选项 1\" a.png --label \"选项 2\" b.png\n                      给紧跟着的那个文件分组；同一组在看板里可以\n                      左右切换对比。按出现顺序和文件一一对应——每个\n                      文件前面放一个 --label，别漏、别多\n  --caption \"…\"       同上，给紧跟着的文件配一行说明，显示在图下方\n  --approval-content  标记为「待发出去之前要你批准」的内容，记下\n                      sha256；你在看板里批这个节点时顺带批准它，\n                      之后用 `nod approved <id> --check <path>` 核对\n  --approve-on 1,3    哪些答复算批准这份内容（逗号分隔；子问题写 Q2:1）。\n                      只有一个选项的节点（验收）默认就是那个选项；\n                      有多个选项或子问题时必须给。负责人选了别的，内容\n                      就不算批准\n  --to body|last|<n>|<文字>\n                      落在哪个段落：正文、最新的段落（不分作者）、第 n 个段落\n                      （从 1 数）、或是匹配某个段落标题/时间的文字；默认落在你\n                      自己最新的段落，没有就落正文——先回复、再附证据的工作线\n                      根本不用管这个\n\n截图默认会被复制进 decisions/attachments/<编号>/，因为暂存区\n迟早会被清掉，而验收节点下个月还要看。链接落在它所附的那个段落里——\n正文或某条段落——所以会显示在那条消息下面，不会堆在最后一块。\n图片写成 ![](…)，所以在任何 markdown viewer 里还是直接显示成图。\n\n新一轮：负责人在你上一条之后写过东西，不给 --to 的 attach 不再落回正文——\n会先写一条你自己的短段落（「附件见下。」），文件跟着这一轮。更好的做法是一起写：\n  nod note <编号> \"<这是什么>\" --attach 草稿.html   （或 nod ask … --attach）\n\n  --move <文件> --to <段落>   把已有的附件挪到另一个段落下；文件和批准都不变",
-    "note": "nod note <id> <文字>          追加一段补充；不答复、不归档\n\n  --human           这是负责人本人的回复（会进队列、会把归档的条目拉回来）\n  --agent           这是工作线记的补充（不进队列、不唤醒任何人）\n  --role human|agent\n  --author / --by   署名；`agent` 默认取 --author / NODDIT_AUTHOR / 分支名，`human` 默认 `owner`\n  --heading <词>    段落标题，默认 `human`「回复」、`agent`「补充」\n  --attach <路径|网址>   和这条一起附上文件（可以重复给）；`nod attach` 的\n                    --link/--name/--label/--caption/--approval-content/--approve-on\n                    都适用。文件落在这条自己的段落里，不是另开一个全局的——\n                    跟着来一次 `nod attach --to last` 效果一样，只是分两步\n\n不给 --human/--agent 时看是谁在跑：Claude Code 的终端（设了 CLAUDECODE）\n或 NODDIT_ROLE=agent 算智能体——记下自己做了什么、补一条事实，**不会**进队列，\n也不会唤醒任何人；其余（负责人在自己的终端里敲）算 `human`，会进队列。\nNODDIT_ROLE=human 强制算 `human`。\n\n写出来的段落标题带角色、署名和时间，例如：\n  ## 补充（agent · lead/ship-v2 · 2026-10-28 10:51:30）\n  ## 回复（human · owner · 2026-10-28 11:02:07）",
+    "note": "nod note <id> <文字>          追加一段补充；不答复、不归档\n\n  --human           这是负责人本人的回复（会进队列、会把归档的条目拉回来）\n  --agent           这是工作线记的补充（不进队列、不唤醒任何人）\n  --role human|agent\n  --author / --by   署名；`agent` 默认取 --author / NODDIT_AUTHOR / 分支名，`human` 默认 `owner`\n  --heading <词>    段落标题，默认 `human`「回复」、`agent`「补充」\n  --attach <路径|网址>   和这条一起附上文件（可以重复给）；`nod attach` 的\n                    --link/--name/--label/--caption/--approval-content/--approve-on\n                    都适用。文件落在这条自己的段落里，不是另开一个全局的——\n                    跟着来一次 `nod attach --to last` 效果一样，只是分两步\n\n不给 --human/--agent 时看是谁在跑：Claude Code 的终端（设了 CLAUDECODE）\n或 NODDIT_ROLE=agent 算智能体——记下自己做了什么、补一条事实，**不会**进队列，\n也不会唤醒任何人；其余（负责人在自己的终端里敲）算 `human`，会进队列。\nNODDIT_ROLE=human 强制算 `human`。\n\n写出来的段落标题带角色、署名和时间，例如：\n  ## 补充（agent · lead/ship-v2 · 2026-10-28 10:51:30）\n  ## 回复（human · owner · 2026-10-28 11:02:07）\n\n本会话 nod start <id> 之后可以不写 <id>：nod note \"内容\" 就写到那个节点上。",
     "archive": "nod archive <id>...        这个节点做完了 → 已完成，收进 archived/（同 nod done）\nnod archive <id> --seen    看过了、不用处理 → 记一句然后归档\nnod archive <id> --undo    拿回 active/\n\n  --force   连还没答复的条目也归档（很少是对的）\n\n--seen 是给验收类条目用的：它记下「看过了，不用处理」，然后归档，\n**不进队列**——提出它的工作线不需要为这件事被唤醒。\n\n归档是「我做完了」，不是「我看到了」。看到用 nod read——\n它把条目从队列里划掉，但留在 active/，因为活还没干完。",
     "read": "nod read <id>...        取走这几条更新（nod pop 是同一个命令）\n\n  --mine / --author <s>   只是过滤检查用；id 仍然必须给\n  --peek                  只看不取，不出队\n  --done                  取走并且归档——这件事已经解决、或者不再需要解决\n  --ack \"…\"               取走加回复一步到位：写一条「已收到」加准备怎么处理——\n                          负责人看得到的回复，别图省事跳过\n  --json\n\nid 是必须的。没有「取队列最前面那条」的写法：几条工作线同时在跑的时候，\n盲取会把别人的答复取走，而且是静默丢失。先看队列，再指名取：\n\n  nod queue --mine\n  nod read 415\n\n**取走不等于归档。** read = 「我看到了」，archive = 「我做完了」，\n这两件事常常隔着好几天。做完之后自己收尾：\n\n  nod archive 415\n\n只有读完当场就办完的（例如答复是「不用做了」），才用 --done 一步到位。",
     "watch": "nod watch [flags]        一直跑，把变化往外流\n\n  --mine / --author <s>   只看某个提出者的\n  --json                  一行一个 JSON 事件\n  --dir <项目>            可重复\n\n这个命令**不会退出**，所以它是给人开一个终端窗格看的。\n智能体要等答复请用 `nod wait`——那个拿到答复就退出，\n放进后台终端才会把你唤醒。",
@@ -55,10 +55,10 @@
     "claim": "nod claim <id>          接走负责人派的活，免得别的会话也去展开它\n\n接活是原子的：在节点锁里记下。第二个会话再来接同一个，会被拒绝并告诉它是谁接了（退出码 1）。\n接自己已经接了的，什么也不变。对没人接的派活跑 nod start 或 nod expand 也算接。\n\n  --force   接手别人已经接了的，或者接一个负责人手写的普通节点\n  --json    `{\"ok\": true|false, \"already\": bool, …节点本身：brief、claimed_by、claimed_at、original}`",
     "expand": "nod expand <id> [--title \"<标题>\"] <<'EOF' … EOF\n                        给接到的派活写完整描述\n\n替换「## 原话」上面的描述；原话本身和下面的记录都不动。写清做什么 / 为什么 / 做完的标准，\n假设要标明是假设。然后拆子节点（--parent、--after、--est），再\nnod ask <id> -o 1=\"按计划开始\" 2=\"要改（回复里写怎么改）\"。负责人答 1 之前不开工。\n\n没有「原话」段的节点（负责人手写的短节点），会先把原来的描述挪进一个「原话」段，什么都不丢。\n\n  --title     换个更好的标题（≤ 32 列）\n  --body / --body-file   代替 stdin\n  --json",
     "briefs": "nod briefs [--all] [--json]   负责人派了、还没有 AI 接的活，以及谁在线\n\n派活是负责人用几个字建的节点（nod add --brief，或者负责人自己终端里的裸 nod add），交给 AI 展开。\n「在线」是说这个项目里有主控会话的 nod monitor 在跑；没有的话，派的活要等有会话开起来。\n\n  --all       连已经有人接、还没做完的也列出来\n  --project, -p <名字>\n  --json      `{\"projects\": [{project, letter, root, listening, listeners: [{author, lead, started_at, at}]}], \"briefs\": [节点…]}`",
-    "session": "nod sessions [--json]                     每个项目里有哪些 AI 会话在线\nnod session start [--agent claude|codex|kimi] [--dir <项目>] [--dry-run] [--json]\n                                          在那里开一个新终端窗口，跑这个智能体\nnod session goto [--dir <项目>] [--dry-run] [--json]\n                                          把那个项目主控会话的终端窗口切到前台\n\n会话在线，是说它的 nod monitor 在这个项目里跑着（插件在每个会话里都会自动启动一个）。\n每个监听在 $NODDIT_HOME/sessions/ 下维持一个心跳（pid、署名、所在终端程序、主控还是子智能体、\n开始时间、最后一次心跳）；pid 已经不在或者心跳超过 90 秒的不算。\n\n`session start` 开一个新的前台窗口：macOS 上装了 iTerm2 用 iTerm2，否则用「终端」；Windows 上用\nWindows Terminal，否则 cmd；Linux 上用找到的第一个终端，找不到就把命令打印出来。它在项目的真实根目录\n里启动智能体，第一句话让它去接等着的派活。这里已经有主控会话在线时不开，并说明是谁。\n\n`session goto` 用的是监听心跳记下的终端：iTerm2 按会话 id，「终端」按 tty——只认这两种，\n而且只有记下了才算。合条件的会话不止一个时，挑最近一次心跳的那个。它不开新窗口：会话\n已经不在了，就什么都不做，只说一声。\n\n  --agent     claude（默认，或 $NODDIT_AGENT）| codex | kimi\n  --dry-run   只打印确切的 AppleScript / 命令，什么都不打开\n  --json      `sessions`：`{\"projects\": [{project, letter, root, listening, sessions: [{pid, author, harness, role, started_at, last_seen, terminal?}]}]}`\n              `start`：`{\"ok\": true, \"started\": bool, \"plan\": {agent, root, terminal, command, exec, script?}}`\n                     或 `{\"ok\": false, \"reason\": \"already_listening\", \"session\": {…}}`\n              `goto`：`{\"ok\": true, \"terminal\": {type, id}}` 或 `{\"ok\": false, \"reason\": \"no_terminal_session\" | \"not_found\"}`",
+    "session": "nod sessions [--json]                     每个项目里有哪些 AI 会话在线\nnod session start [--agent claude|codex|kimi] [--dir <项目>] [--dry-run] [--json]\n                                          在那里开一个新终端窗口，跑这个智能体\nnod session goto [--dir <项目>] [--dry-run] [--json]\n                                          把那个项目主控会话的终端窗口切到前台\n\n会话在线，是说它的 nod monitor 在这个项目里跑着（插件在每个会话里都会自动启动一个）。\n每个监听在 $NODDIT_HOME/sessions/ 下维持一个心跳（pid、署名、所在终端程序、主控还是子智能体、\n开始时间、最后一次心跳）；pid 已经不在或者心跳超过 90 秒的不算。\n\n`session start` 开一个新的前台窗口：macOS 上装了 iTerm2 用 iTerm2，否则用「终端」；Windows 上用\nWindows Terminal，否则 cmd；Linux 上用找到的第一个终端，找不到就把命令打印出来。它在项目的真实根目录\n里启动智能体，第一句话让它去接等着的派活。这里已经有主控会话在线时不开，并说明是谁。\n\n`session goto` 用的是监听心跳记下的终端：iTerm2 按会话 id，「终端」按 tty——只认这两种，\n而且只有记下了才算。合条件的会话不止一个时，挑最近一次心跳的那个。它不开新窗口：会话\n已经不在了，就什么都不做，只说一声。\n\n  --agent     claude（默认，或 $NODDIT_AGENT）| codex | kimi\n  --dry-run   只打印确切的 AppleScript / 命令，什么都不打开\n  --json      `sessions`：`{\"projects\": [{project, letter, root, listening, sessions: [{pid, author, harness, role, started_at, last_seen, terminal?}]}]}`\n              `start`：`{\"ok\": true, \"started\": bool, \"plan\": {agent, root, terminal, command, exec, script?}}`\n                     或 `{\"ok\": false, \"reason\": \"already_listening\", \"session\": {…}}`\n              `goto`：`{\"ok\": true, \"terminal\": {type, id}}` 或 `{\"ok\": false, \"reason\": \"no_terminal_session\" | \"not_found\"}`\n\n开新会话由负责人决定——智能体不要自己跑 nod session start。",
     "whoami": "nod whoami [--json]     这个进程现在的身份（core/identity.ts）\n\n每次写入会打在看不见的 `<!-- nod:by=… -->` 标记里（这样 nod monitor 能分清是不是\n自己写的，转记负责人的话时不会反过来推给转记的那个人自己）；也是 --mine 匹配的依据。\n\n  NODDIT_IDENTITY / DECS_IDENTITY   每个智能体设一次就固定住——跟 NODDIT_AGENT\n                                     （nod session start 选 claude/codex/kimi 用的）\n                                     是两个不同的变量\n  没设的话：署名里「 · 」前面的名字（NODDIT_AUTHOR）加上会话 id\n             （CLAUDE_SESSION_ID 或 NODDIT_SESSION）\n\n两个都没有 → 没有身份：写入不带标记，也不会被跳过，--mine 还是只按名字匹配。\n\n  --json    `{identity, explicit, author, session, harness}`",
     "flag": "nod flag <编号> important                   标为很重要：每个列表里排最前，看板上带 ★\nnod flag <编号> milestone --due 2026-11-15   关键时间节点：排最前，倒计时（⚑ 3 天后）\nnod flag <编号> normal                      两个标记都去掉（也可以写 off）\n\n  --due <日期|4h|3d>   里程碑的日期；只写日期就是那天结束\n                       也认模糊日期：周五、下周一、11月15日、next week（见 nod date）\n  --json               输出改完的节点\n  --force              AI 也直接改（负责人在对话里说了）\n\n由负责人来定。AI 运行时（有 CLAUDECODE 或 NODDIT_ROLE=agent）只在节点上记一条建议，\n负责人标了才算。重要就是 urgency high；里程碑是 due 加 milestone: true。",
-    "beat": "nod beat [<id>…] [--note \"…\"]     「我还在做」——算一次 check-in 回复\n\n跟其他写入一样会更新 updated_at、清零 check-in 的问询次数（core/checkins.ts），\n不给 --note 就不留可见记录。不给 <id> 就用 NODDIT_NODE（跟 nod progress 默认取的一样）。\n\n  --note \"…\"    写成一条「心跳」记录，而不是只悄悄更新时间\n  --json",
+    "beat": "nod beat [<id>…] [--note \"…\"]     「我还在做」——算一次 check-in 回复\n\n跟其他写入一样会更新 updated_at、清零 check-in 的问询次数（core/checkins.ts），\n不给 --note 就不留可见记录。不给 <id> 就用 NODDIT_NODE（跟 nod progress 默认取的一样）。\n\n  --note \"…\"    写成一条「心跳」记录，而不是只悄悄更新时间\n  --json\n\nNODDIT_NODE 也没设时：用本会话最近一次 nod start 的节点。",
     "after": "nod after <id> <id>… [--clear]\n\n让节点排在别的节点后面：前面的完成或关闭之前，它排队等着（这期间不算 stale）。--clear 取消排队。",
     "assign": "nod assign <id> me|ai     谁来做\n\n  me   你自己的事：出现在「需要人类」里；智能体不会开始做、不会问进度、不会催，\n       也不会当派活接走——智能体可以替你记一件（「给供应商打电话」）\n  ai   AI 来做（默认）\n\n智能体要把你的事交回给 AI，得加 --force（你说过可以）。\n\n  --json",
     "date": "nod date \"<文字>\" [--json]     模糊日期是哪一天\n\n  明天  后天  下周一  周五  3天后  两周后  下个月  11月15日  15号\n  英文也认：tomorrow、fri、3d、2w、11/15、15 nov、2026-11-15、q1\n\n不给文字：列出几个常用选项。--json 给 `{ date, text, relative, at, suggestions }`，\n窗口可以边输入边预览。--until 和 --due 都用它。",
@@ -81,7 +81,8 @@
     "briefNoOptions": "--brief 只要几个字，交给 AI 展开；不能带选项、子问题或 --fyi",
     "startSession": "{{project}} 没有会话在线。现在在那里开一个 AI 会话？(y/n)",
     "humanTaskIsTask": "--for me 记的是你自己的事：不带选项，不能 --brief，不能 --fyi",
-    "milestoneNeedsDue": "--milestone 要配 --due <日期>"
+    "milestoneNeedsDue": "--milestone 要配 --due <日期>",
+    "taskNext": "下一步：开工时 nod start {{ref}}（之后它就是本会话的当前节点）"
   },
   "check": {
     "letterClash": "项目字母 {{letter}} 被不止一个项目使用——{{letter}}1 这样的引用有歧义；改用项目名引用",
@@ -138,7 +139,7 @@
     "usage": "用法：nod step <id> <第几步>"
   },
   "progress": {
-    "noNode": "没有节点：传 --node <id>，或者先 export NODDIT_NODE=W12（NODDIT_TASK 也认）。",
+    "noNode": "没有节点：传 --node <id>，或者先 nod start <id>（之后本会话默认用它；NODDIT_NODE 也认，而且优先）。",
     "unknownParser": "不认识的解析器 \"{{name}}\"（{{parsers}}）",
     "countLinesNeedsTotal": "--count-lines 要配 --total <N>",
     "noInput": "没有可读的输入：给个百分数（nod progress 45 \"msg\"），或者用管道接 --parse/--regex。"
@@ -178,16 +179,21 @@
     "repliedChoice": "答复 {{choice}}",
     "hasReply": "有回复",
     "queued": "{{ref}} 已答待取：{{title}} —— {{text}}",
-    "idle": "{{duration}}没有新事件，监听下线。要继续盯时再挂 nod monitor。",
+    "idle": "{{duration}}没有新事件，监听下线。之后还要等回复时：Monitor({ command: \"{{command}}\", description: \"nod\", timeout_ms: 1800000 })，到期原样重挂。",
     "brief": "{{ref}} 负责人新派了：{{title}}{{extra}} —— nod claim {{ref}} 接走，展开、拆分后用 nod ask 请负责人确认",
     "briefUnclaimed": "{{ref}} 负责人派的活 {{duration}}没人接：{{title}} —— nod claim {{ref}}",
     "noProjectHere": "不在 nod 项目里——没什么可监听的。cd 进项目，或者加 --all-projects 监听所有登记过的项目。",
-    "checkin": "{{duration}}没更新——用 nod progress / nod note 回报",
+    "checkin": "{{duration}}没更新——用 nod progress / nod note 回报，暂时没新进展就 nod beat {{ref}}",
     "stale_other": "{{count}} 个 stale task——没开始、也不待决策：nod start / nod defer / nod close，或者重新规划",
-    "backFromDeferral": "{{ref}} 延迟到期，回来了：{{title}}",
-    "checkBack": "{{ref}}：到日子了，去问问 {{on}}——{{title}}",
+    "backFromDeferral": "{{ref}} 延迟到期，回来了：{{title}} → 从停下的地方接着做",
+    "checkBack": "{{ref}}：到日子了，去问问 {{on}}——{{title}} → 还在等：nod hold {{ref}} --until <日期>；等到了：nod start {{ref}}",
     "tidy_other": "{{count}} 个节点的状态和它的子树对不上——nod tidy 看看，然后 nod done / nod close / nod move，或者重新规划",
-    "tidyClean": "有一阵子没跑 nod tidy 了——跑一下，确认树还跟状态对得上"
+    "tidyClean": "有一阵子没跑 nod tidy 了——跑一下，确认树还跟状态对得上",
+    "nextRead": "→ nod read {{ref}} --ack \"<你打算怎么做>\"",
+    "nextDeferred": "→ {{ref}} 先停手，等它回来再动",
+    "nextUndeferred": "→ {{ref}} 从停下的地方接着做",
+    "nextUnclaimed": "→ nod read {{ref}} --ack \"…\"，或者交给在做它的人",
+    "nextSource": "→ 处理完 nod source ack {{source}} {{id}}"
   },
   "defer": {
     "undeferred": "已解除延迟",
@@ -211,7 +217,10 @@
     "humanTask": "{{ref}} 是负责人自己的事——智能体不做（负责人让你做的话加 --force）",
     "needUntil": "要加 --until <日期>：回来看的日子（明天、周五、下周、3天后、2026-11-15）",
     "waitingOnUntil": "等 {{on}} · {{date}} 回来看",
-    "holdOff": "回到待开始"
+    "holdOff": "回到待开始",
+    "deferredByOwner": "{{ref}} 被负责人延迟了——回来之前先别动（负责人让你做的话加 --force）",
+    "currentNode": "本会话的当前节点现在是 {{ref}}：nod progress / nod beat / nod note / nod steps 不给编号就写到它上面",
+    "askNext": "答复会作为 nod monitor 的一行到达——不用在对话里再问；先做不依赖它的事"
   },
   "retitle": {
     "usage": "用法：nod retitle 203 \"定价页文案怎么改\""
@@ -301,7 +310,7 @@
     "moved": "{{ref}}：{{name}} 挪到了 {{to}} 下"
   },
   "note": {
-    "whichOne": "哪一个？例如 `nod note 313 \"还有个前提…\"`",
+    "whichOne": "哪一个？例如 `nod note 313 \"还有个前提…\"`——本会话 nod start <id> 之后可以不写编号",
     "nothingToAdd": "没有要加的内容",
     "badRole": "--role 只能是 `human` 或 `agent`",
     "humanOrAgentOnly": "--human 和 --agent 只能给一个",
@@ -326,9 +335,10 @@
     "notQueued": "这些条目不在队列里（没有待取的更新）：{{refs}}\n已经取过了，或者还没被答复。nod get <id> 看它的状态。",
     "cantDoneUnanswered": "{{refs}} 只有回复、还没选选项，--done 不能替它归档。先 nod read 取走；办完了再 nod archive <id> --force",
     "archivedHint": "已归档：{{refs}}（拿回来：nod archive <id> --undo）",
-    "doneNextHint": "做完之后：nod archive {{ids}}",
+    "doneNextHint": "做完之后：nod done {{ids}} --note \"<结果>\"",
     "leftInQueue_other": "队列里还有 {{count}} 条：{{refs}}",
-    "ackHint": "取走了，{{refs}} 还没回复——负责人看得到：这次用 nod note --agent，或下次直接 nod read <id> --ack \"…\""
+    "ackHint": "取走了，{{refs}} 还没回复——负责人看得到：这次用 nod note --agent，或下次直接 nod read <id> --ack \"…\"",
+    "briefNext": "{{ref}} 是派活：答 1 → 按子节点开工；答 2 → 改（再 nod expand {{ref}}、调整子节点），然后再 nod ask {{ref}}"
   },
   "watch": {
     "fileGone": "{{project}}:{{id}} 文件不在了",
@@ -470,7 +480,7 @@
     "done": "{{ref}} 已标为{{what}}"
   },
   "beat": {
-    "whichNode": "改哪个节点？给个 id，或者设 NODDIT_NODE",
+    "whichNode": "改哪个节点？给个 id，或者先 nod start <id>（NODDIT_NODE 也认）",
     "done": "还在做"
   },
   "after": {
@@ -537,7 +547,7 @@
     "kind": {
       "childrenDone": "子节点都做完了——nod done，或者补上还缺的子节点",
       "openChildren": "已完成，但有个子节点还开着——关掉/挪走那个子节点，或者重新打开这个",
-      "orphanedAuthor": "执行中，但 {{author}} 没有在线监听——接手，或者在还在线的身份下重新 nod start"
+      "orphanedAuthor": "执行中，但已经没人在听它了（{{author}} 的监听和开始它的会话都不在了）——在线的会话 nod start {{ref}} 接手，或者 nod hold / nod close"
     }
   }
 }

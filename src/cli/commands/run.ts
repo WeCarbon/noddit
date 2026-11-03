@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { bool, one, type Args } from '../args.ts'
-import { guardOtherAuthor, requireDecision, resolveAuthor, resolveStore } from '../context.ts'
+import { guardOtherAuthor, rememberStarted, requireDecision, resolveAuthor, resolveStore } from '../context.ts'
 import { createEventTracker, finishSummary, type FinishEvent } from '../../core/events.ts'
 import { createThrottle } from '../../core/progress.ts'
 import { refOf } from '../../core/ref.ts'
@@ -110,6 +110,7 @@ export async function run(args: Args): Promise<number> {
   const author = resolveAuthor(args)
   const force = bool(args, 'force')
   let node: Decision = store.start(d0, { force })
+  rememberStarted(store, node, author)
 
   const explicitEvents = one(args, 'events')
   const eventsPath = explicitEvents ?? mkEventsPath()

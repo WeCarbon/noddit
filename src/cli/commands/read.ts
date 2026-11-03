@@ -83,6 +83,7 @@ export function run(args: Args): number {
   console.log(delivered.map(describe).join('\n\n'))
   if (done) console.log(dim(`\n${t('cli.read.archivedHint', { refs: delivered.map((d) => refOf(d)).join(' ') })}`))
   else console.log(dim(`\n${t('cli.read.doneNextHint', { ids: delivered.map((d) => d.id).join(' ') })}`))
+  for (const d of delivered) if (d.intake && d.answer) console.log(dim(t('cli.read.briefNext', { ref: refOf(d) })))
   // The owner can see a reply; collecting without one is easy to forget (N47).
   if (!ack) console.log(dim(`\n${t('cli.read.ackHint', { refs: delivered.map((d) => refOf(d)).join(' ') })}`))
 

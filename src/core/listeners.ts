@@ -13,6 +13,8 @@ import type { SessionTerminal } from './terminal.ts'
 export interface Listener {
   /** The monitor process — a file whose pid is gone doesn't count. */
   pid: number
+  /** The agent harness process the monitor runs under (see `harnessPid`), when one was found. */
+  session_pid?: number
   roots: string[]
   /** `--mine` / teammate monitors watch one author's nodes; a lead's (null) watches everything. */
   author: string | null

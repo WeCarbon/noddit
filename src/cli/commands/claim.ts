@@ -1,5 +1,5 @@
 import { bool, type Args } from '../args.ts'
-import { requireDecision, resolveAuthor, resolveStore } from '../context.ts'
+import { rememberStarted, requireDecision, resolveAuthor, resolveStore } from '../context.ts'
 import { refOf } from '../../core/ref.ts'
 import { dim, toJSON } from '../../core/render.ts'
 import { ClaimedError, roleOf } from '../../core/store.ts'
@@ -21,7 +21,9 @@ export function run(args: Args): number {
   // Briefs, and nodes the owner wrote by hand; an agent's node is that agent's.
   if (!d.intake && roleOf(d.author) !== 'human' && !force) throw new Error(t('cli.claim.notABrief', { ref: refOf(d), author: d.author }))
   try {
-    const { node, already } = store.claim(d, resolveAuthor(args), { force })
+    const author = resolveAuthor(args)
+    const { node, already } = store.claim(d, author, { force })
+    rememberStarted(store, node, author)
     if (asJson) console.log(JSON.stringify({ ok: true, already, ...toJSON(node) }))
     else {
       console.log(already ? t('cli.claim.alreadyYours', { ref: refOf(node) }) : t('cli.claim.claimed', { ref: refOf(node) }))

@@ -105,7 +105,10 @@ export async function run(args: Args): Promise<number> {
     return 0
   }
   if (bool(args, 'json')) console.log(JSON.stringify(toJSON(d)))
-  else console.log(`${refOf(d)}  ${d.file}`)
+  else {
+    console.log(`${refOf(d)}  ${d.file}`)
+    if (input.task && !assignee && !cliOptions.length && shellRole() === 'agent') console.error(dim(t('cli.send.taskNext', { ref: refOf(d) })))
+  }
   if (bool(args, 'notify')) notify(d)
   return 0
 }

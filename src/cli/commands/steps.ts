@@ -1,5 +1,5 @@
 import { bool, one, type Args } from '../args.ts'
-import { requireDecision, resolveAuthor, resolveStore } from '../context.ts'
+import { hasSessionNode, looksLikeRef, requireDecision, resolveAuthor, resolveStore, sessionNode } from '../context.ts'
 import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
 import { currentStepLabel, makeSteps, markStep, parseSteps, stepProgress } from '../../core/steps.ts'
@@ -19,11 +19,15 @@ export async function run(args: Args, verb = ''): Promise<number> {
     console.log(HELP_KEYS[verb] ? help(verb) : helpAll())
     return 0
   }
-  const [ref, ...rest] = args._
-  if (!ref) throw new Error(`${t('cli.lifecycle.whichNode')}\n\n${help(verb)}`)
+  // `nod steps "a" "b"` / `nod step 2`: no id in front means this session's node.
+  const implicit = hasSessionNode() && (verb === 'step' ? args._.length === 1 : !args._.length || !looksLikeRef(args._[0]))
+  const ref = implicit ? undefined : args._[0]
+  const rest = implicit ? args._ : args._.slice(1)
+  if (!ref && !implicit) throw new Error(`${t('cli.lifecycle.whichNode')}\n\n${help(verb)}`)
 
   const store = resolveStore(args, { allowRegistry: true })
-  const d = requireDecision(store, ref, args)
+  const d = ref ? requireDecision(store, ref, args) : sessionNode(store, args)
+  if (!d) throw new Error(`${t('cli.lifecycle.whichNode')}\n\n${help(verb)}`)
 
   let next
   if (verb === 'steps') {

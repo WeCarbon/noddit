@@ -353,7 +353,7 @@ test('decs monitor prints one line per owner reply or answer, never an agent rec
   await settle()
   const lines = out.trim().split('\n').filter(Boolean)
   assert.equal(lines.length, 1, out)
-  assert.match(lines[0], /^X1 owner Reply: should we ship —— wait for Carol's reply first  since=\S+$/)
+  assert.match(lines[0], /^X1 owner Reply: should we ship —— wait for Carol's reply first → nod read X1 --ack "<what you'll do>"  since=\S+$/)
 
   // re-arming with the last since= replays nothing already seen, but picks up what happened while no monitor ran
   const since = lines[0].split('since=')[1]
@@ -394,7 +394,7 @@ test('decs monitor --mine still reports an answer nobody collected on a node fil
   const lines = out.trim().split('\n').filter((l) => l.startsWith('DECS-UNCLAIMED'))
   assert.equal(lines.length, 1, out)
   // The exact span (dayjs-formatted, "a few seconds" for anything under a minute) isn't the point here.
-  assert.match(lines[0], /^DECS-UNCLAIMED X1 answered .*ago, not collected: check the mail \(proposed by mail-deliv · check delivery\)$/)
+  assert.match(lines[0], /^DECS-UNCLAIMED X1 answered .*ago, not collected: check the mail \(proposed by mail-deliv · check delivery\) → nod read X1 --ack "…", or hand it to whoever is on it$/)
 })
 
 test('decs add under another agent\'s name warns that --mine will not see it', (t) => {
@@ -448,6 +448,18 @@ test('decs monitor goes offline by itself after --idle-exit with no events, sayi
   const code = await new Promise<number | null>((r) => child.on('exit', r))
   assert.equal(code, 0)
   assert.match(out, /^DECS-IDLE .*monitor going offline/m)
+  // The line carries the exact call to arm it again.
+  assert.match(out, /Monitor\(\{ command: "nod monitor", description: "nod", timeout_ms: 1800000 \}\)/)
+
+  const mine = spawn(process.execPath, [BIN, 'monitor', '--mine', '--idle-exit', '1s', '--interval', '200', '--no-sources'], {
+    cwd: root,
+    env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'lane-a · x', CLAUDECODE: '1', DECS_HOME: join(root, 'home') },
+  })
+  let mineOut = ''
+  mine.stdout.on('data', (b) => (mineOut += b))
+  t.after(() => killAndWait(mine))
+  await new Promise<number | null>((r) => mine.on('exit', r))
+  assert.match(mineOut, /command: "nod monitor --mine"/, 'a --mine monitor is re-armed with --mine')
 })
 
 test('a teammate session is recognised from its agent process arguments', async () => {

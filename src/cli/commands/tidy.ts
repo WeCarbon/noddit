@@ -3,7 +3,7 @@ import { refOf } from '../../core/ref.ts'
 import { alignRow, cyan, dim, toJSON, yellow } from '../../core/render.ts'
 import { statusLabel } from '../../core/status.ts'
 import { ownedBy } from '../../core/store.ts'
-import { isAuthorListening, recordTidyAck, tidyFindings, type TidyFinding } from '../../core/tidy.ts'
+import { isNodeListened, recordTidyAck, tidyFindings, type TidyFinding } from '../../core/tidy.ts'
 import type { Decision } from '../../core/types.ts'
 import { bool, one, type Args } from '../args.ts'
 import { resolveAuthor, resolveStore } from '../context.ts'
@@ -26,7 +26,7 @@ export async function run(args: Args): Promise<number> {
   const author = one(args, 'author') ?? (bool(args, 'mine') ? resolveAuthor(args) : undefined)
 
   const items = store.all()
-  const findings = tidyFindings(items, (d, name) => isAuthorListening(store.layoutOf(d).projectRoot, name))
+  const findings = tidyFindings(items, (d, name) => isNodeListened(store.layoutOf(d).projectRoot, d, name))
   // A node can carry more than one finding at once (e.g. its children are all
   // done AND its author has no live monitor) — key by node, value is every
   // finding on it, never just the last one written.
@@ -66,7 +66,7 @@ export async function run(args: Args): Promise<number> {
   }
   const lines: string[] = []
   const markOf = (f: TidyFinding): string => {
-    const text = t(`cli.tidy.kind.${f.kind}`, { author: f.author ?? '' })
+    const text = t(`cli.tidy.kind.${f.kind}`, { author: f.author ?? '', ref: f.ref })
     return yellow(` ◆ ${text}`)
   }
   const draw = (d: Decision, prefix: string, last: boolean, top: boolean) => {

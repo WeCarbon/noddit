@@ -227,7 +227,7 @@ test('decs monitor tells the lane "owner Deferred", and nothing is queued', asyn
   await new Promise((r) => setTimeout(r, 500))
   const lines = out.trim().split('\n').filter(Boolean)
   assert.equal(lines.length, 1, out)
-  assert.match(lines[0], new RegExp(`^X1 owner Deferred: run the gate —— ${NOTE_TEXT.deferred}  since=\\S+$`))
+  assert.match(lines[0], new RegExp(`^X1 owner Deferred: run the gate —— ${NOTE_TEXT.deferred} → stop work on X1 until it comes back  since=\\S+$`))
   assert.equal(decs(root, ['queue']).includes('X1'), false)
   assert.match(decs(root, ['get', '1']), /In progress · Deferred/)
 })

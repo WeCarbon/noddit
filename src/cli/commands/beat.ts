@@ -1,6 +1,5 @@
 import { bool, one, type Args } from '../args.ts'
-import { guardOtherAuthor, requireDecision, resolveAuthor, resolveStore } from '../context.ts'
-import { nodditNodeEnv } from '../../core/env.ts'
+import { guardOtherAuthor, hasSessionNode, requireDecision, resolveAuthor, resolveStore, sessionNode } from '../context.ts'
 import { NOTE_KIND } from '../../core/format.ts'
 import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
@@ -20,15 +19,16 @@ export async function run(args: Args): Promise<number> {
     console.log(help())
     return 0
   }
-  const ids = args._.length ? args._ : [nodditNodeEnv()].filter((x): x is string => Boolean(x))
-  if (!ids.length) throw new Error(`${t('cli.beat.whichNode')}\n\n${help()}`)
+  if (!args._.length && !hasSessionNode()) throw new Error(`${t('cli.beat.whichNode')}\n\n${help()}`)
   const note = one(args, 'note')
   const store = resolveStore(args, { allowRegistry: true })
   const author = resolveAuthor(args)
   const asJson = bool(args, 'json')
+  const fallback = args._.length ? undefined : sessionNode(store, args)
+  if (!args._.length && !fallback) throw new Error(`${t('cli.beat.whichNode')}\n\n${help()}`)
+  const nodes = fallback ? [fallback] : args._.map((ref) => requireDecision(store, ref, args))
 
-  for (const ref of ids) {
-    const d = requireDecision(store, ref, args)
+  for (const d of nodes) {
     guardOtherAuthor(store, d, args)
     const next = note ? store.note(d, { text: note, role: 'agent', author, kind: NOTE_KIND.heartbeat }) : store.rewrite(d)
     if (asJson) console.log(JSON.stringify(toJSON(next)))

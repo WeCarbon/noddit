@@ -17,3 +17,6 @@ process.env.TZ = 'Asia/Shanghai'
 process.env.NODDIT_LAUNCH_RECORD ||= join(tmpdir(), `nod-launch-${process.pid}.jsonl`)
 // Never the user's own tabs: a test that edits views points this at a file of its own.
 process.env.NODDIT_VIEWS ||= join(tmpdir(), `nod-views-${process.pid}-absent.json`)
+// Which node each session is on is per user; the suite keeps its own, and never keys it by the session running the suite.
+process.env.NODDIT_SESSION_NODES ||= join(tmpdir(), `nod-session-nodes-${process.pid}.json`)
+delete process.env.CLAUDE_CODE_SESSION_ID

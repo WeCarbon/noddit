@@ -4,8 +4,9 @@
  * three ways a node's own state and its subtree disagree:
  *   (a) `childrenDone` — a non-terminal node whose children all finished.
  *   (b) `openChildren` — a terminal node with a child that hasn't.
- *   (c) `orphanedAuthor` — an in-progress node whose author (a lane/agent,
- *       never the owner) has no live monitor left in this project.
+ *   (c) `orphanedAuthor` — an in-progress node nobody listens for any more:
+ *       no live monitor in this project under its author's name, nor in the
+ *       session that started it (see `isNodeListened`).
  * `tidyFindings` is pure over whatever `Store.all()` already loaded, so
  * tests never touch the filesystem; only `isAuthorLive` is a seam.
  *
@@ -20,6 +21,7 @@ import { parseDuration } from './duration.ts'
 import { ensureGitignoreLines } from './gitignore.ts'
 import { agentNameOf } from './identity.ts'
 import { listenersFor } from './listeners.ts'
+import { namesStartedBy, starterOf } from './session-nodes.ts'
 import { withFileLock, writeFileAtomic } from './lock.ts'
 import type { Layout } from './paths.ts'
 import { refOf } from './ref.ts'
@@ -84,6 +86,23 @@ export function tidyFindings(items: Decision[], isAuthorLive: IsAuthorLive): Tid
 /** Live-listener lookup `tidyFindings`' `isAuthorLive` seam is built from outside the pure function. */
 export function isAuthorListening(projectRoot: string, name: string, now = Date.now()): boolean {
   return listenersFor(projectRoot, now).some((l) => l.author && agentNameOf(l.author) === name)
+}
+
+/**
+ * Whether someone still listens for in-progress `d`: a live monitor signed
+ * with its author's (or its starter's) name, or a live monitor running in
+ * the very session that started it. The lead's monitor carries no name, so
+ * it covers what its session started — and, by the names that session has
+ * started nodes under, the other nodes it signed the same way.
+ */
+export function isNodeListened(projectRoot: string, d: Pick<Decision, 'id' | 'author'>, name: string, now = Date.now()): boolean {
+  const live = listenersFor(projectRoot, now)
+  const starter = starterOf(projectRoot, d.id)
+  const names = new Set([name, ...(starter?.name ? [starter.name] : [])])
+  if (live.some((l) => l.author && names.has(agentNameOf(l.author) ?? ''))) return true
+  return live.some(
+    (l) => l.session_pid !== undefined && (l.session_pid === starter?.pid || namesStartedBy(l.session_pid).has(name)),
+  )
 }
 
 // ---------------------------------------------------------------------------

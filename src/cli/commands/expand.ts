@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { bool, one, oneLine, type Args } from '../args.ts'
-import { guardOtherAuthor, readStdin, requireDecision, resolveAuthor, resolveStore } from '../context.ts'
+import { guardOtherAuthor, readStdin, requireDecision, resolveAuthor, resolveStore, shellRole } from '../context.ts'
+import { isHumanTask } from '../../core/assignee.ts'
 import { refOf } from '../../core/ref.ts'
 import { dim, toJSON } from '../../core/render.ts'
 import { assertTitleFits } from '../../core/title.ts'
@@ -23,6 +24,7 @@ export async function run(args: Args): Promise<number> {
 
   const store = resolveStore(args, { allowRegistry: true })
   let d = requireDecision(store, args._[0], args)
+  if (isHumanTask(d) && shellRole() === 'agent' && !bool(args, 'force')) throw new Error(t('cli.lifecycle.humanTask', { ref: refOf(d) }))
   // Expanding an unclaimed brief takes it, atomically, like `nod claim`.
   if (d.intake && !d.claimedBy) d = store.claim(d, resolveAuthor(args)).node
   guardOtherAuthor(store, d, args)

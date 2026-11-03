@@ -1,7 +1,7 @@
 import { bool, many, one, type Args } from '../args.ts'
 import { noteKindKey } from '../../core/format.ts'
 import { refOf } from '../../core/ref.ts'
-import { readStdin, requireDecision, resolveAuthor, resolveStore, shellRole } from '../context.ts'
+import { hasSessionNode, looksLikeRef, readStdin, requireDecision, resolveAuthor, resolveStore, sessionNode, shellRole } from '../context.ts'
 import type { NoteRole } from '../../core/types.ts'
 import { t } from '../../i18n/index.ts'
 
@@ -25,14 +25,18 @@ export async function run(args: Args): Promise<number> {
     console.log(help())
     return 0
   }
-  const [ref, ...rest] = args._
-  if (!ref) throw new Error(t('cli.note.whichOne'))
+  // No id in front (`nod note "text"`, or nothing but a piped body): this session's node.
+  const implicit = !args._.length || !looksLikeRef(args._[0])
+  if (implicit && !hasSessionNode()) throw new Error(t('cli.note.whichOne'))
+  const ref = implicit ? undefined : args._[0]
+  const rest = implicit ? args._ : args._.slice(1)
 
   const text = rest.join(' ') || one(args, 'text') || (await readStdin()).trim()
   if (!text) throw new Error(t('cli.note.nothingToAdd'))
 
   const store = resolveStore(args, { allowRegistry: true })
-  const d = requireDecision(store, ref, args)
+  const d = ref ? requireDecision(store, ref, args) : sessionNode(store, args)
+  if (!d) throw new Error(t('cli.note.whichOne'))
 
   const explicitBy = one(args, 'by')
   const roleFlag = one(args, 'role')
@@ -74,9 +78,9 @@ export async function run(args: Args): Promise<number> {
         }
       : undefined,
   })
-  // A note like 「等 Dave 推新版」 leaves the node 执行中, and the bench
+  // A note like 「等 Dave 推新版」 or "waiting on Dave" leaves the node 执行中, and the bench
   // never shows it is held up outside. Point at hold.
-  if (role === 'agent' && next.state === 'in_progress' && /(^|[，。；：:])\s*(在等|等(?!待))\s?[^\s，。]{1,20}/.test(text)) {
+  if (role === 'agent' && next.state === 'in_progress' && (/(^|[，。；：:])\s*(在等|等(?!待))\s?[^\s，。]{1,20}/.test(text) || /\b(waiting (on|for)|blocked on)\b/i.test(text))) {
     process.stderr.write(`${t('cli.note.holdHint', { ref: refOf(next), id: next.id })}\n`)
   }
   const revived = d.archived && !next.archived

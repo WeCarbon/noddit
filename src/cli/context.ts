@@ -2,11 +2,13 @@ import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { readProjects } from '../core/config.ts'
-import { nodditEnv } from '../core/env.ts'
+import { nodditEnv, nodditNodeEnv } from '../core/env.ts'
 import { findLayout, layoutFor, type Layout } from '../core/paths.ts'
+import { currentNode, recordStarted } from '../core/session-nodes.ts'
+import { isTerminal } from '../core/status.ts'
 import { Store, sameAgent } from '../core/store.ts'
 import type { Decision, NoteRole } from '../core/types.ts'
-import { refOf } from '../core/ref.ts'
+import { parseRef as parseRefStrict, refOf } from '../core/ref.ts'
 import { bool, many, one, type Args } from './args.ts'
 import { list, t } from '../i18n/index.ts'
 
@@ -89,6 +91,40 @@ export function shellRole(env: NodeJS.ProcessEnv = process.env): NoteRole {
 
 export function requireDecision(store: Store, raw: string, args: Args) {
   return store.resolve(raw, one(args, 'project', 'p'))
+}
+
+/** Whether a node id was given some way other than as a positional: `NODDIT_NODE`, or this session's `nod start`. */
+export function hasSessionNode(): boolean {
+  return Boolean(nodditNodeEnv() || currentNode())
+}
+
+/**
+ * The node a command means when no id is given: `NODDIT_NODE` (or its
+ * older names) first, else the one this session last ran `nod start` on —
+ * as long as it is still open in this store.
+ */
+export function sessionNode(store: Store, args: Args): Decision | undefined {
+  const fromEnv = nodditNodeEnv()
+  if (fromEnv) return requireDecision(store, fromEnv, args)
+  const cur = currentNode()
+  if (!cur) return undefined
+  const d = store.all().find((x) => x.id === cur.id && store.layoutOf(x).projectRoot === cur.root)
+  return d && !isTerminal(d.state) ? d : undefined
+}
+
+/** `raw` reads as a node id (`305`, `W305`, `web:305`) rather than free text. */
+export function looksLikeRef(raw: string): boolean {
+  try {
+    parseRefStrict(raw)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** `nod start` / `nod claim`: remember `d` as this session's current node and its starter. */
+export function rememberStarted(store: Store, d: Decision, author: string | undefined): boolean {
+  return recordStarted({ id: d.id, ref: refOf(d), root: store.layoutOf(d).projectRoot }, author)
 }
 
 /**
