@@ -17,6 +17,7 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 |---|---|
 | 还没有 `decisions/` | `nod init` |
 | 新建节点 / 子节点 | `nod add "<标题>" [--task] [--parent <id>] [--after <id>] [--est 30m] [--due 周五] [--every 3d]`；计划里还没开始的步骤都建成子节点。`--est` 是负责做的那一方的时间（`--for me` 是负责人的，其余是 AI 的）；`--due` 到期日；`--every` 是 R（「延迟 R 天」的快捷量）。建好以后改用 `nod edit <id> --est / --due / --every`（`off` 清掉） |
+| AI 提醒负责人 | `nod add --remind "周五下午2点" "<到点要告诉负责人什么>"`——不是负责人自己的事，`--for me` 不行；到点 `nod monitor` 发 `NODDIT-REMIND`（下一步：告诉负责人，然后 `nod done`），app 也通知负责人。改时间 / 取消：`nod edit <id> --remind <时间>\|off` |
 | 补一条记录 / 转记 owner 的话 | `nod note <id> --agent "…"` / `nod note <id> --human --by "owner（对话里说，<你> 转记）" "…"` |
 | 开始 / 做完 / 不做了 | `nod start` / `nod done --note` / `nod close --reason` |
 | 要 owner 拍板 / 再看一眼 | `nod ask <id> -o 1="…" 2="…"` / `nod ask <id>`；每个选项写清选了会怎样（花多久、谁来做、放弃什么、风险、能不能反悔）和推荐哪个、为什么——`-o` 只放短标签，说明用 heredoc 写在正文里，每个选项一节 `### 1 · <标签>`（app 把它挪到选项卡片上） |
@@ -60,6 +61,9 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 - **做完自己标完成，不要等别人**：活合进去、检查（测试/gate）通过，当场 `nod done <id> --note "<结果、提交>"`。
   核对的人发现不对，用 `nod start <id>` 重新打开——核对不等于收尾。派子 agent 时**不要**写「做完别标完成、等我核对」；
   lead 合并前用 `nod tree <上层节点>` 把每个子节点的状态对一遍，子 agent 自己建的子节点也要关掉。
+- **提醒负责人是 AI 的活，不是 `--for me`**：「提醒我」「告诉我」「汇报」的主语是 AI，不是负责人亲手做的事。
+  对：`nod add --remind "周五下午2点" "提醒负责人明天的访谈"`——到点 monitor 发 `NODDIT-REMIND`，app 也会通知负责人；
+  错：`nod add --for me "提醒我明天的访谈"`——这记成了负责人自己要做的事，没人会在周五替他提醒。
 - 标题 ≤ 32 列（约 16 个汉字），只写「要决什么 / 要做什么」，细节放正文。
 - 正文用 heredoc 喂给 `nod add`；正文里写了 `## 选项` 就要和 `-o` 一致。
 - owner 在对话里的话，回复前先 `nod note <id> --human --by "owner（对话里说，<你> 转记）"`。

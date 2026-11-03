@@ -28,6 +28,10 @@ how? `nod <command> --help`; for the details, load the nod skill.
   `nod after <id> <that>`. A chat message, HANDOFF.md or a note alone is
   invisible to them. Work you set aside isn't 「in progress」 — close it or
   ask.
+- **`--for me` is only what the owner does by hand** — reminding, reporting
+  to, or notifying the owner is an AI's job (`nod add --remind <time>
+  "<what>"`), never their to-do. Relaying a brief: pass on the owner's own
+  words and facts, don't pick the nod command for whichever AI picks it up.
 - **Whoever finishes a node closes it**: once merged and the gate passes,
   `nod done <id> --note "<result, commit>"` right away. When delegating,
   never tell a sub-agent "don't mark it done". Before merging, the lead
