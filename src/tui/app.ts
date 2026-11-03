@@ -493,6 +493,20 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     startText('delay')
   }
 
+  /** `s`: picks the node up. Already running or finished says so; needing a decision or an unmet `after` refuses with the store's own reason. */
+  const startNode = () => {
+    if (!current) return
+    if (current.state === 'in_progress' || current.state === 'decided' || isTerminal(current.state))
+      return say(t('bench.toast.alreadyPendingChange', { ref: refOf(current), status: statusLabel(current.state) }))
+    try {
+      const started = store.start(current, {})
+      say(t('bench.toast.started', { ref: refOf(started) }))
+    } catch (e) {
+      return say((e as Error).message)
+    }
+    reload()
+  }
+
   /** 「延迟 R 天」 (`D`): to today + the node's R; a wait keeps its who. */
   const delayEvery = () => {
     if (!current) return
@@ -1121,6 +1135,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (input === 'i') return enterDetail()
     if (input === 'd') return toggleDefer()
     if (input === 'D') return delayEvery()
+    if (input === 's' || input === 'S') return startNode()
     if (input === 'H') {
       const idx = firstHtmlAttachmentIndex(current)
       if (idx === -1) return say(t('bench.toast.noHtmlAttachment'))
