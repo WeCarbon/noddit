@@ -36,28 +36,29 @@ export function NodCalendar({ history, onClose }: { history: NodsDay[]; onClose:
     <div class="overlay" onClick={onClose}>
       <div class="nod-cal" onClick={(e) => e.stopPropagation()}>
         <h3>{s('nodsCalendarTitle')}</h3>
-        <div class="nod-cal-chart">
-          <div class="nod-cal-weekdays">
-            {WEEKDAY_ROWS.map((n) => (
-              <span key={n}>{LABELLED_ROWS.has(n) ? weekdayLabel(n) : ''}</span>
-            ))}
-          </div>
-          {weeks.map((week, wi) => (
-            <div class="nod-cal-week" key={wi}>
-              <span class="nod-cal-month">{months[wi] ?? ''}</span>
-              {week.map((day, di) =>
-                day ? (
-                  <span
-                    key={di}
-                    class={`nod-cal-cell nod-cal-l${nodsLevel(day.count, max)} ${day.date === today ? 'today' : ''}`}
-                    title={s('nodsCalendarHover', { date: day.date, count: String(day.count) })}
-                  />
-                ) : (
-                  <span key={di} class="nod-cal-cell empty" />
-                ),
-              )}
-            </div>
+        <div class="nod-cal-chart" style={{ '--weeks': weeks.length }}>
+          <span />
+          {WEEKDAY_ROWS.map((n) => (
+            <span key={`d${n}`} class="nod-cal-weekday">
+              {LABELLED_ROWS.has(n) ? weekdayLabel(n) : ''}
+            </span>
           ))}
+          {weeks.map((week, wi) => [
+            <span key={`m${wi}`} class="nod-cal-month">
+              {months[wi] ?? ''}
+            </span>,
+            ...week.map((day, di) =>
+              day ? (
+                <span
+                  key={`${wi}-${di}`}
+                  class={`nod-cal-cell nod-cal-l${nodsLevel(day.count, max)} ${day.date === today ? 'today' : ''}`}
+                  title={s('nodsCalendarHover', { date: day.date, count: String(day.count) })}
+                />
+              ) : (
+                <span key={`${wi}-${di}`} class="nod-cal-cell empty" />
+              ),
+            ),
+          ])}
         </div>
         <div class="nod-cal-legend">
           <span>{s('nodsCalendarLess')}</span>

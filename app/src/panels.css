@@ -618,45 +618,42 @@
   font-size: 15px;
 }
 
+/* Weeks fill the sheet's width, so the whole year shows with no scrolling. */
 .nod-cal-chart {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: 12px repeat(7, auto);
+  grid-template-columns: auto repeat(var(--weeks), minmax(0, 1fr));
   gap: 3px;
-  overflow-x: auto;
-  padding-bottom: 4px;
 }
 
-.nod-cal-weekdays,
-.nod-cal-week {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: none;
-}
-
-.nod-cal-weekdays {
-  padding-top: 15px;
-}
-
-.nod-cal-weekdays span {
-  height: 11px;
+.nod-cal-weekday {
+  align-self: center;
+  padding-inline-end: 4px;
   font-size: 9px;
-  line-height: 11px;
   color: var(--text-3);
 }
 
 .nod-cal-month {
-  height: 12px;
   font-size: 9px;
   line-height: 12px;
   color: var(--text-3);
   white-space: nowrap;
+  overflow: visible;
 }
 
 .nod-cal-cell {
   width: 11px;
   height: 11px;
+  flex: none;
   border-radius: 2px;
   background: var(--line);
+}
+
+.nod-cal-chart .nod-cal-cell {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 .nod-cal-cell.empty {
