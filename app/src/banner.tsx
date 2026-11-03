@@ -9,7 +9,7 @@ interface Shown {
   focus: boolean
 }
 
-const AUTO_HIDE_MS = 12_000
+const AUTO_HIDE_MS = 20_000
 
 /**
  * The small always-on-top window: one waiting decision and its options. Shown by a new
