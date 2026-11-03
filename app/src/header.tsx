@@ -2,7 +2,9 @@ import { Bot, CalendarClock, MessageCircleQuestion, CornerLeftUp, GitFork, Link2
 import { limitInput } from './limit-input.ts'
 import type { ComponentChildren } from 'preact'
 import { useRef } from 'preact/hooks'
+import { RefText } from './body.tsx'
 import { useDialogFocus } from './focus.ts'
+import type { RefLinker } from './refs.ts'
 import { Bar, Glyph, segClass } from './segs.tsx'
 import { s } from './strings.ts'
 import type { Approval, Node, NodePill, Seg } from './types.ts'
@@ -136,6 +138,7 @@ export function NodeHeader({
   onStartTitle,
   onSaveTitle,
   onCancelTitle,
+  refs,
 }: {
   n: Node
   onJump: (key: string) => void
@@ -144,6 +147,7 @@ export function NodeHeader({
   onStartTitle: () => void
   onSaveTitle: (title: string) => void
   onCancelTitle: () => void
+  refs?: RefLinker
 }) {
   const waitingSince = n.status === 'needs_decision' ? n.updated_at ?? n.created : null
   const steps = Array.isArray(n.steps) ? (n.steps as { label: string; done: boolean }[]) : []
@@ -190,7 +194,7 @@ export function NodeHeader({
         <TitleField title={n.title} onSave={onSaveTitle} onCancel={onCancelTitle} />
       ) : (
         <h2 class="node-title clickable" dir="auto" title={s('titleEditHint')} onClick={onStartTitle}>
-          {n.title}
+          <RefText text={n.title} refs={refs} />
         </h2>
       )}
       {n.intake && n.original && n.original.trim() !== n.title.trim() && (

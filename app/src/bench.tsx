@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
-import { Body } from './body.tsx'
+import { Body, RefText } from './body.tsx'
 import { NodeHeader } from './header.tsx'
+import { buildRefLinker } from './refs.ts'
 import { QuickEntry, StartSession } from './quick.tsx'
 import { DelayDialog, NewNode } from './newnode.tsx'
 import { Viewer, itemsAround, type ViewItem } from './viewer.tsx'
@@ -1769,6 +1770,8 @@ function Detail(p: {
   onCancelTitle: () => void
 }) {
   const n = p.node
+  // G91-style refs mentioned in the body/notes/title/options link to that node, in its own project.
+  const refs = useMemo(() => buildRefLinker(p.bench.projects, p.bench.nodes, p.onJump), [p.bench, p.onJump])
   // Each message's files sit under it when the CLI says which message they belong to; older CLIs: one list at the end.
   const perMessage = n.body_attachments !== undefined || n.notes.some((x) => x.attachments !== undefined)
   const files = perMessage ? [] : n.attachments.filter((a) => !a.image)
@@ -1800,6 +1803,7 @@ function Detail(p: {
           onStartTitle={p.onStartTitle}
           onSaveTitle={p.onSaveTitle}
           onCancelTitle={p.onCancelTitle}
+          refs={refs}
         />
 
         {n.options.length > 0 && !n.questions.length && (
@@ -1820,7 +1824,7 @@ function Detail(p: {
                     <span class="key">{o.key}</span>
                     <span class="opt-main">
                       <span class="opt-label">
-                        {o.label}
+                        <RefText text={o.label} refs={refs} />
                         {isDefault && (
                           <span class="chip def" title={waitsForAnswer && n.if_no_answer ? `${s('ifNoAnswer')}: ${n.if_no_answer}` : s('defaultOption')}>
                             {waitsForAnswer && n.if_no_answer ? <Timer size={11} strokeWidth={2} /> : null}
@@ -1834,7 +1838,7 @@ function Detail(p: {
                       </span>
                       {o.body && (
                         <span class="opt-body">
-                          <Body rows={o.body.split('\n').map((text) => ({ text }))} images={[]} onImage={() => {}} />
+                          <Body rows={o.body.split('\n').map((text) => ({ text }))} images={[]} onImage={() => {}} refs={refs} />
                         </span>
                       )}
                     </span>
@@ -1871,7 +1875,7 @@ function Detail(p: {
         {p.editing === 'body' ? (
           <>
             <BodyEditor markdown={n.description ?? ''} onSave={(md) => p.onSaveEdit('body', md)} onCancel={p.onCancelEdit} onFiles={(f) => p.onFiles('body', f)} />
-            <Body rows={afterDescription(n.body_rows)} images={n.images} onImage={p.onImage} />
+            <Body rows={afterDescription(n.body_rows)} images={n.images} onImage={p.onImage} refs={refs} />
           </>
         ) : (
           <div class="body-wrap">
@@ -1888,6 +1892,7 @@ function Detail(p: {
               rows={n.description?.trim() ? n.body_rows : afterDescription(n.body_rows)}
               images={n.images}
               onImage={p.onImage}
+              refs={refs}
               notes={{
                 tools: (i, human) =>
                   human && p.editing === null ? (
