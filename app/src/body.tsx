@@ -1,24 +1,77 @@
 import type { ComponentChildren } from 'preact'
 import { useState } from 'preact/hooks'
 import { imageSrc } from './backend.ts'
+import { findRefs, type RefLinker } from './refs.ts'
 import { segClass } from './segs.tsx'
 import type { BodyRow, Image } from './types.ts'
 
-/** `**bold**`, `` `code` ``, and links — the little markdown a node's prose leans on. */
-export function Inline({ text }: { text: string }) {
+/** A node ref rendered in place, as a plain clickable span (not `<a>`/`<button>`, so it nests
+ *  safely inside a `<button>` option card without breaking HTML or double-firing its click). */
+function RefLink({ text, onClick }: { text: string; onClick: () => void }) {
+  return (
+    <span
+      class="ref-link"
+      role="link"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        e.stopPropagation()
+        onClick()
+      }}
+    >
+      {text}
+    </span>
+  )
+}
+
+/** `text`, with any node ref that resolves to a real node swapped for a `RefLink`; a ref whose
+ *  letter isn't a known project, or that resolves to no node, is left as plain text. */
+function splitRefs(text: string, refs: RefLinker | undefined, nextKey: () => number): ComponentChildren[] {
+  if (!refs) return [text]
+  const matches = findRefs(text, refs.knownLetters)
+  if (!matches.length) return [text]
+  const out: ComponentChildren[] = []
+  let last = 0
+  for (const m of matches) {
+    const key = refs.resolve(`${m.letter}${m.id}`)
+    if (!key) continue
+    if (m.start > last) out.push(text.slice(last, m.start))
+    out.push(<RefLink key={nextKey()} text={m.text} onClick={() => refs.jump(key)} />)
+    last = m.end
+  }
+  if (!out.length) return [text]
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
+/** A plain string with node refs linked — titles, option labels, a note's one-line summary: text
+ *  that never carries the rest of `Inline`'s markdown. */
+export function RefText({ text, refs }: { text: string; refs?: RefLinker }) {
+  let i = 0
+  return <>{splitRefs(text, refs, () => i++)}</>
+}
+
+/** `**bold**`, `` `code` ``, links, and node refs — the little markdown a node's prose leans on. */
+export function Inline({ text, refs }: { text: string; refs?: RefLinker }) {
   const out: ComponentChildren[] = []
   const re = /\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s)]+)/g
   let last = 0
   let i = 0
+  const nextKey = () => i++
   for (const m of text.matchAll(re)) {
-    if (m.index > last) out.push(text.slice(last, m.index))
-    if (m[1] !== undefined) out.push(<strong key={i++}>{m[1]}</strong>)
-    else if (m[2] !== undefined) out.push(<code key={i++}>{m[2]}</code>)
-    else if (m[3] !== undefined) out.push(<a key={i++} href={m[4]} target="_blank" rel="noreferrer">{m[3]}</a>)
-    else out.push(<a key={i++} href={m[5]} target="_blank" rel="noreferrer">{m[5]}</a>)
+    if (m.index > last) out.push(...splitRefs(text.slice(last, m.index), refs, nextKey))
+    if (m[1] !== undefined) out.push(<strong key={nextKey()}>{splitRefs(m[1], refs, nextKey)}</strong>)
+    else if (m[2] !== undefined) out.push(<code key={nextKey()}>{m[2]}</code>)
+    else if (m[3] !== undefined) out.push(<a key={nextKey()} href={m[4]} target="_blank" rel="noreferrer">{m[3]}</a>)
+    else out.push(<a key={nextKey()} href={m[5]} target="_blank" rel="noreferrer">{m[5]}</a>)
     last = m.index + m[0].length
   }
-  if (last < text.length) out.push(text.slice(last))
+  if (last < text.length) out.push(...splitRefs(text.slice(last), refs, nextKey))
   return <>{out}</>
 }
 
@@ -134,7 +187,7 @@ function blocks(rows: BodyRow[], images: Image[], dropAttachmentHeadings = false
 /** `AI | lane-a | 3 hours ago` / `User | 3 hours ago`, as decs words it, laid out on one line: name · when, role.
  *  N203/N206: a `summary` (the note's own one-line `--summary`) takes the title spot instead — who/when
  *  moves down to a small secondary line, same idea as a chat message's own one-line preview. */
-function NoteHead({ text, summary, label, tools }: { text: string; summary?: string | null; label?: string | null; tools?: preact.ComponentChildren }) {
+function NoteHead({ text, summary, label, tools, refs }: { text: string; summary?: string | null; label?: string | null; tools?: preact.ComponentChildren; refs?: RefLinker }) {
   const parts = text.split(' | ')
   const role = parts[0]
   const when = parts.length > 1 ? parts.at(-1)! : ''
@@ -144,7 +197,7 @@ function NoteHead({ text, summary, label, tools }: { text: string; summary?: str
       <header class="has-summary" title={text}>
         <span class="dot" />
         <div class="head-text">
-          <span class="summary" dir="auto">{summary}</span>
+          <span class="summary" dir="auto"><RefText text={summary} refs={refs} /></span>
           <span class="who-line">
             {label && <span class="decision-label">{label}</span>}
             <span class="who">{who}</span>
@@ -179,20 +232,20 @@ export interface NoteHooks {
   decision?: (index: number) => string | null | undefined
 }
 
-function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks }) {
+function Blocks({ list, images, onImage, notes, refs }: { list: Block[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks; refs?: RefLinker }) {
   return (
     <>
       {list.map((b, i) => {
         switch (b.kind) {
           case 'heading':
-            return <h3 dir="auto" key={i} class={segClass({ ...b.row.style, color: undefined })}>{b.row.text}</h3>
+            return <h3 dir="auto" key={i} class={segClass({ ...b.row.style, color: undefined })}><Inline text={b.row.text} refs={refs} /></h3>
           case 'note': {
             const decision = notes?.decision?.(b.index)
             return (
               <section key={i} class={`note ${b.human ? 'human' : 'agent'}${decision ? ' decision' : ''}`} data-ctx="note">
-                <NoteHead text={b.row.text} summary={notes?.summary?.(b.index)} label={decision} tools={notes?.tools?.(b.index, b.human)} />
+                <NoteHead text={b.row.text} summary={notes?.summary?.(b.index)} label={decision} tools={notes?.tools?.(b.index, b.human)} refs={refs} />
                 <div class="note-body">
-                  {notes?.replace?.(b.index) ?? <Blocks list={b.rows} images={images} onImage={onImage} />}
+                  {notes?.replace?.(b.index) ?? <Blocks list={b.rows} images={images} onImage={onImage} refs={refs} />}
                   {notes?.after?.(b.index)}
                 </div>
               </section>
@@ -204,7 +257,7 @@ function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image
                 {b.lines.map((l, j) => (
                   <>
                     {j > 0 && <br />}
-                    <Inline text={l} />
+                    <Inline text={l} refs={refs} />
                   </>
                 ))}
               </p>
@@ -215,7 +268,7 @@ function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image
               <L dir="auto" key={i}>
                 {b.items.map((it, j) => (
                   <li dir="auto" key={j}>
-                    <Inline text={it} />
+                    <Inline text={it} refs={refs} />
                   </li>
                 ))}
               </L>
@@ -226,7 +279,7 @@ function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image
               <blockquote dir="auto" key={i}>
                 {b.lines.map((l, j) => (
                   <div key={j}>
-                    <Inline text={l} />
+                    <Inline text={l} refs={refs} />
                   </div>
                 ))}
               </blockquote>
@@ -240,7 +293,7 @@ function Blocks({ list, images, onImage, notes }: { list: Block[]; images: Image
                   <tbody>
                     {b.rows.map((r, j) => (
                       <tr key={j}>
-                        {r.map((c, k) => (j === 0 ? <th key={k}><Inline text={c} /></th> : <td key={k}><Inline text={c} /></td>))}
+                        {r.map((c, k) => (j === 0 ? <th key={k}><Inline text={c} refs={refs} /></th> : <td key={k}><Inline text={c} refs={refs} /></td>))}
                       </tr>
                     ))}
                   </tbody>
@@ -341,21 +394,21 @@ export function withoutComments(rows: BodyRow[]): BodyRow[] {
   return out
 }
 
-export function Body({ rows, images, onImage, notes }: { rows: BodyRow[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks }) {
+export function Body({ rows, images, onImage, notes, refs }: { rows: BodyRow[]; images: Image[]; onImage: (i: number) => void; notes?: NoteHooks; refs?: RefLinker }) {
   return (
     <div class="prose">
       {(() => {
         const list = blocks(withoutComments(rows), images, Boolean(notes?.after))
-        if (!notes?.after) return <Blocks list={list} images={images} onImage={onImage} notes={notes} />
+        if (!notes?.after) return <Blocks list={list} images={images} onImage={onImage} notes={notes} refs={refs} />
         // The description's own files sit between it and the first note.
         const first = list.findIndex((b) => b.kind === 'note')
         const head = first === -1 ? list : list.slice(0, first)
         const rest = first === -1 ? [] : list.slice(first)
         return (
           <>
-            <Blocks list={head} images={images} onImage={onImage} notes={notes} />
+            <Blocks list={head} images={images} onImage={onImage} notes={notes} refs={refs} />
             {notes.after(-1)}
-            <Blocks list={rest} images={images} onImage={onImage} notes={notes} />
+            <Blocks list={rest} images={images} onImage={onImage} notes={notes} refs={refs} />
           </>
         )
       })()}

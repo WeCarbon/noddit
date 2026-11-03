@@ -1004,6 +1004,24 @@ svg.lucide.ico {
   font-weight: 600;
 }
 
+/* A node ref (`G91`) mentioned in prose, a title, an option label or a note's summary —
+ * linked to that node wherever it resolves. Not `.prose`-scoped: titles and option labels
+ * sit outside it. */
+.ref-link {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.ref-link:hover {
+  text-decoration: underline;
+}
+
+.ref-link:focus-visible {
+  outline: 2px solid var(--sel-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .table-wrap {
   overflow-x: auto;
   margin: 0 0 14px;

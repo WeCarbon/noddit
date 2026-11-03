@@ -18,6 +18,7 @@ Read from the code, not from memory: the app's menus/keys live in `app/src/bench
 | Expand / collapse one node | Triangle, or `←` `→` / `+` `-` | `←` `→` / `+` `-` | |
 | Expand / collapse a whole view at once | Right-click a view tab → Expand all / Collapse all | *(none — one node at a time)* | No natural one-key terminal equivalent; low impact |
 | Jump to a node by ref or title | `g` / `:` → palette, matches ref or a title substring | `g` / `:` prompts for a ref; falls back to the same title match the palette uses | |
+| Click a node ref in prose (`G91`) to jump | Refs in titles, bodies, notes, summaries and options link to the node (`refs.ts`, `body.tsx`) | *(none — type it at `g` / `:`)* | UI-only: a terminal has no pointer to click with |
 | Jump to the next decision an AI is stuck on | `W` | `w` / `W` | |
 | Switch to the Live (all-activity) view | `H` | `h` | |
 | Resize the sidebar / list / detail columns | Drag the dividers | *(fixed layout)* | **UI-only** — drag gesture |
