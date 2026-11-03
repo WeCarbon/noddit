@@ -7,7 +7,7 @@ export const fr: Strings = {
   addProject: 'Ajouter un projet',
   shortcuts: 'Raccourcis',
   nothingSelected: 'Rien de sélectionné',
-  pickSomething: 'Choisissez un nœud à gauche pour le voir ici.',
+  pickSomething: 'Choisissez un nœud à gauche (↑↓ fonctionnent aussi) — {{count}} dans cette vue.',
   options: 'Options',
   questions: 'Questions',
   defaultOption: 'par défaut',

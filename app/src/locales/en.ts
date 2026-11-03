@@ -4,7 +4,7 @@ export const en = {
   addProject: 'Add project',
   shortcuts: 'Shortcuts',
   nothingSelected: 'Nothing selected',
-  pickSomething: 'Pick a node on the left to see it here.',
+  pickSomething: 'Pick a node on the left (↑↓ also work) — {{count}} in this view.',
   options: 'Options',
   questions: 'Questions',
   defaultOption: 'default',

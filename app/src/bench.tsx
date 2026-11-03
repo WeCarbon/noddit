@@ -123,6 +123,13 @@ export function Bench(props: {
   // The node the owner just answered, closed, finished or put off stays where it was, detail and
   // all, until they pick another node or list; only then does it leave by the list's own rules.
   const [held, setHeld] = useState<Held | null>(null)
+  /** Clicked empty list space or Esc: no row highlighted, right pane empty. Counts as picking
+   *  another node — same as `select` — so the held row (above) lets go of it too. */
+  const [deselected, setDeselected] = useState(false)
+  const deselect = () => {
+    setDeselected(true)
+    setHeld(null)
+  }
   const where = `${scope ?? ''}|${view.view}`
   const rows = useMemo(() => keepHeld(visibleRows(view, prefs.folds), held, where, bench), [view, prefs.folds, held, where, bench])
   const liveList = !scope && view.view === 'live'
@@ -156,6 +163,7 @@ export function Bench(props: {
     setPalette(false)
     setHelp(false)
     setLightbox(null)
+    setDeselected(false)
     if (key && bench.nodes[key]) {
       const decide = bench.views.find((v) => v.view === 'decide')
       const folds = decide ? reveal(bench, decide, key, prefs.folds) : null
@@ -231,7 +239,7 @@ export function Bench(props: {
   const found = selectable.findIndex((r) => r.key === prefs.selected)
   const index = found >= 0 ? found : Math.min(lastIndex.current, selectable.length - 1)
   if (index >= 0) lastIndex.current = index
-  const current: Row | undefined = selectable[index]
+  const current: Row | undefined = deselected ? undefined : selectable[index]
   const [archived, setArchived] = useState<Record<string, Node>>({})
   const nodeKey = current?.kind === 'node' ? current.node! : undefined
   const node: Node | undefined = nodeKey ? (bench.nodes[nodeKey] ?? archived[nodeKey]) : undefined
@@ -267,9 +275,11 @@ export function Bench(props: {
     listRef.current?.querySelector('.row.sel')?.scrollIntoView({ block: 'nearest' })
   }, [prefs.selected, prefs.view])
 
-  const select = (key: string) => setPrefs({ selected: key })
+  const select = (key: string) => (setDeselected(false), setPrefs({ selected: key }))
   const move = (delta: number) => {
     if (!selectable.length) return
+    // Deselected: ↓ starts at the first row, ↑ at the last — not wherever the cursor was.
+    if (deselected) return select(selectable[delta > 0 ? 0 : selectable.length - 1].key)
     const next = selectable[Math.max(0, Math.min(selectable.length - 1, Math.max(0, index) + delta))]
     select(next.key)
   }
@@ -840,6 +850,7 @@ export function Bench(props: {
       if (folds) {
         // A node in another project lifts the project filter, or it could not show.
         const elsewhere = scope !== null && nodeKey.slice(0, nodeKey.lastIndexOf('#')) !== scope
+        setDeselected(false)
         setPrefs({ view: v.view, folds, selected: nodeKey, ...(elsewhere ? { project: null } : {}) })
         return
       }
@@ -867,9 +878,10 @@ export function Bench(props: {
           ;(document.activeElement as HTMLElement | null)?.blur()
           return
         }
-        if (menu || letterFor || unlinkFor || renaming || quick || startFor || isTyping(e)) return
+        if (menu || letterFor || unlinkFor || renaming || quick || startFor || editing || editConflict || editingTitle || titleConflict || isTyping(e)) return
         if (error) return setError(null)
         if (scope) return setScope(null)
+        if (current && !deselected) return deselect()
         return
       }
       if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || holdFor || milestoneFor || editing || editConflict || editingTitle || titleConflict || viewEditor || isTyping(e)) return
@@ -1124,7 +1136,7 @@ export function Bench(props: {
             ↑ {s('newAbove', { count: motion.above })}
           </button>
         )}
-        <div class="list" ref={listRef} role="listbox">
+        <div class="list" ref={listRef} role="listbox" onClick={(e) => (e.target === e.currentTarget ? deselect() : undefined)}>
           {!rows.length && (
             <div class="empty">
               <Inbox size={28} strokeWidth={1.25} />
@@ -1203,7 +1215,7 @@ export function Bench(props: {
           <div class="placeholder">
             <div class="ph-glyph">◇</div>
             <p class="ph-title">{s('nothingSelected')}</p>
-            <p>{s('pickSomething')}</p>
+            <p>{s('pickSomething', { count: view.count ?? selectable.length })}</p>
           </div>
         )}
       </section>

@@ -6,7 +6,7 @@ export const zhHant: Strings = {
   addProject: '新增專案',
   shortcuts: '快捷鍵',
   nothingSelected: '未選取',
-  pickSomething: '在左邊選一個節點，在這裡看詳情。',
+  pickSomething: '在左邊選一個節點（↑↓ 也行）——這個視圖有 {{count}} 項。',
   options: '選項',
   questions: '子問題',
   defaultOption: '預設',

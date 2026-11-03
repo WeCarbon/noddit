@@ -6,7 +6,7 @@ export const ar: Strings = {
   addProject: 'إضافة مشروع',
   shortcuts: 'الاختصارات',
   nothingSelected: 'لا شيء محدد',
-  pickSomething: 'اختر عقدة من القائمة لتظهر هنا.',
+  pickSomething: 'اختر عقدة من القائمة (↑↓ تعمل أيضًا) — {{count}} في هذا العرض.',
   options: 'الخيارات',
   questions: 'الأسئلة',
   defaultOption: 'افتراضي',

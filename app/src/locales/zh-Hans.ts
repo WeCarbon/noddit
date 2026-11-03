@@ -6,7 +6,7 @@ export const zhHans: Strings = {
   addProject: '添加项目',
   shortcuts: '快捷键',
   nothingSelected: '未选中',
-  pickSomething: '在左边选一个节点，在这里看详情。',
+  pickSomething: '在左边选一个节点（↑↓ 也行）——这个视图有 {{count}} 项。',
   options: '选项',
   questions: '子问题',
   defaultOption: '默认',
