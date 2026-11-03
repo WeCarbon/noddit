@@ -59,7 +59,7 @@
     "whoami": "nod whoami [--json]     這個行程現在的身份（core/identity.ts）\n\n每次寫入會打在看不見的 `<!-- nod:by=… -->` 標記裡（這樣 nod monitor 能分清是不是\n自己寫的，轉記負責人的話時不會反過來推給轉記的那個人自己）；也是 --mine 比對的依據。\n\n  NODDIT_IDENTITY / DECS_IDENTITY   每個 AI 代理設一次就固定住——跟 NODDIT_AGENT\n                                     （nod session start 選 claude/codex/kimi 用的）\n                                     是兩個不同的變數\n  沒設的話：署名裡「 · 」前面的名字（NODDIT_AUTHOR）加上工作階段 id\n             （CLAUDE_SESSION_ID 或 NODDIT_SESSION）\n\n兩個都沒有 → 沒有身份：寫入不帶標記，也不會被跳過，--mine 還是只按名字比對。\n\n  --json    `{identity, explicit, author, session, harness}`",
     "flag": "nod flag <編號> important                   標為很重要：每個列表裡排最前，看板上帶 ★\nnod flag <編號> milestone --due 2026-11-15   關鍵時間節點：排最前\nnod flag <編號> normal                      兩個標記都拿掉（也可以寫 off）\n\n  --due <日期|4h|3d>   里程碑的日期；只寫日期就是那天結束\n                       也認模糊日期：週五、下週一、11月15日、next week（見 nod date）\n  --json               輸出改完的節點\n  --force              AI 也直接改（負責人在對話裡說了）\n\n由負責人來定。AI 執行時（有 CLAUDECODE 或 NODDIT_ROLE=agent）只在節點上記一條建議，\n負責人標了才算。重要就是 urgency high；里程碑是 due 加 milestone: true。",
     "beat": "nod beat [<id>…] [--note \"…\"]     「我還在做」——算一次 check-in 回覆\n\n跟其他寫入一樣會更新 updated_at、清零 check-in 的詢問次數（core/checkins.ts），\n不給 --note 就不留可見記錄。不給 <id> 就用 NODDIT_NODE（跟 nod progress 預設取的一樣）。\n\n  --note \"…\"    寫成一條「心跳」記錄，而不是只悄悄更新時間\n  --json\n\nNODDIT_NODE 也沒設時：用本工作階段最近一次 nod start 的節點。",
-    "after": "nod after <id> <id>… [--clear]\n\n讓節點排在別的節點後面：前面的完成或關閉之前，它排隊等著（這期間不算 stale）。--clear 取消排隊。",
+    "after": "nod after <id> <id>… [--clear]\nnod after --before <前置> <id> <id>…\n\n讓節點排在別的節點後面：前面的完成或關閉之前，它排隊等著（這期間不算 stale）。--clear 取消排隊。\n--before 一次把同一個前置掛到多個節點上。",
     "assign": "nod assign <id> me|ai|milestone     誰來做\n\n  me          你自己的事：出現在「人類工作」裡；智慧體不會開始做、不會問進度、不會催，\n              也不會當派活接走——智慧體可以替你記一件（「給供應商打電話」）\n  ai          AI 來做（預設）\n  milestone   第三種：目標節點，下面掛子目標和具體的活，不自己開始、不自己完成——\n              nod assign <編號> ai|me 改回普通節點\n\n智慧體要把你的事交回給 AI，得加 --force（你說過可以）。milestone 不用 --force——\n它本來就不是誰的事，沒什麼要「收回」的。\n\n需要人類觸發、AI 跟上：先 --for me 記成你的事，你開了頭以後 nod assign <編號> ai\n[--note \"<接下來做什麼>\"] 交出去——記成你的一條回覆並排進佇列，AI 的 nod monitor\n跟收到別的回覆一樣會收到。\n\n  --note \"<…>\"   交給 AI 時附一句接下來做什麼\n  --json",
     "date": "nod date \"<文字>\" [--json]     模糊日期是哪一天\n\n  明天  後天  下週一  週五  3天後  兩週後  下個月  11月15日  15號\n  英文也認：tomorrow、fri、3d、2w、11/15、15 nov、2026-11-15、q1\n\n不給文字：列出幾個常用選項。--json 給 `{ date, text, relative, at, suggestions }`，\n視窗可以邊輸入邊預覽。--until 和 --due 都用它。",
     "views": "nod views [--json]     看板的標籤，按順序，連同各自的定義\n\n--json 還給出存放的檔案，以及定義裡能用的全部欄位\n（`{ file, views: [...], schema }`）。改用 nod view（nod view --help）。",
@@ -500,6 +500,7 @@
   },
   "after": {
     "set": "{{ref}} 現在排在 {{deps}} 後面",
+    "setMany": "{{refs}} 現在都排在 {{dep}} 後面",
     "cleared": "{{ref}} 不再排隊"
   },
   "assign": {

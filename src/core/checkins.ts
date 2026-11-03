@@ -19,7 +19,7 @@ import type { Layout } from './paths.ts'
 import { isHumanTask, isMilestone } from './assignee.ts'
 import { remindsLater } from './remind.ts'
 import { checkinThresholdMs } from './staleness.ts'
-import { isDeferred, isStartable } from './status.ts'
+import { isDeferred, isStartable, isTerminal } from './status.ts'
 import type { Decision } from './types.ts'
 
 /** After this many unanswered asks, the bench shows an alert. */
@@ -154,15 +154,27 @@ export function staleNagDue(
   return dueAndRecord(l, d.id, lastWrite, checkinThresholdMs(d.staleAfter), now)
 }
 
+/**
+ * A not-started child whose parent is itself needs_decision or the owner's own open to-do:
+ * structurally queued behind the owner one level up — same principle as `waitsOnlyOnOwner`,
+ * just read from the child's side instead of the parent's.
+ */
+function parentWaitsOnOwner<T extends Pick<Decision, 'id' | 'project' | 'parent' | 'state' | 'assignee'>>(d: T, items: T[]): boolean {
+  if (d.parent === undefined) return false
+  const parent = items.find((p) => p.project === d.project && p.id === d.parent)
+  return Boolean(parent) && (parent!.state === 'needs_decision' || (isHumanTask(parent!) && !isTerminal(parent!.state)))
+}
+
 /** Not-started, not deferred, free to start and not the owner's own to-do — the owner's
  *  "stale task": neither waiting on a decision nor being worked on. A node queued behind
  *  an unfinished `--after` is waiting its turn, not stale; neither is a reminder before its
- *  own clock (`remind_at`, `nod add --remind` / `nod edit --remind`) — not idle, just
- *  waiting on its own schedule. Oldest first, so the nag (and `stale_count` in the
- *  bench/JSON) surfaces what's sat longest. */
+ *  own clock (`remind_at`), nor a child structurally queued behind the owner (its parent is
+ *  needs_decision, or the owner's own open to-do — N287, same idea as `waitsOnlyOnOwner`).
+ *  Oldest first, so the nag (and `stale_count` in the bench/JSON) surfaces what's sat longest. */
 export function staleTasksOf<T extends Decision>(items: T[], now = Date.now()): T[] {
   return items
     .filter((d) => d.state === 'not_started' && !isDeferred(d) && !isHumanTask(d) && !isMilestone(d) && isStartable(d, items))
     .filter((d) => !remindsLater(d, now))
+    .filter((d) => !parentWaitsOnOwner(d, items))
     .sort((a, b) => Date.parse(a.created) - Date.parse(b.created))
 }
