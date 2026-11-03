@@ -253,7 +253,7 @@ Unicode 隔離符，給自己處理雙向排版的終端用（開了 bidi 的 iT
 | `nod add <title> --parent W12 --after W13` | 子節點，排在另一個之後 |
 | `nod start / done / close <id>` | 待開始 → 執行中 → 已完成 / 已關閉（`--reason obsolete\|superseded\|merged-into:W15`） |
 | `nod ask <id> -o 1=… 2=…` | 執行中的節點需要負責人拍板 |
-| `nod hold <id> --on "Carol: icon set"` | 卡在外部某人身上；不算卡住 |
+| `nod hold <id> --on "Carol: icon set" --until fri` | 在等外部某人（積極延後，紫色）；不算卡住——同 `nod defer --on` |
 | `nod progress <pct> "msg"` · `… \| nod progress --parse pytest` | 回報進度（或者讓管線自己回報） |
 | `nod steps <id> "a" "b" "c"` · `nod step <id> 2` | 多步驟的工作，百分比幫你算好 |
 | `nod note <id> "…"` | 追加一筆記錄（預設是 AI 代理；`--human` 給負責人用） |
@@ -262,7 +262,7 @@ Unicode 隔離符，給自己處理雙向排版的終端用（開了 bidi 的 iT
 | `nod read <id>` · `nod queue` | 收走回答 / 看還有哪些沒收 |
 | `nod attach <id> file [--approval-content --approve-on 1]` | 附上一個檔案；可以掛上核准關卡 |
 | `nod approved <id> --check <file>` | 只有這份內容被核准過才會退出 0 |
-| `nod defer <id>` · `nod undefer <id>` | 延後 / 解除延後 |
+| `nod defer <id> [--until <date>]` · `nod undefer <id>` | 延後到某天或先放著（消極延後，灰色）/ 解除延後 |
 | `nod show [open\|active\|deferred\|…] [--stale]` · `nod tree` · `nod get <id>` | 讀這個儲存區 |
 | `nod search <words> [--all]` | 標題、正文、記錄、附件名稱 |
 | `nod source register/sync/push/list/items/ack` | 外部來源 |

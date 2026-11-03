@@ -9,7 +9,7 @@ import { overdue } from './order.ts'
 import { isWaitDue } from './status.ts'
 import { formatRef, refOf } from './ref.ts'
 import { minutesSince, stalenessOf } from './staleness.ts'
-import { isDeferred, statusLabel } from './status.ts'
+import { delayOf, isDeferred, statusLabel } from './status.ts'
 import { lastHumanAt, reopenedAfterArchive } from './store.ts'
 import { type Attachment, type AttachmentApproval, type Decision } from './types.ts'
 
@@ -158,6 +158,11 @@ function shortTime(iso: string): string {
   return `${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`
 }
 
+function delayJSON(d: Decision): Record<string, unknown> | null {
+  const delay = delayOf(d)
+  return delay ? { kind: delay.kind, until: delay.until ?? null, on: delay.on ?? null, due: delay.due } : null
+}
+
 /** The compact shape machines consume — `decs get --json` and friends. */
 export function toJSON(d: Decision): Record<string, unknown> {
   return {
@@ -177,6 +182,8 @@ export function toJSON(d: Decision): Record<string, unknown> {
     deferred_by: d.deferredBy ?? null,
     /** `nod defer --until`: when it comes back on its own; null = deferred until undeferred (or not deferred). */
     deferred_until: d.deferredAt ? (d.deferredUntil ?? null) : null,
+    /** 延迟, whichever record holds it: `{ kind: passive | active, until, on }`, or null. */
+    delay: delayJSON(d),
     /** Who does it: `human` (the owner's own to-do — agents don't work on it) or `ai`. */
     assignee: d.assignee ?? 'ai',
     human_task: isHumanTask(d),

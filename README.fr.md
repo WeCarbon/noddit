@@ -307,7 +307,7 @@ ci-dessous.
 | `nod add <title> --parent W12 --after W13` | nœud enfant, ordonné après un autre |
 | `nod start / done / close <id>` | À faire → En cours → Terminé / Fermé (`--reason obsolete\|superseded\|merged-into:W15`) |
 | `nod ask <id> -o 1=… 2=…` | un nœud en cours a besoin du responsable |
-| `nod hold <id> --on "Carol: icon set"` | en attente de quelqu’un à l’extérieur ; ne compte pas comme bloqué |
+| `nod hold <id> --on "Carol: icon set" --until fri` | en attente de quelqu’un à l’extérieur (report actif, violet) ; ne compte pas comme bloqué — comme `nod defer --on` |
 | `nod progress <pct> "msg"` · `… \| nod progress --parse pytest` | rapporter la progression (ou laisser un tube le faire) |
 | `nod steps <id> "a" "b" "c"` · `nod step <id> 2` | travail en plusieurs étapes, le pourcentage est calculé pour vous |
 | `nod note <id> "…"` | ajoute une note (agent par défaut ; `--human` pour le responsable) |
@@ -316,7 +316,7 @@ ci-dessous.
 | `nod read <id>` · `nod queue` | récupère les réponses / voir ce qui n’est pas encore récupéré |
 | `nod attach <id> file [--approval-content --approve-on 1]` | attache un fichier ; verrouille-le sur une approbation |
 | `nod approved <id> --check <file>` | ne sort en 0 que si exactement ce contenu a été approuvé |
-| `nod defer <id>` · `nod undefer <id>` | reporter / reprendre |
+| `nod defer <id> [--until <date>]` · `nod undefer <id>` | reporter, à un jour ou sans date (report passif, gris) / reprendre |
 | `nod show [open\|active\|deferred\|…] [--stale]` · `nod tree` · `nod get <id>` | lire le dépôt de données |
 | `nod search <words> [--all]` | titres, corps, notes, noms de pièces jointes |
 | `nod source register/sync/push/list/items/ack` | sources externes |

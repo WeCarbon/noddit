@@ -154,70 +154,48 @@ export function NewNode(p: {
   )
 }
 
-/** d: put a node off until a day (it comes back by itself then), or indefinitely. */
-export function DeferDialog(p: { title: string; busy: boolean; onClose: () => void; onDefer: (date: string | null) => void }) {
-  const [text, setText] = useState('')
-  const [date, setDate] = useState<string | null>(null)
-  const go = () => (text.trim() ? date && p.onDefer(date) : p.onDefer(null))
-  return (
-    <div class="overlay" onClick={p.onClose}>
-      <div class="confirm defer-dialog" role="dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{s('deferTitle')}</h3>
-        <p class="d">{p.title}</p>
-        <DateField value={text} onText={setText} onChange={setDate} onEnter={go} onEscape={p.onClose} autoFocus placeholder={s('deferPlaceholder')} />
-        <div class="sheet-footer">
-          <button class="ghost" onClick={() => p.onDefer(null)} disabled={p.busy}>
-            {s('deferIndefinitely')}
-          </button>
-          <span class="grow" />
-          <button class="ghost" onClick={p.onClose}>
-            {s('cancel')}
-          </button>
-          <button class="primary" disabled={!date || p.busy} onClick={go}>
-            {s('deferUntilButton')}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** Waiting on someone outside, until a day to check back on them. On a node already waiting, the who is filled in. */
-export function HoldDialog(p: { node: import('./types.ts').Node; busy: boolean; onClose: () => void; onHold: (on: string | null, date: string) => void }) {
+/**
+ * 延迟到…: a day to come back and, if it waits on someone or something, who or what. Naming one
+ * makes it an active wait (purple); a day alone, or nothing, a passive delay (grey). Emptying the
+ * who on a node already waiting turns it into a passive delay (`passive`).
+ */
+export function DelayDialog(p: { node: import('./types.ts').Node; busy: boolean; onClose: () => void; onDelay: (on: string | null, date: string | null, passive: boolean) => void }) {
   const waiting = p.node.status === 'waiting'
   const [on, setOn] = useState(waiting ? (p.node.waiting_on ?? '') : '')
   const [text, setText] = useState('')
   const [date, setDate] = useState<string | null>(null)
-  const field = useRef<HTMLInputElement>(null)
-  useDialogFocus(field)
-  const ready = Boolean(on.trim() && date)
-  const go = () => ready && p.onHold(waiting && on.trim() === (p.node.waiting_on ?? '') ? null : on.trim(), date!)
+  const who = on.trim()
+  const newWho = who && who !== (waiting ? (p.node.waiting_on ?? '') : '') ? who : null
+  // A wait always has a day (on a node already waiting, the one it has); a passive delay may have none.
+  const ready = who ? Boolean(date || (newWho && waiting && p.node.waiting_until)) : Boolean(date) || !text.trim()
+  const go = () => ready && p.onDelay(newWho, date, waiting && !who)
   return (
     <div class="overlay" onClick={p.onClose}>
       <div class="confirm hold-dialog" role="dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{waiting ? s('holdChange') : s('holdMenu')}</h3>
+        <h3>{s('deferTitle')}</h3>
         <p class="d">
           {p.node.ref} {p.node.title}
         </p>
+        <DateField value={text} onText={setText} onChange={setDate} onEnter={go} onEscape={p.onClose} autoFocus placeholder={s('deferPlaceholder')} />
         <input
-          ref={field}
           class="hold-on"
           value={on}
-          placeholder={s('holdOnPlaceholder')}
+          placeholder={s('delayOnPlaceholder')}
           onInput={(e) => setOn((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => {
             e.stopPropagation()
             if (e.key === 'Escape') p.onClose()
+            if (e.key === 'Enter') go()
           }}
         />
-        <DateField value={text} onText={setText} onChange={setDate} onEnter={go} onEscape={p.onClose} placeholder={s('holdUntilPlaceholder')} />
+        <p class="d">{who ? s('delayActiveHint') : s('delayPassiveHint')}</p>
         <div class="sheet-footer">
           <span class="grow" />
           <button class="ghost" onClick={p.onClose}>
             {s('cancel')}
           </button>
           <button class="primary" disabled={!ready || p.busy} onClick={go}>
-            {s('holdButton')}
+            {s('deferUntilButton')}
           </button>
         </div>
       </div>

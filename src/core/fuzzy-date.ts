@@ -212,6 +212,19 @@ export function parseWhen(input: string, now: Date = new Date()): { day: string;
   return day ? { day, at: startOfDay(day), timed: false } : null
 }
 
+/**
+ * `fri Carol to confirm` → that day, then what it waits on: the longest run of leading words
+ * that reads as a date; no date at the front leaves everything as `rest`.
+ */
+export function splitWhen(input: string, now: Date = new Date()): { when?: { day: string; at: Date; timed: boolean }; rest: string } {
+  const words = input.trim().split(/\s+/).filter(Boolean)
+  for (let n = Math.min(words.length, 4); n > 0; n--) {
+    const when = parseWhen(words.slice(0, n).join(' '), now)
+    if (when) return { when, rest: words.slice(n).join(' ') }
+  }
+  return { rest: words.join(' ') }
+}
+
 /** Ready-made picks offered while the owner types; each is a phrase `parseFuzzyDate` reads. */
 export const DATE_SUGGESTIONS: { key: string; phrase: string; hints: string[] }[] = [
   { key: 'tomorrow', phrase: 'tomorrow', hints: ['tomorrow', 'tom', 'tmr', '明天', '明', 'demain', 'غدا'] },

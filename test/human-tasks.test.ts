@@ -128,7 +128,7 @@ test('the view key stays decide; old names still map onto it', () => {
   assert.equal(viewFromArg('owner'), 'decide')
 })
 
-test('defer --until: hidden until that day, the return date on the row, then back on its own exactly once', (t) => {
+test('defer --until: grey until that day, the return date on the row, then back on its own exactly once', (t) => {
   const store = tmpStore(t)
   const d = store.create({ title: 'Renew the domain', author: A, task: true })
   const until = new Date(Date.now() + 3 * 86_400_000)
@@ -136,8 +136,8 @@ test('defer --until: hidden until that day, the return date on the row, then bac
   assert.ok(deferred.deferredUntil)
   assert.match(readFileSync(deferred.file, 'utf8'), /^deferred_until: /m)
   let items = store.all()
-  assert.ok(!inView('available', items[0], items))
-  const rows = rowsFor('waiting', items, { openGroups: new Set(['fold:deferred']) })
+  assert.ok(inView('available', items[0], items), 'still listed in Available, grey')
+  const rows = rowsFor('waiting', items)
   const row = rows.find((r) => r.node?.id === d.id)!
   assert.match(text(suffixOf(row.node!, items, Date.now(), row)[0]), /Deferred until .* · in 3 days/)
 

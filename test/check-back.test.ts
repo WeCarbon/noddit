@@ -80,5 +80,7 @@ test('hold --off: a wait that was never on anyone outside goes back to To do', (
   const d = JSON.parse(decs(root, ['get', '1', '--json']))
   assert.equal(d.status, 'not_started')
   assert.equal(d.waiting_on ?? null, null)
-  assert.equal(decsResult(root, ['hold', '1', '--off']).code, 1, 'not waiting any more')
+  const again = decsResult(root, ['hold', '1', '--off'])
+  assert.equal(again.code, 0, 'nothing to lift is not an error')
+  assert.match(again.stdout, /wasn't deferred/)
 })

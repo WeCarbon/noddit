@@ -45,7 +45,7 @@ export type Filter = { any: Filter[] } | { all: Filter[] } | { not: Filter } | C
 
 /**
  * One condition. Enum fields match when the node's value is any of `value`.
- * `is` tests flags (`startable`, `deferred`, …); `due` / `updated` take a span
+ * `is` tests flags (`startable`, `deferred` — itself or under a deferred parent, `delayed` — itself, …); `due` / `updated` take a span
  * (`7d`) and match within it; `title` / `author` match a substring.
  */
 export interface Cond {
@@ -55,7 +55,7 @@ export interface Cond {
 export const COND_FIELDS = ['state', 'assignee', 'flag', 'kind', 'project', 'author', 'tag', 'is', 'due', 'updated', 'title'] as const
 export type CondField = (typeof COND_FIELDS)[number]
 /** What `is:` can test. */
-export const IS_VALUES = ['startable', 'deferred', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'] as const
+export const IS_VALUES = ['startable', 'deferred', 'delayed', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'] as const
 
 export const LAYOUTS = ['tree', 'list'] as const
 export const GROUPS = ['project', 'state', 'assignee', 'none'] as const
@@ -67,6 +67,8 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     id: 'available',
     icon: 'list-todo',
     layout: 'tree',
+    // 延迟 stays in sight: a passive one grey, an active one (waiting on someone) purple.
+    deferred: 'show',
     filter: parseFilter('state:in_progress,waiting,needs_decision,decided or state:not_started is:startable'),
   },
   // 活动 = 可用 minus what the AIs are waiting on; the owner's own waits stay (人类工作 ⊆ 活动).
@@ -84,7 +86,7 @@ export const BUILTIN_VIEWS: readonly ViewDef[] = [
     sort: ['blocks_ai', 'flag', 'bench'],
     filter: parseFilter('state:needs_decision or assignee:human state:in_progress,waiting,decided or assignee:human state:not_started is:startable'),
   },
-  { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['check_back', 'flag', 'waiting_since'], deferred: 'fold', filter: parseFilter('state:waiting') },
+  { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['check_back', 'flag', 'waiting_since'], deferred: 'show', filter: parseFilter('state:waiting or is:delayed') },
   {
     id: 'live',
     icon: 'radio',

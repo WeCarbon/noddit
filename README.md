@@ -285,7 +285,7 @@ teammate whatever language their CLI speaks. When you write a file by hand,
 | `nod add <title> --parent W12 --after W13` | child node, ordered after another |
 | `nod start / done / close <id>` | To do → In progress → Done / Closed (`--reason obsolete\|superseded\|merged-into:W15`) |
 | `nod ask <id> -o 1=… 2=…` | a running node needs the owner |
-| `nod hold <id> --on "Carol: icon set"` | waiting on someone outside; not counted as stuck |
+| `nod hold <id> --on "Carol: icon set" --until fri` | waiting on someone outside (an active delay, purple); not counted as stuck — same as `nod defer --on` |
 | `nod progress <pct> "msg"` · `… \| nod progress --parse pytest` | report progress (or let a pipe report it) |
 | `nod steps <id> "a" "b" "c"` · `nod step <id> 2` | multi-step work, percent computed for you |
 | `nod note <id> "…"` | append a record (agent by default; `--human` for the owner) |
@@ -294,7 +294,7 @@ teammate whatever language their CLI speaks. When you write a file by hand,
 | `nod read <id>` · `nod queue` | collect answers / see what's uncollected |
 | `nod attach <id> file [--approval-content --approve-on 1]` | attach a file; gate it on approval |
 | `nod approved <id> --check <file>` | exit 0 only if exactly this content was approved |
-| `nod defer <id>` · `nod undefer <id>` | put off / bring back |
+| `nod defer <id> [--until <date>]` · `nod undefer <id>` | put off, to a day or indefinitely (a passive delay, grey) / bring back |
 | `nod show [open\|active\|deferred\|…] [--stale]` · `nod tree` · `nod get <id>` | read the store |
 | `nod search <words> [--all]` | titles, bodies, notes, attachment names |
 | `nod source register/sync/push/list/items/ack` | external sources |

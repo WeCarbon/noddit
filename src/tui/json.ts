@@ -8,7 +8,7 @@ import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isHumanTask } from '../core/assignee.ts'
 import { builtinView, filterText, isPristine, loadViews, type ViewDef } from '../core/view-defs.ts'
-import { dependenciesOf, isDeferred, isTerminal, isWaitDue } from '../core/status.ts'
+import { delayOf, dependenciesOf, isDeferred, isTerminal, isWaitDue } from '../core/status.ts'
 import { projectSessions } from '../core/listeners.ts'
 import type { Store } from '../core/store.ts'
 import type { Decision as Item } from '../core/types.ts'
@@ -77,6 +77,8 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
     collapsed,
     context: Boolean(row.context),
     deferred: isDeferHidden(d, items),
+    // 延迟 on the node itself: 'passive' (grey) or 'active' (waiting on someone — purple).
+    delay: delayOf(d, now)?.kind ?? null,
     progress: progressOf(d) ?? null,
     badge: plain(forms[0] ?? []),
     badge_short: plain(forms.at(-1) ?? []),

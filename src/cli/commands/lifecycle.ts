@@ -1,7 +1,3 @@
-import { deferUntil } from './defer.ts'
-import { untilDay } from '../../core/fuzzy-date.ts'
-import { nowStamp } from '../../core/store.ts'
-import { dayText } from '../../i18n/time.ts'
 import { isDeferred, statusLabel } from '../../core/status.ts'
 import { bool, many, one, optionsAndDefault, questionsFromArgs, type Args } from '../args.ts'
 import { guardOtherAuthor, readStdin, rememberStarted, requireDecision, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
@@ -17,7 +13,6 @@ const HELP_KEYS: Record<string, string> = {
   start: 'cli.help.start',
   done: 'cli.help.done',
   close: 'cli.help.close',
-  hold: 'cli.help.hold',
   ask: 'cli.help.ask',
 }
 const help = (verb: string) => t(HELP_KEYS[verb] ?? 'cli.help.start')
@@ -84,25 +79,6 @@ export async function run(args: Args, verb = ''): Promise<number> {
       report(args, started, t('cli.lifecycle.started'))
       if (author && rememberStarted(store, started, author) && !bool(args, 'json') && ref === args._.at(-1))
         console.log(dim(t('cli.lifecycle.currentNode', { ref: refOf(started) })))
-    }
-    else if (verb === 'hold' && bool(args, 'off')) {
-      const role = shellRole()
-      report(args, store.unhold(d, role === 'human' ? (one(args, 'by') ?? 'owner') : resolveAuthor(args), { role }), t('cli.lifecycle.holdOff'))
-    }
-    else if (verb === 'hold') {
-      const raw = one(args, 'on')
-      const on = raw && raw !== 'true' ? raw : undefined
-      const untilRaw = one(args, 'until')
-      const waiting = d.state === 'waiting'
-      // Already waiting: --until alone moves the day, --on alone changes who and keeps the day.
-      if (!on && !(waiting && untilRaw)) throw new Error(`${t('cli.lifecycle.needOn')}\n\n${help('hold')}`)
-      // Every wait has a day to check back on.
-      if (!untilRaw && !(waiting && d.waitingUntil)) throw new Error(`${t('cli.lifecycle.needUntil')}\n\n${help('hold')}`)
-      const until = untilRaw ? nowStamp(deferUntil(untilRaw)) : undefined
-      const role = shellRole()
-      const next = store.hold(d, on, role === 'human' ? (one(args, 'by') ?? 'owner') : resolveAuthor(args), { until, role })
-      const day = next.waitingUntil ? dayText(untilDay(next.waitingUntil) ?? next.waitingUntil) : ''
-      report(args, next, day ? t('cli.lifecycle.waitingOnUntil', { on: next.waitingOn ?? '', date: day }) : t('cli.lifecycle.waitingOnWhat', { on: next.waitingOn ?? '' }))
     }
     else if (verb === 'done') {
       if (d.state === 'needs_decision' && !force)

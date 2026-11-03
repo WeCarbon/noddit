@@ -253,7 +253,7 @@ nod                                  # the bench (same as nod bench); q to quit
 | `nod add <title> --parent W12 --after W13` | 子节点，排在另一个之后 |
 | `nod start / done / close <id>` | 待开始 → 执行中 → 已完成 / 已关闭（`--reason obsolete\|superseded\|merged-into:W15`） |
 | `nod ask <id> -o 1=… 2=…` | 在跑的节点需要负责人拍板 |
-| `nod hold <id> --on "Carol: icon set"` | 卡在外部某人身上；不算卡住 |
+| `nod hold <id> --on "Carol: icon set" --until fri` | 在等外部某人（积极延迟，紫色）；不算卡住——同 `nod defer --on` |
 | `nod progress <pct> "msg"` · `… \| nod progress --parse pytest` | 报进度（或者让一个管道自己报） |
 | `nod steps <id> "a" "b" "c"` · `nod step <id> 2` | 多步骤的活，百分比帮你算好 |
 | `nod note <id> "…"` | 追加一条记录（默认是智能体；`--human` 给负责人用） |
@@ -262,7 +262,7 @@ nod                                  # the bench (same as nod bench); q to quit
 | `nod read <id>` · `nod queue` | 取走答复 / 看还有哪些没取 |
 | `nod attach <id> file [--approval-content --approve-on 1]` | 附一个文件；可以挂上批准关 |
 | `nod approved <id> --check <file>` | 只有这份内容被批准过才退出 0 |
-| `nod defer <id>` · `nod undefer <id>` | 延迟 / 解除延迟 |
+| `nod defer <id> [--until <date>]` · `nod undefer <id>` | 延迟到某天或先放着（消极延迟，灰色）/ 解除延迟 |
 | `nod show [open\|active\|deferred\|…] [--stale]` · `nod tree` · `nod get <id>` | 读这个存储 |
 | `nod search <words> [--all]` | 标题、正文、记录、附件名 |
 | `nod source register/sync/push/list/items/ack` | 外部来源 |

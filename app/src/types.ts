@@ -28,6 +28,8 @@ export interface Row {
   collapsed?: boolean
   context?: boolean
   deferred?: boolean
+  /** 延迟 on the node itself: `passive` (grey) or `active` (waiting on someone — purple). */
+  delay?: 'passive' | 'active' | null
   progress?: number | null
   badge?: Seg[]
   badge_short?: Seg[]

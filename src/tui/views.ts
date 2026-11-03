@@ -9,7 +9,7 @@ import { parseNotes } from '../core/parse.ts'
 import { refOf } from '../core/ref.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isStale, minutesSince } from '../core/staleness.ts'
-import { ITEM_STATUSES, deferHidden, dependenciesOf, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel, waitingOnOwner } from '../core/status.ts'
+import { ITEM_STATUSES, deferHidden, delayOf, dependenciesOf, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps, stepProgress } from '../core/steps.ts'
 import type { Decision as Item } from '../core/types.ts'
 import { isRtl, lang, t } from '../i18n/index.ts'
@@ -158,6 +158,8 @@ function isHolds(what: string, d: Item, items: Item[], now: number): boolean {
       return isStartable(d, items)
     case 'deferred':
       return isDeferHidden(d, items)
+    case 'delayed':
+      return delayOf(d, now) !== undefined
     case 'blocks_ai':
       return blocksAnAi(d, items)
     case 'brief':
@@ -206,11 +208,14 @@ export function viewDueCount(view: View | ViewDef, items: Item[], now = Date.now
   return items.filter((d) => isWaitDue(d, now) && inView(def, d, items)).length
 }
 
-/** Waiting nodes due to be checked on first (the longest overdue first; one without a day first of all), then by their day. */
+/** Waiting nodes due to be checked on first (the longest overdue first; one without a day first of all),
+ *  then every 延迟 by its day; a deferral with no day last. */
 function checkBackKey(d: Item, now = Date.now()): [number, number] {
-  if (d.state !== 'waiting') return [2, 0]
-  const at = d.waitingUntil ? Date.parse(d.waitingUntil) : -Infinity
-  return [isWaitDue(d, now) ? 0 : 1, Number.isNaN(at) ? -Infinity : at]
+  const delay = delayOf(d, now)
+  if (!delay) return [3, 0]
+  if (delay.kind === 'passive' && !delay.until) return [2, 0]
+  const at = delay.until ? Date.parse(delay.until) : -Infinity
+  return [delay.due ? 0 : 1, Number.isNaN(at) ? -Infinity : at]
 }
 
 export const keyOf = (d: Pick<Item, 'project' | 'id'>) => `${d.project}#${d.id}`

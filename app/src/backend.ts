@@ -563,9 +563,6 @@ export async function addNode(root: string, n: NewNode): Promise<{ id: number; r
 }
 
 /** Defer until a day (the node comes back on its own then), or indefinitely with `null`. */
-export const deferUntil = (root: string, id: number, date: string | null) =>
-  ok(['defer', String(id), ...(date ? ['--until', date] : []), ...human, '--dir', root])
-
 export const assign = (root: string, id: number, who: 'me' | 'ai') => ok(['assign', String(id), who, '--dir', root])
 
 /** The first megabyte of an attachment as text, for the in-app viewer. */
@@ -620,7 +617,7 @@ const DEMO_VIEWS: ViewsList = {
   views: [
     { id: 'available', icon: 'list-todo', layout: 'tree', label: 'Available', filter_text: 'state:in_progress,waiting,needs_decision,decided or state:not_started is:startable', builtin: true, pristine: true },
     { id: 'decide', icon: 'hand', layout: 'list', group: 'project', sort: ['blocks_ai', 'flag', 'bench'], label: 'Human work', filter_text: 'state:needs_decision or assignee:human', builtin: true, pristine: true },
-    { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['flag', 'waiting_since'], deferred: 'fold', label: 'Waiting', filter_text: 'state:waiting', builtin: true, pristine: true },
+    { id: 'waiting', icon: 'hourglass', layout: 'list', group: 'none', sort: ['check_back', 'flag', 'waiting_since'], deferred: 'show', label: 'Waiting', filter_text: 'state:waiting or is:delayed', builtin: true, pristine: true },
   ],
   schema: {
     layouts: ['tree', 'list'],
@@ -629,7 +626,7 @@ const DEMO_VIEWS: ViewsList = {
     deferred: ['hide', 'show', 'fold'],
     sort: ['bench', 'blocks_ai', 'flag', 'manual', 'urgency', 'due', 'created', 'updated', 'waiting_since', 'touched', 'changed', 'id', 'title', 'state'],
     filter_fields: ['state', 'assignee', 'flag', 'kind', 'project', 'author', 'tag', 'is', 'due', 'updated', 'title'],
-    is_values: ['startable', 'deferred', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'],
+    is_values: ['startable', 'deferred', 'delayed', 'blocks_ai', 'brief', 'touched', 'finished', 'archived', 'stale', 'root', 'parent'],
     builtin: ['available', 'active', 'decide', 'waiting', 'live', 'all'],
   },
 }
@@ -660,5 +657,11 @@ export const resetViews = (id?: string) => ok(['view', 'reset', ...(id ? [id] : 
 export const moveView = (id: string, n: number) => ok(['view', 'move', id, String(n)])
 
 /** 等待: held up on `on` until `date` (YYYY-MM-DD or a loose date), the day to check back. `on` left out moves only the day. */
-export const hold = (root: string, id: number, on: string | null, date: string) =>
-  ok(['hold', String(id), ...(on ? ['--on', on] : []), '--until', date, '--dir', root])
+/**
+ * 延迟 (`nod defer`): `on` makes it a wait on someone or something; with `on` null a node already
+ * waiting only moves its day, unless `passive` turns it into a plain deferral first.
+ */
+export const delay = async (root: string, id: number, on: string | null, date: string | null, passive = false) => {
+  if (passive) await defer(root, id, true)
+  return ok(['defer', String(id), ...(on ? ['--on', on] : []), ...(date ? ['--until', date] : []), ...human, '--dir', root])
+}

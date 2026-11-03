@@ -942,6 +942,10 @@ export class Store {
         state: 'waiting',
         waitingOn: who,
         waitingUntil: opts.until ?? (d.state === 'waiting' ? d.waitingUntil : undefined),
+        // One 延迟 at a time: waiting on someone replaces a plain deferral.
+        deferredAt: undefined,
+        deferredBy: undefined,
+        deferredUntil: undefined,
         body: appendSection(d.body, noteHeading(NOTE_KIND.waiting, opts.role ?? 'agent', author, nowStamp()), text),
       },
       move: d.archived ? 'unarchive' : undefined,
@@ -991,18 +995,39 @@ export class Store {
   }
 
   /**
-   * 延迟: owner wants this done later. Only a flag — state is unchanged, so `undefer` restores it exactly.
+   * 延迟, the one verb behind `nod defer` and `nod hold`: with `on` (or on a node already
+   * waiting) it is an active wait — `hold`; with only a day it is a passive deferral — `defer`.
+   */
+  delay(d: Decision, opts: { by: string; role: NoteRole; until?: string; on?: string }): Decision {
+    const on = opts.on?.trim() || undefined
+    if (on || (d.state === 'waiting' && opts.until)) return this.hold(d, on, opts.by, { until: opts.until, role: opts.role })
+    return this.defer(d, opts)
+  }
+
+  /** Lifts any 延迟: a plain deferral comes back as it was; a wait goes back to 待开始. */
+  undelay(d: Decision, opts: { by: string; role: NoteRole }): Decision {
+    let next = d
+    if (next.state === 'waiting') next = this.unhold(next, opts.by, { role: opts.role })
+    if (next.deferredAt) next = this.undefer(next, opts)
+    return next
+  }
+
+  /**
+   * 延迟 with no one to wait on: state is unchanged, so `undefer` restores it exactly — except a
+   * node that was waiting, which stops waiting (one 延迟 at a time) and goes back to 待开始.
    * `until` (an ISO stamp) brings it back on its own at that moment; deferring again changes or drops it.
    */
   defer(d: Decision, opts: { by: string; role: NoteRole; until?: string }): Decision {
     if (d.state === 'completed' || d.state === 'closed') throw new Error(t('core.store.alreadyFinishedNoDefer', { ref: refOf(d) }))
-    if (isDeferred(d) && d.deferredUntil === opts.until) return d
+    if (isDeferred(d) && d.deferredUntil === opts.until && d.state !== 'waiting') return d
     return this.mutate(d, (d) => {
       const at = nowStamp(new Date(), { ms: true })
       const day = opts.until ? untilDay(opts.until) : undefined
+      const wasWaiting = d.state === 'waiting'
       return {
         next: {
           ...d,
+          ...(wasWaiting ? { state: 'not_started' as const, waitingOn: undefined, waitingUntil: undefined } : {}),
           deferredAt: at,
           deferredBy: opts.by,
           deferredUntil: opts.until,

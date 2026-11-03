@@ -14,8 +14,10 @@ import { refOf } from '../core/ref.ts'
 import { listSources, type SourceSummary } from '../core/sources.ts'
 import { projectSessions } from '../core/listeners.ts'
 import type { ProjectSessions } from '../core/overview.ts'
-import { findRef, isDeferred, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
-import type { Store } from '../core/store.ts'
+import { delayOf, findRef, isDeferred, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
+import { splitWhen } from '../core/fuzzy-date.ts'
+import { dayText } from '../i18n/time.ts'
+import { nowStamp, type Store } from '../core/store.ts'
 import { assertTitleFits } from '../core/title.ts'
 import { type Decision } from '../core/types.ts'
 import { isRtl, t } from '../i18n/index.ts'
@@ -91,9 +93,9 @@ export function repaintRows(frame: Line[], from: number, to: number): string {
 const MIN_PANEL_COLS = 12
 
 type Line = Segment[]
-export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother' | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle'
+export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother' | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay'
 /** Modes where keystrokes go into the prompt-line draft. */
-const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle']
+const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay']
 
 interface Props {
   store: Store
@@ -475,18 +477,35 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     reload()
   }
 
-  /** 延迟 on/off (`d`): the node keeps its state, only leaves the working lists. */
+  /** 延迟 (`d`): already delayed, it is lifted; otherwise a prompt asks until when, and on what. */
   const toggleDefer = () => {
     if (!current) return
     if (isTerminal(current.state)) return say(t('bench.toast.cannotDeferTerminal'))
-    try {
-      if (current.deferredAt) {
-        store.undefer(current, { by: 'owner', role: 'human' })
-        say(t('bench.toast.undeferred', { ref: refOf(current), status: statusLabel(current.state) }))
-      } else {
-        store.defer(current, { by: 'owner', role: 'human' })
-        say(t('bench.toast.deferred', { ref: refOf(current) }))
+    if (delayOf(current) || current.deferredAt) {
+      try {
+        const next = store.undelay(current, { by: 'owner', role: 'human' })
+        say(t('bench.toast.undeferred', { ref: refOf(current), status: statusLabel(next.state) }))
+      } catch (e) {
+        say((e as Error).message)
       }
+      return reload()
+    }
+    startText('delay')
+  }
+
+  /** `fri Carol to confirm`: until that day, waiting on Carol (purple); a day alone is passive (grey); blank is indefinitely. */
+  const commitDelay = () => {
+    const raw = draft.trim()
+    setMode('browse')
+    setDraft('')
+    if (!current) return
+    const { when, rest } = splitWhen(raw)
+    try {
+      if (rest && !when) throw new Error(t('bench.toast.delayNeedsDate'))
+      if (when && when.at.getTime() <= Date.now()) throw new Error(t('cli.defer.untilPast', { value: raw, date: dayText(when.day) }))
+      const next = store.delay(current, { by: 'owner', role: 'human', until: when && nowStamp(when.at), on: rest || undefined })
+      const date = when ? dayText(when.day) : ''
+      say(next.state === 'waiting' ? t('bench.toast.delayedOn', { ref: refOf(next), on: next.waitingOn ?? '', date }) : when ? t('bench.toast.delayedUntil', { ref: refOf(next), date }) : t('bench.toast.deferred', { ref: refOf(next) }))
     } catch (e) {
       say((e as Error).message)
     }
@@ -923,6 +942,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         if (mode === 'qnote') return commitQNote()
         if (mode === 'qother') return commitQOther()
         if (mode === 'close') return commitClose()
+        if (mode === 'delay') return commitDelay()
         if (mode === 'brief') return commitBrief()
         if (mode === 'retitle') return commitRetitle()
         return commitGoto()
@@ -1995,6 +2015,7 @@ function promptPrefix(s: FrameInput): Line | null {
   }
   if (s.mode === 'close') return [{ text: t('bench.prompt.close', { ref: refOf(d) }), color: 'red', bold: true }]
   if (s.mode === 'retitle') return [{ text: t('bench.prompt.retitle', { ref: refOf(d) }), color: 'cyan', bold: true }]
+  if (s.mode === 'delay') return [{ text: t('bench.prompt.delay', { ref: refOf(d) }), color: 'magenta', bold: true }]
   return null
 }
 
@@ -2037,6 +2058,7 @@ const PLACEHOLDER: Partial<Record<Mode, () => string>> = {
   goto: () => t('bench.placeholder.goto'),
   brief: () => t('bench.placeholder.brief'),
   retitle: () => t('bench.placeholder.retitle'),
+  delay: () => t('bench.placeholder.delay'),
 }
 
 function promptLine(s: FrameInput): Line {

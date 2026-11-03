@@ -20,8 +20,8 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 | 补一条记录 / 转记 owner 的话 | `nod note <id> --agent "…"` / `nod note <id> --human --by "owner（对话里说，<你> 转记）" "…"` |
 | 开始 / 做完 / 不做了 | `nod start` / `nod done --note` / `nod close --reason` |
 | 要 owner 拍板 / 再看一眼 | `nod ask <id> -o 1="…" 2="…"` / `nod ask <id>`；每个选项写清选了会怎样（花多久、谁来做、放弃什么、风险、能不能反悔）和推荐哪个、为什么——`-o` 只放短标签，说明用 heredoc 写在正文里，每个选项一节 `### 1 · <标签>`（app 把它挪到选项卡片上） |
-| 等外部（同事、客户、供应商、服务恢复） | `nod hold <id> --on "<谁/什么>" --until <日期>`（必须给回头看的那天；状态是「等待」，不是卡住），到日子 monitor 打 `NODDIT-CHECK-BACK`；恢复用 `nod start` |
-| owner 延迟了 / 解除 | owner 可以把节点延迟（bench 里按 d / `nod defer`）：它从可用/活动/需要人类里消失，状态不变；你收到「owner 延迟」就先停手，解除前别动它（`nod undefer` 解除，`nod show deferred` 列出）。`nod defer <id> --until 周五`（3d、15 nov、下周一……，`nod date "<文字>"` 先看是哪天）到那天自己回来，monitor 打 `NODDIT-UNDEFERRED <id>` |
+| 等外部（同事、客户、供应商、服务恢复） | `nod hold <id> --on "<谁/什么>" --until <日期>`（= `nod defer --on`，积极延迟；必须给回头看的那天；状态是「等待」，不是卡住），到日子 monitor 打 `NODDIT-CHECK-BACK`；恢复用 `nod start`，`--off` 回到待开始 |
+| owner 延迟了 / 解除 | owner 可以把节点延迟（bench 里按 d / `nod defer`）：消极延迟在可用里变灰、从活动/需要人类里拿掉，状态不变；你收到「owner 延迟」就先停手，解除前别动它（`nod undefer` 解除，`nod show deferred` 列出）。`nod defer <id> --until 周五`（3d、15 nov、下周一……，`nod date "<文字>"` 先看是哪天）到那天自己回来，monitor 打 `NODDIT-UNDEFERRED <id>` |
 | owner 自己的事 | `assignee: human`，bench 上「你来做」，列在「需要人类」里：**不要开始、接走、展开或去做**，也不会有 check-in 和催办。需要 owner 亲手做的事替他记：`nod add --for me "给供应商打电话" --parent <id>`，等它的活 `--after` 它；`nod assign <id> me` 交给 owner，交回 AI（`--force`）只在他说了时 |
 | 进度 | `nod start <id>` 之后它就是本会话的当前节点，`nod progress <pct> "…"` / `nod note "…"` / `nod beat` / `nod steps` / `nod step <n>` 都可以不写 id（`NODDIT_NODE` 设了以它为准；同一会话里的几个子 agent 会互相覆盖，各自写 id 或设 `NODDIT_IDENTITY`）。长命令直接管道：`pytest … \| nod progress --parse pytest`；`nod progress --from-file x.jsonl` 自动认 noddit JSONL 事件；或者 `nod run <id> -- <命令…>` 一条包办：开始、跟进度（替你设 `NODDIT_EVENTS`）、成功 `nod done`、失败 `nod hold` 带上输出末尾。超过 check-in 间隔（默认 30m，`nod config checkin-after`）没更新会收到 `NODDIT-CHECKIN`；还在做但没新内容就 `nod beat`，问满 3 次没回 bench 上标红 |
 | 等 owner 答复、等外部来源 | 主 session：plugin 自动启动的 decs monitor；DECS-IDLE 之后或子 agent：用 Monitor 挂 `nod monitor`（子 agent 加 --mine） |

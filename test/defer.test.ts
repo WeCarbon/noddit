@@ -8,11 +8,11 @@ import { initLayout } from '../src/core/paths.ts'
 import { buildOverview } from '../src/core/overview.ts'
 import { renderDecision } from '../src/core/render.ts'
 import { stalenessOf } from '../src/core/staleness.ts'
-import { deferHidden } from '../src/core/status.ts'
+import { deferHidden, delayOf } from '../src/core/status.ts'
 import { Store } from '../src/core/store.ts'
 import { readQueue } from '../src/core/queue.ts'
 import { NOTE_KIND, NOTE_TEXT } from '../src/core/format.ts'
-import { DEFERRED_GROUP, VIEWS, homeView, inView, rowsFor, viewCount, viewFromArg } from '../src/tui/views.ts'
+import { VIEWS, homeView, inView, rowsFor, viewCount, viewFromArg } from '../src/tui/views.ts'
 import { BIN, decs, decsResult, killAndWait, scratch } from './helpers.ts'
 import { bench, has, KEY } from './tui-harness.ts'
 
@@ -42,12 +42,11 @@ test('deferred_at / deferred_by round-trip through front matter and survive othe
   assert.match(back.body, new RegExp(`## ${NOTE_KIND.undeferred}（human · owner · `))
 })
 
-test('defer keeps the state (in progress, needs decision, waiting) and undefer brings it back as it was', (t) => {
+test('defer keeps the state (in progress, needs decision) and undefer brings it back as it was', (t) => {
   const store = tmpStore(t)
   const running = store.start(store.create({ title: 'running', author: A, task: true }))
   const asking = store.create({ title: 'needs a call', author: A, options: opt, default: '1' })
-  const held = store.hold(store.create({ title: 'waiting on the customer', author: A, task: true }), 'customer', A)
-  for (const d of [running, asking, held]) {
+  for (const d of [running, asking]) {
     const off = store.defer(d, owner)
     assert.equal(off.state, d.state, `${d.title}: defer leaves the state`)
     assert.equal(store.get(d.id)!.queued, undefined, `${d.title}: an owner's defer is not a request — nothing enqueued`)
@@ -116,39 +115,34 @@ function fixture(t: { after: (fn: () => void) => void }) {
   return { store, ids: { P: P.id, c: c.id, w: w.id, R: R.id, x: x.id, y: y.id, H: H.id, K: K.id, F: F.id } }
 }
 
-test('views: a deferred node and its subtree leave Available/Active/Decide; Waiting ends with a folded "Deferred N"; All keeps all', (t) => {
+test('views: a deferred node stays in Available (grey) and is listed in Waiting beside every wait; Active/Decide still leave it out; All keeps all', (t) => {
   const { store, ids } = fixture(t)
   const items = store.all()
   const get = (id: number) => items.find((d) => d.id === id)!
   const hidden = deferHidden(items)
   assert.deepEqual([ids.P, ids.c, ids.w, ids.x, ids.H].map((id) => hidden(get(id))), [true, true, true, true, true])
   assert.deepEqual([ids.R, ids.y, ids.K, ids.F].map((id) => hidden(get(id))), [false, false, false, false], 'a finished node is not deferred')
-  for (const v of ['available', 'active', 'decide', 'waiting'] as const)
+  for (const v of ['active', 'decide'] as const)
     for (const id of [ids.P, ids.c, ids.w, ids.x, ids.H]) assert.equal(inView(v, get(id), items), false, `${v} hides ${get(id).title}`)
+  for (const id of [ids.P, ids.c, ids.w, ids.x, ids.H]) assert.equal(inView('available', get(id), items), true, `Available lists ${get(id).title}`)
+  assert.equal(get(ids.H).state, 'not_started', 'a plain defer of a waiting node replaced the wait')
   assert.ok(inView('decide', get(ids.y), items))
   assert.ok(rowsFor('all', items).some((r) => r.node?.id === ids.c))
 
-  // Waiting: K, then the folded group — shut by default.
-  const shut = rowsFor('waiting', items)
-  assert.deepEqual(shut.map((r) => r.kind), ['node', 'fold'])
-  assert.equal(shut[0].node!.id, ids.K)
-  assert.equal(shut[1].key, DEFERRED_GROUP)
-  assert.match(shut[1].text!, /Deferred 3  \+ expand/)
-  const open = rowsFor('waiting', items, { openGroups: new Set([DEFERRED_GROUP]) })
-  assert.match(open[1].text!, /Deferred 3  - collapse/)
-  assert.deepEqual(open.slice(2).map((r) => r.node!.title), ['P parent', 'x needs decision', 'H waiting and deferred'], 'every deferred node, longest-deferred first')
-  assert.equal(open.filter((r) => r.node?.id === ids.H).length, 1, 'a deferred Waiting node is listed once, under Deferred')
+  // Waiting: every 延迟, passive and active, as plain rows — no fold.
+  const rows = rowsFor('waiting', items)
+  assert.deepEqual(rows.map((r) => r.kind), rows.map(() => 'node'))
+  assert.deepEqual(new Set(rows.map((r) => r.node!.id)), new Set([ids.K, ids.w, ids.P, ids.x, ids.H]))
 
   assert.deepEqual(VIEWS, ['available', 'active', 'decide', 'waiting', 'live', 'all'], 'no Deferred tab')
   const counts = Object.fromEntries(VIEWS.map((v) => [v, viewCount(v, items)]))
-  assert.deepEqual(counts, { available: 3, active: 2, decide: 1, all: undefined, waiting: 1, live: undefined })
+  assert.deepEqual(counts, { available: 8, active: 2, decide: 1, all: undefined, waiting: 5, live: undefined })
   const ov = buildOverview(items)
   assert.deepEqual(ov.needsOwner.map((r) => r.id), [ids.y])
   assert.deepEqual(ov.inProgress.map((r) => r.id), [ids.R])
 
-  assert.equal(homeView(get(ids.x), items, 'decide'), 'waiting', 'a jump to a deferred node lands in Waiting (under Deferred)')
+  assert.equal(homeView(get(ids.x), items, 'decide'), 'available', 'a jump to a deferred node lands in Available')
   assert.equal(homeView(get(ids.x), items, 'waiting'), 'waiting')
-  assert.equal(homeView(get(ids.c), items, 'available'), 'all', 'one under a deferred parent lands in All')
   assert.equal(viewFromArg('deferred'), 'waiting')
   assert.equal(viewFromArg('defer'), 'waiting')
 })
@@ -236,47 +230,47 @@ test('decs monitor tells the lane "owner Deferred", and nothing is queued', asyn
 // Bench
 // ---------------------------------------------------------------------------
 
-test('App: d in Available defers the cursor node — it leaves, the cursor moves on, a banner says where it went', async (t) => {
+test('App: d asks until when — blank defers (grey, stays in Available), a day and a name waits on them (purple)', async (t) => {
   const store = tmpStore(t)
   const a = store.start(store.create({ title: 'a first one', author: A, task: true }))
-  store.start(store.create({ title: 'b second one', author: A, task: true }))
+  const c = store.start(store.create({ title: 'b second one', author: A, task: true }))
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a first one/))
   assert.match(b.frame()[0], /^decs +Available 2 +Active 2 +Human work +Waiting +Live +All *$/)
   await b.press('d')
-  await b.until(has(b, /deferred \(undo it in Waiting → Deferred\)/))
-  const f = b.frame().join('\n')
-  assert.match(f, new RegExp(`X${a.id} deferred`))
-  assert.doesNotMatch(f.split('\n').slice(2).map((l) => l.split('│')[0]).join('\n'), /a first one/, 'gone from Available')
-  assert.match(f, /b second one[^\n]*│[^\n]*X2/, 'the cursor moved on to b')
-  assert.match(b.frame()[0], /Available 1 /)
+  await b.until(has(b, new RegExp(`Delay X${a.id} until: `)))
+  await b.press('\r')
+  await b.until(has(b, /delayed — d again to lift it/))
+  assert.match(b.frame().slice(2).map((l) => l.split('│')[0]).join('\n'), /a first one/, 'still in Available')
   assert.ok(store.get(a.id)!.deferredAt)
   assert.equal(store.get(a.id)!.state, 'in_progress')
   assert.match(store.get(a.id)!.body, new RegExp(`## ${NOTE_KIND.deferred}（human · owner · `))
+
+  await b.press(KEY.down)
+  await b.until(right(b, /b second one/))
+  await b.press('d', ...'3d Carol to confirm'.split(''), '\r')
+  await b.until(has(b, /waiting on Carol to confirm/))
+  assert.equal(store.get(c.id)!.state, 'waiting')
+  assert.equal(store.get(c.id)!.waitingOn, 'Carol to confirm')
+  assert.ok(store.get(c.id)!.waitingUntil)
 })
 
-test('App: Waiting → + opens "Deferred N", d un-defers from there, - folds it; on a finished node d says so', async (t) => {
+test('App: Waiting lists deferred nodes; d lifts one there; on a finished node d says so', async (t) => {
   const store = tmpStore(t)
   const a = store.defer(store.create({ title: 'a do it later', author: A, options: opt, default: '1' }), owner)
   store.defer(store.create({ title: 'b also later', author: A, task: true }), owner)
   const b = bench(t, store, { view: 'waiting' })
-  await b.until(has(b, /Deferred 2  \+ expand/))
   const left = () => b.frame().slice(2).map((l) => l.split('│')[0]).join('\n')
-  assert.doesNotMatch(left(), /a do it later/, 'folded by default')
-  await b.press('+')
-  await b.until(() => /a do it later/.test(left()))
+  await b.until(() => /a do it later/.test(left()) && /b also later/.test(left()))
   // Relative time goes through dayjs, which says "a few seconds ago" for a sub-minute span.
   assert.match(b.frame().join('\n'), /Deferred · (a few seconds ago|a minute ago|\d+ minutes ago)/)
-  await b.press(KEY.down)
-  await b.until(right(b, /a do it later/))
+  while (!right(b, /a do it later/)()) await b.press(KEY.down)
   await b.press('d')
   await b.until(has(b, /resumed · Needs decision/))
   assert.equal(store.get(a.id)!.deferredAt, undefined)
   assert.equal(store.get(a.id)!.state, 'needs_decision')
-  await b.until(has(b, /Deferred 1  - collapse/))
+  await b.until(() => !/a do it later/.test(left()))
   assert.match(b.frame()[0], /Human work 1/, 'back in its views')
-  await b.press('-')
-  await b.until(has(b, /Deferred 1  \+ expand/))
 
   const done = store.complete(store.start(store.create({ title: 'z all done', author: A, task: true })))
   const c = bench(t, store, { view: 'all' })
@@ -287,12 +281,11 @@ test('App: Waiting → + opens "Deferred N", d un-defers from there, - folds it;
   await c.until(has(c, /need deferring/))
 })
 
-test('App: --view deferred opens Waiting with "Deferred N" unfolded', async (t) => {
+test('App: --view deferred opens Waiting, where deferred nodes are listed', async (t) => {
   const store = tmpStore(t)
   store.defer(store.create({ title: 'x put it off', author: A, task: true }), owner)
   const b = bench(t, store, { view: 'waiting', openDeferred: true })
   await b.until(has(b, /x put it off/))
-  assert.match(b.frame().join('\n'), /Deferred 1  - collapse/)
 })
 
 test('App: g is goto — g 64 ⏎ lands on 64, : still works, the old d+digits jump is gone, g no longer scrolls', async (t) => {
@@ -323,8 +316,60 @@ test('App: g is goto — g 64 ⏎ lands on 64, : still works, the old d+digits j
   await b.until(right(b, /n64 target/))
   await b.press(':', ...`${x.id}`.split(''), '\r')
   await b.until(right(b, /x put it off/))
-  assert.match(b.frame().join('\n'), /Deferred 1  - collapse/, 'jumping to a deferred node opens Waiting → Deferred')
   assert.match(b.frame().join('\n'), /Deferred \(owner/, 'the detail pane says it is deferred')
+})
+
+test('延迟 is one thing: --on makes it active (waiting), a day alone passive; hold and defer are two spellings', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  for (const title of ['chase Carol', 'look again later', 'also later']) decs(root, ['add', '--task', title])
+  decs(root, ['defer', '1', '--on', 'Carol to confirm', '--until', 'fri'])
+  decs(root, ['hold', '2', '--until', 'fri'])
+  decs(root, ['defer', '3', '--until', 'fri'])
+  const get = (id: number) => JSON.parse(decs(root, ['get', String(id), '--json']))
+  const [a, b, c] = [get(1), get(2), get(3)]
+  assert.equal(a.status, 'waiting')
+  assert.deepEqual([a.delay.kind, a.delay.on], ['active', 'Carol to confirm'])
+  assert.equal(b.status, 'not_started', 'hold without --on is a passive delay, not an error')
+  assert.equal(b.delay.kind, 'passive')
+  assert.equal(c.delay.kind, 'passive')
+  assert.equal(b.delay.until, c.delay.until)
+  // Either spelling lifts either kind.
+  decs(root, ['hold', '2', '--off'])
+  decs(root, ['defer', '1', '--off'])
+  assert.equal(get(2).delay, null)
+  assert.equal(get(1).delay, null)
+  assert.equal(get(1).status, 'not_started')
+  assert.notEqual(decsResult(root, ['defer', '3', '--on', 'Bob']).code, 0, 'an active delay needs a day')
+})
+
+test('one delay at a time: waiting on someone replaces a passive delay, and a plain defer replaces a wait', (t) => {
+  const store = tmpStore(t)
+  const d = store.defer(store.create({ title: 'later', author: A, task: true }), { ...owner, until: '2099-01-01T00:00:00' })
+  const held = store.delay(d, { ...owner, on: 'Carol', until: '2099-01-02T00:00:00' })
+  assert.equal(held.state, 'waiting')
+  assert.equal(held.deferredAt, undefined)
+  const back = store.delay(held, { ...owner, until: undefined })
+  assert.equal(back.state, 'not_started')
+  assert.equal(back.waitingOn, undefined)
+  assert.ok(back.deferredAt)
+  const lifted = store.undelay(back, owner)
+  assert.equal(lifted.deferredAt, undefined)
+})
+
+test('old records of either kind read as a delay: deferred_at → passive, state waiting → active; both in Waiting and Available', (t) => {
+  const store = tmpStore(t)
+  const passive = store.defer(store.start(store.create({ title: 'old defer', author: A, task: true })), owner)
+  const active = store.hold(store.start(store.create({ title: 'old hold', author: A, task: true })), 'customer', A, { until: '2099-01-01T00:00:00' })
+  const items = store.all()
+  const get = (id: number) => items.find((i) => i.id === id)!
+  assert.equal(delayOf(get(passive.id))?.kind, 'passive')
+  assert.equal(delayOf(get(active.id))?.kind, 'active')
+  for (const id of [passive.id, active.id]) {
+    assert.equal(inView('waiting', get(id), items), true)
+    assert.equal(inView('available', get(id), items), true)
+  }
 })
 
 /** Whether the right pane (what the cursor is on) mentions `re`. */

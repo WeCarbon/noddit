@@ -45,7 +45,7 @@ const COMMANDS: Record<string, () => Promise<CommandModule>> = {
   done: () => import('./commands/lifecycle.ts'),
   close: () => import('./commands/lifecycle.ts'),
   ask: () => import('./commands/lifecycle.ts'),
-  hold: () => import('./commands/lifecycle.ts'),
+  hold: () => import('./commands/defer.ts'),
   defer: () => import('./commands/defer.ts'),
   undefer: () => import('./commands/defer.ts'),
   assign: () => import('./commands/assign.ts'),

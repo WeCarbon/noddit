@@ -40,6 +40,25 @@ export function isWaitDue(i: Pick<Item, 'state'> & Partial<Pick<Item, 'waitingUn
   return Number.isNaN(at) || at <= now
 }
 
+/**
+ * 延迟, the one idea behind `nod defer` and `nod hold`, read off either record:
+ * `active` waits on someone or something (state `waiting`, shown purple);
+ * `passive` only waits for a day, or indefinitely (the `deferred_at` flag, shown grey).
+ * `due`: the day has come — an active wait to follow up on.
+ */
+export interface Delay {
+  kind: 'passive' | 'active'
+  until?: string
+  on?: string
+  due: boolean
+}
+
+export function delayOf(i: Pick<Item, 'state'> & Partial<Pick<Item, 'deferredAt' | 'deferredUntil' | 'waitingOn' | 'waitingUntil'>>, now = Date.now()): Delay | undefined {
+  if (i.state === 'waiting') return { kind: 'active', ...(i.waitingOn ? { on: i.waitingOn } : {}), ...(i.waitingUntil ? { until: i.waitingUntil } : {}), due: isWaitDue(i, now) }
+  if (isDeferred({ deferredAt: i.deferredAt, deferredUntil: i.deferredUntil, state: i.state }, now)) return { kind: 'passive', ...(i.deferredUntil ? { until: i.deferredUntil } : {}), due: false }
+  return undefined
+}
+
 /** Deferred `--until` a moment that has now come. */
 export function deferralOver(i: Partial<Pick<Item, 'deferredAt' | 'deferredUntil'>>, now = Date.now()): boolean {
   if (!i.deferredAt || !i.deferredUntil) return false

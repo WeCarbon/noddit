@@ -3,7 +3,7 @@ import * as api from './backend.ts'
 import { Body } from './body.tsx'
 import { NodeHeader } from './header.tsx'
 import { QuickEntry, StartSession } from './quick.tsx'
-import { DeferDialog, HoldDialog, NewNode } from './newnode.tsx'
+import { DelayDialog, NewNode } from './newnode.tsx'
 import { Viewer, itemsAround, type ViewItem } from './viewer.tsx'
 import { BodyEditor } from './editor.tsx'
 import { ViewEditor, ViewIcon } from './views.tsx'
@@ -446,41 +446,36 @@ export function Bench(props: {
     if (node && !node.terminal) setComposer({ kind: 'close' })
   }
   const [deferFor, setDeferFor] = useState<Node | null>(null)
-  const [holdFor, setHoldFor] = useState<Node | null>(null)
-  /** 等待 on `on` (null: only the day moves) until `date`. */
-  const holdNode = (n: Node, on: string | null, date: string) => {
-    setHoldFor(null)
-    holdShown(n.key)
-    optimistic(
-      both(
-        patchNode(n.key, (x) => ({ ...x, status: 'waiting', waiting_on: on ?? x.waiting_on, waiting_until: `${date}T00:00:00` })),
-        patchRows(n.key, (r) => ({ ...r, state: 'waiting', wait_due: false, waiting_until: `${date}T00:00:00`, glyph: r.glyph && { ...r.glyph, text: '⏸', color: 'magenta', dim: false } })),
-      ),
-      () => api.hold(rootOf(n), n.id, on, date),
-      s('heldUntil', { date }),
-    )
-  }
-  /** Put off until `date` (YYYY-MM-DD), or indefinitely with null. */
-  const deferNode = (n: Node, date: string | null) => {
+  /** 延迟到…: waiting on `on` (purple), or — no one named — a plain deferral (grey); `date` null = indefinitely. */
+  const delayNode = (n: Node, on: string | null, date: string | null, passive: boolean) => {
     setDeferFor(null)
     holdShown(n.key)
+    const active = Boolean(on) || (n.status === 'waiting' && !passive)
+    const until = date ? `${date}T00:00:00` : null
     optimistic(
-      both(patchNode(n.key, (x) => ({ ...x, deferred_at: now(), deferred_until: date })), dropRows(n.key, ['all', 'waiting', 'live']), patchRows(n.key, (r) => ({ ...r, deferred: true }))),
-      () => api.deferUntil(rootOf(n), n.id, date),
-      date ? s('deferredUntil', { date }) : s('deferred'),
+      active
+        ? both(
+            patchNode(n.key, (x) => ({ ...x, status: 'waiting', deferred_at: null, waiting_on: on ?? x.waiting_on, waiting_until: until ?? x.waiting_until })),
+            patchRows(n.key, (r) => ({ ...r, state: 'waiting', delay: 'active', deferred: false, wait_due: false, waiting_until: until ?? r.waiting_until, glyph: r.glyph && { ...r.glyph, text: '⏸', color: 'magenta', dim: false } })),
+          )
+        : both(
+            patchNode(n.key, (x) => ({ ...x, ...(x.status === 'waiting' ? { status: 'not_started' as const, waiting_on: null } : {}), deferred_at: now(), deferred_until: date })),
+            dropRows(n.key, ['all', 'live']),
+            patchRows(n.key, (r) => ({ ...r, deferred: true, delay: 'passive' })),
+          ),
+      () => api.delay(rootOf(n), n.id, on, date, passive),
+      active ? s('heldUntil', { date: date ?? '' }) : date ? s('deferredUntil', { date }) : s('deferred'),
     )
   }
+  /** Lifts any 延迟 (a wait goes back to To do); with none, asks until when. */
   const toggleDefer = () => {
     if (!node || node.terminal) return
-    if (!node.deferred_at) return setDeferFor(node)
-    const off = Boolean(node.deferred_at)
+    if (!node.deferred_at && node.status !== 'waiting') return setDeferFor(node)
     const key = node.key
     optimistic(
-      off
-        ? patchNode(key, (n) => ({ ...n, deferred_at: null }))
-        : both(patchNode(key, (n) => ({ ...n, deferred_at: now() })), dropRows(key, ['all', 'waiting', 'live']), patchRows(key, (r) => ({ ...r, deferred: true }))),
-      () => api.defer(rootOf(node), node.id, off),
-      off ? s('undeferred') : s('deferred'),
+      patchNode(key, (n) => ({ ...n, deferred_at: null, ...(n.status === 'waiting' ? { status: 'not_started' as const, waiting_on: null } : {}) })),
+      () => api.defer(rootOf(node), node.id, true),
+      s('undeferred'),
     )
   }
   /*
@@ -640,7 +635,7 @@ export function Bench(props: {
   const isMac = /Mac/.test(navigator.platform)
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
-  latest.current = { startAnswer, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign, setHoldFor } as never
+  latest.current = { startAnswer, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign, setDeferFor } as never
 
   const nodeMenu = (n: Node | undefined, r: Row): MenuItem[] => {
     const L = () => latest.current as unknown as {
@@ -649,7 +644,7 @@ export function Bench(props: {
       setMilestoneFor: (n: Node) => void
       clearMilestone: () => void
       reassign: () => void
-      setHoldFor: (n: Node) => void
+      setDeferFor: (n: Node) => void
       seen: () => void
       startClose: () => void
       toggleDefer: () => void
@@ -688,8 +683,15 @@ export function Bench(props: {
       items.push({ kind: 'separator' })
       if (n.status === 'not_started') items.push({ label: s('ctxStart'), icon: I(Play), run: () => L().markStart() })
       if (n.status === 'in_progress' || n.status === 'waiting') items.push({ label: s('ctxDone'), icon: I(CircleCheck), run: () => L().markDone() })
-      items.push({ label: n.deferred_at ? s('undefer') : s('deferMenu'), icon: n.deferred_at ? I(TimerOff) : I(Timer), shortcut: 'D', run: () => L().toggleDefer() })
-      if (n.status !== 'needs_decision') items.push({ label: n.status === 'waiting' ? s('holdChange') : s('holdMenu'), icon: I(Hourglass), run: () => L().setHoldFor(n) })
+      const delayed = Boolean(n.deferred_at) || n.status === 'waiting'
+      items.push({
+        label: s('defer'),
+        icon: I(Timer),
+        sub: [
+          { label: s('deferMenu'), icon: I(Hourglass), shortcut: delayed ? undefined : 'D', run: () => L().setDeferFor(n) },
+          ...(delayed ? [{ label: s('undefer'), icon: I(TimerOff), shortcut: 'D', run: () => L().toggleDefer() }] : []),
+        ],
+      })
       items.push({ label: n.assignee === 'human' ? s('assignAi') : s('assignMe'), icon: n.assignee === 'human' ? I(Bot) : I(User), run: () => L().reassign() })
       items.push({ label: s('seen'), icon: I(Eye), shortcut: 'A', run: () => L().seen() })
       items.push({ label: s('ctxCloseMenu'), icon: I(Ban), shortcut: 'X', danger: true, run: () => L().startClose() })
@@ -884,7 +886,7 @@ export function Bench(props: {
         if (current && !deselected) return deselect()
         return
       }
-      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || holdFor || milestoneFor || editing || editConflict || editingTitle || titleConflict || viewEditor || isTyping(e)) return
+      if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || milestoneFor || editing || editConflict || editingTitle || titleConflict || viewEditor || isTyping(e)) return
       if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault()
         return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
@@ -1288,8 +1290,7 @@ export function Bench(props: {
           }}
         />
       )}
-      {holdFor && <HoldDialog node={holdFor} busy={busy} onClose={() => setHoldFor(null)} onHold={(on, date) => holdNode(holdFor, on, date)} />}
-      {deferFor && <DeferDialog title={`${deferFor.ref} ${deferFor.title}`} busy={busy} onClose={() => setDeferFor(null)} onDefer={(date) => deferNode(deferFor, date)} />}
+      {deferFor && <DelayDialog node={deferFor} busy={busy} onClose={() => setDeferFor(null)} onDelay={(on, date, passive) => delayNode(deferFor, on, date, passive)} />}
       {startFor && (
         <StartSession
           project={startFor.project}

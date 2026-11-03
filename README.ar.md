@@ -273,7 +273,7 @@ macOS)؛ و`terminal` يجعل nod يكتب بالترتيب المنطقي وي
 | `nod add <title> --parent W12 --after W13` | عقدة فرعية، مرتَّبة بعد أخرى |
 | `nod start / done / close <id>` | لم يبدأ → قيد التنفيذ → مكتمل / مغلق (`--reason obsolete\|superseded\|merged-into:W15`) |
 | `nod ask <id> -o 1=… 2=…` | عقدة جارية تحتاج المسؤول |
-| `nod hold <id> --on "Carol: icon set"` | متعثّرة بانتظار شخص خارجي؛ لا تُحسب متعثّرة |
+| `nod hold <id> --on "Carol: icon set" --until fri` | بانتظار شخص خارجي (تأجيل نشط، بنفسجي)؛ لا تُحسب متعثّرة — مثل `nod defer --on` |
 | `nod progress <pct> "msg"` · `… \| nod progress --parse pytest` | أبلِغ عن التقدّم (أو اترك أنبوبًا يبلّغ عنه) |
 | `nod steps <id> "a" "b" "c"` · `nod step <id> 2` | عمل متعدّد الخطوات، تُحسب النسبة لك |
 | `nod note <id> "…"` | يضيف سجلًّا (وكيل افتراضيًا؛ `--human` للمسؤول) |
@@ -282,7 +282,7 @@ macOS)؛ و`terminal` يجعل nod يكتب بالترتيب المنطقي وي
 | `nod read <id>` · `nod queue` | يجمع الإجابات / يرى ما لم يُجمع بعد |
 | `nod attach <id> file [--approval-content --approve-on 1]` | يُرفق ملفًا؛ يربطه بموافقة |
 | `nod approved <id> --check <file>` | يخرج بـ 0 فقط إذا وافق على هذا المحتوى بالضبط |
-| `nod defer <id>` · `nod undefer <id>` | أجّل / أعد |
+| `nod defer <id> [--until <date>]` · `nod undefer <id>` | أجّل إلى يوم أو بلا موعد (تأجيل سلبي، رمادي) / أعد |
 | `nod show [open\|active\|deferred\|…] [--stale]` · `nod tree` · `nod get <id>` | اقرأ المخزن |
 | `nod search <words> [--all]` | العناوين، النصوص، السجلات، أسماء المرفقات |
 | `nod source register/sync/push/list/items/ack` | المصادر الخارجية |
