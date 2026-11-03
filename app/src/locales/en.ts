@@ -202,7 +202,6 @@ export const en = {
   assignAi: 'Hand it to an AI',
   assignedMe: 'Yours now',
   assignedAi: 'An AI’s now',
-  forYou: 'For you',
   keyNew: 'New node',
   settingsShared: 'Noddit — also in the terminal bench',
   settingsApp: 'This app',

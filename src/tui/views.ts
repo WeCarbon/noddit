@@ -842,17 +842,24 @@ export function decidedShape(d: Item): string {
 /** 派活 the owner filed that no AI has picked up yet — its own shape, whatever the state says. */
 export const BRIEF_GLYPH = '✎'
 
+/** 人类工作, not a decision: a hollow yellow diamond, instead of its state's own shape. */
+export const HUMAN_GLYPH = '◇'
+
 /** The glyph text for `d`, whatever its state. */
-export const glyphText = (d: Item) => (isUnclaimedBrief(d) ? BRIEF_GLYPH : d.state === 'decided' ? decidedShape(d) : GLYPH[d.state])
+export const glyphText = (d: Item, items: Item[]) =>
+  isUnclaimedBrief(d) ? BRIEF_GLYPH : isOpenHumanTask(d, items) ? HUMAN_GLYPH : d.state === 'decided' ? decidedShape(d) : GLYPH[d.state]
 
 /**
  * ◆ is yellow, bold while an AI is stuck on it, dim if answerable early.
- * Green is 已答待取 (owner answered, AI hasn't picked up), keeping its task
- * shape. ◐ goes red once a check-in has gone unanswered 3 times (core/checkins.ts).
+ * ◇ (hollow, also yellow) is the owner's own open to-do — a human task, not
+ * a decision; see `isOpenHumanTask`. Green is 已答待取 (owner answered, AI
+ * hasn't picked up), keeping its task shape. ◐ goes red once a check-in has
+ * gone unanswered 3 times (core/checkins.ts).
  */
 export function glyphOf(d: Item, items: Item[], now = Date.now()): Glyph {
-  const text = glyphText(d)
+  const text = glyphText(d, items)
   if (isUnclaimedBrief(d)) return { text, color: 'blue', bold: true }
+  if (isOpenHumanTask(d, items)) return { text, color: 'yellow' }
   switch (d.state) {
     case 'not_started':
       return { text, dim: true }

@@ -1372,11 +1372,6 @@ function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boo
       </span>
       <Glyph g={r.glyph} />
       <span class="ref">{r.ref}</span>
-      {r.assignee === 'human' && (
-        <span class="me-mark" title={s('forYou')}>
-          <User size={11} strokeWidth={2.25} />
-        </span>
-      )}
       {r.flag === 'important' && <span class="flag-mark important" title={s('important')}>★</span>}
       {r.flag === 'milestone' && (
         <span class={`flag-mark milestone ${r.due && Date.parse(r.due) - Date.now() < 86_400_000 ? 'soon' : ''}`} title={s('milestone')}>

@@ -204,7 +204,6 @@ export const ar: Strings = {
   assignAi: 'سلّمه لوكيل',
   assignedMe: 'صار لك',
   assignedAi: 'صار لوكيل',
-  forYou: 'لك',
   keyNew: 'عقدة جديدة',
   settingsShared: 'Noddit — نفسها في لوحة الطرفية',
   settingsApp: 'هذا التطبيق',

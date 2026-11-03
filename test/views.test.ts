@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { initLayout } from '../src/core/paths.ts'
 import { Store } from '../src/core/store.ts'
 import { groupFoldKey, loadFolds } from '../src/tui/folds.ts'
-import { GLYPH, VIEWS, doneGroupKey, glyphOf, glyphText, homeView, inView, nodeRowSegments, rowsFor, viewCount, type Row, type View } from '../src/tui/views.ts'
+import { GLYPH, HUMAN_GLYPH, VIEWS, doneGroupKey, glyphOf, glyphText, homeView, inView, nodeRowSegments, rowsFor, viewCount, type Row, type View } from '../src/tui/views.ts'
 import { statusSegments } from '../src/tui/detail.ts'
 import { helpText } from '../src/tui/app.ts'
 import { stringWidth } from '../src/tui/width.ts'
@@ -291,12 +291,13 @@ test('the detail status line and the help use the same glyphs', (t) => {
   const items = store.all()
   for (const k of ['a', 'r', 'f', 'c', 'd', 'e', 'g', 'h'] as const) {
     const d = items.find((x) => x.id === ids[k])!
-    assert.equal(statusSegments(d, items, Date.now())[0].text, glyphText(d), k)
+    assert.equal(statusSegments(d, items, Date.now())[0].text, glyphText(d, items), k)
   }
   const help = helpText().join('\n')
   for (const glyph of Object.values(GLYPH)) assert.ok(help.includes(glyph), `help shows ${glyph}`)
+  assert.ok(help.includes(HUMAN_GLYPH), 'help shows the human-work diamond')
   assert.match(help, /green = answered, awaiting an AI \(you answered, an AI hasn't picked it up\)/)
-  assert.doesNotMatch(help, /[▶◇⇢]/, 'the old glyphs are gone')
+  assert.doesNotMatch(help, /[▶⇢]/, 'the old glyphs are gone')
 })
 
 test('◐ is one column, like ◆ and ○, in our width helper and in the one ink lays out with', async () => {

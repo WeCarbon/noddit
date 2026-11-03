@@ -205,7 +205,6 @@ export const fr: Strings = {
   assignAi: 'Confier à une IA',
   assignedMe: 'À vous maintenant',
   assignedAi: 'Confié à une IA',
-  forYou: 'Pour vous',
   keyNew: 'Nouveau nœud',
   settingsShared: 'Noddit — aussi dans le tableau du terminal',
   settingsApp: 'Cette application',

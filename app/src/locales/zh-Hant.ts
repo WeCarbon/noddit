@@ -204,7 +204,6 @@ export const zhHant: Strings = {
   assignAi: '交給 AI',
   assignedMe: '現在是你的',
   assignedAi: '現在交給 AI 了',
-  forYou: '給你的',
   keyNew: '新節點',
   settingsShared: 'Noddit——終端看板裡也一樣',
   settingsApp: '這個 app',
