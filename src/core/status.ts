@@ -24,16 +24,17 @@ export function isTerminal(s: ItemStatus): boolean {
   return s === 'completed' || s === 'closed'
 }
 
-/** Options on the table and no answer yet: the owner's turn, whatever else is going on. */
-export function awaitsDecision(i: Pick<Item, 'state' | 'options'> & { answer?: unknown }): boolean {
-  return !isTerminal(i.state) && i.options.length > 0 && !i.answer
+/** Options on the table, no answer yet, and the owner hasn't withdrawn the round by
+ *  replying instead: the owner's turn, whatever else is going on. */
+export function awaitsDecision(i: Pick<Item, 'state' | 'options'> & { answer?: unknown; roundWithdrawn?: boolean }): boolean {
+  return !isTerminal(i.state) && i.options.length > 0 && !i.answer && !i.roundWithdrawn
 }
 
 /**
  * 执行中 / 待开始 never hold an open question: a node in either state with
  * unanswered options is 待决, on read and on every write.
  */
-export function withOpenQuestion(i: Pick<Item, 'state' | 'options'> & { answer?: unknown }): ItemStatus {
+export function withOpenQuestion(i: Pick<Item, 'state' | 'options'> & { answer?: unknown; roundWithdrawn?: boolean }): ItemStatus {
   return (i.state === 'in_progress' || i.state === 'not_started') && awaitsDecision(i) ? 'needs_decision' : i.state
 }
 
