@@ -206,6 +206,7 @@ export const zhHans: Strings = {
   delayOnPlaceholder: '在等谁、等什么？（可空：Carol 回信、供应商报价）',
   delayActiveHint: '在等某人：显示为紫色，到了那天提醒你去问。',
   delayPassiveHint: '不在等谁：显示为灰色，到了那天恢复正常（不填日子 = 先放着）。',
+  delayOnTooLong: '只写等谁、等什么，约 {{max}} 个字以内——细节写进回复',
   assignMe: '我自己做',
   assignAi: '交给 AI',
   assignedMe: '现在是你的',

@@ -204,6 +204,7 @@ export const en = {
   delayOnPlaceholder: 'Waiting on who or what? (optional: Carol’s reply, the vendor quote)',
   delayActiveHint: 'Waiting on someone: shown purple, and you are reminded to check on them that day.',
   delayPassiveHint: 'Nothing to wait on: shown grey, back to normal on that day (blank = indefinitely).',
+  delayOnTooLong: 'Keep it to who or what, about {{max}} characters — details go in a reply',
   assignMe: 'Do it myself',
   assignAi: 'Hand it to an AI',
   assignedMe: 'Yours now',

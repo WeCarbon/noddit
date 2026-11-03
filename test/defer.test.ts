@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -12,13 +12,14 @@ import { deferHidden, delayOf } from '../src/core/status.ts'
 import { Store } from '../src/core/store.ts'
 import { readQueue } from '../src/core/queue.ts'
 import { NOTE_KIND, NOTE_TEXT } from '../src/core/format.ts'
-import { VIEWS, homeView, inView, rowsFor, viewCount, viewFromArg } from '../src/tui/views.ts'
+import { VIEWS, homeView, inView, rowsFor, suffixOf, viewCount, viewFromArg } from '../src/tui/views.ts'
 import { BIN, decs, decsResult, killAndWait, scratch } from './helpers.ts'
 import { bench, has, KEY } from './tui-harness.ts'
 
 const A = 'lane-defer · test'
 const opt = [{ key: '1', label: 'Yes' }, { key: '2', label: 'No' }]
 const owner = { by: 'owner', role: 'human' as const }
+const text = (segs: { text: string }[]) => segs.map((s) => s.text).join('')
 
 function tmpStore(t: { after: (fn: () => void) => void }) {
   const root = mkdtempSync(join(tmpdir(), 'decs-defer-'))
@@ -380,6 +381,25 @@ test('old records of either kind read as a delay: deferred_at → passive, state
     assert.equal(inView('waiting', get(id), items), true)
     assert.equal(inView('available', get(id), items), true)
   }
+})
+
+test('「等」 is a few words: --on past 30 columns (CJK counts two) is refused, pointing at nod note; an old long one shows cut to one line', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', '--task', 'migrate the bucket'])
+  const long = decsResult(root, ['hold', '1', '--on', '等 lead 明天白天执行：本机、容器、同步工具都切到新地址', '--until', 'fri'])
+  assert.notEqual(long.code, 0)
+  assert.match(long.stderr, /limit is 30[\s\S]*nod note 1/)
+  assert.equal(decsResult(root, ['hold', '1', '--on', '等 lead 切到新地址', '--until', 'fri']).code, 0, '17 columns is fine')
+
+  const store = tmpStore(t)
+  const d = store.create({ title: 'old wait', author: A, task: true })
+  const file = store.hold(d, 'x', A, { until: '2099-01-01T00:00:00' }).file
+  writeFileSync(file, readFileSync(file, 'utf8').replace(/^waiting_on: .*$/m, 'waiting_on: Carol to confirm the invoice amount and the second page as well'))
+  const items = store.all()
+  const row = text(suffixOf(items[0], items, Date.now())[0])
+  assert.match(row, /Carol to confirm the invoice …/)
 })
 
 /** Whether the right pane (what the cursor is on) mentions `re`. */

@@ -12,9 +12,10 @@ import { parseBodyRefs, parseRef, refOf } from './ref.ts'
 import { dequeue, enqueue, readQueue } from './queue.ts'
 import { HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
 import { OPTIONS_HEADING_RE, optionsRoundOf, parseDecision, parseNoteHeading, parseNotes, parseOptions, sectionAttachments } from './parse.ts'
-import { deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
+import { WAIT_ON_MAX_COLS, deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
 import { isHumanTask } from './assignee.ts'
 import { everyUntil, untilDay } from './fuzzy-date.ts'
+import { stringWidth } from '../tui/width.ts'
 import { withDescription } from './intake.ts'
 import { list, t } from '../i18n/index.ts'
 import {
@@ -933,6 +934,7 @@ export class Store {
   hold(d: Decision, on: string | undefined, author: string, opts: { until?: string; role?: NoteRole } = {}): Decision {
     const who = on?.trim() || (d.state === 'waiting' ? d.waitingOn : undefined)
     if (!who) throw new Error(t('core.store.holdNeedsOn'))
+    if (on?.trim() && stringWidth(on.trim()) > WAIT_ON_MAX_COLS) throw new Error(t('core.store.waitOnTooLong', { cols: stringWidth(on.trim()), max: WAIT_ON_MAX_COLS, id: String(d.id) }))
     if (d.state === 'needs_decision') throw new Error(t('core.store.holdNotForOwner', { ref: refOf(d) }))
     const day = opts.until ? (untilDay(opts.until) ?? opts.until) : undefined
     const onlyDate = !on?.trim() && d.state === 'waiting'

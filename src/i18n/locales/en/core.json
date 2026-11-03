@@ -111,7 +111,8 @@
     "attachmentNotFound": "{{ref}} has no attachment called {{name}}",
     "unholdNotWaiting": "{{ref}} isn't waiting",
     "noEvery": "{{ref}} has no R — set one with nod edit {{ref}} --every 3d",
-    "alreadyFinishedNoHand": "{{ref}} is already finished; nothing to hand over"
+    "alreadyFinishedNoHand": "{{ref}} is already finished; nothing to hand over",
+    "waitOnTooLong": "--on is who or what it waits on, in a few words — this is {{cols}} columns, the limit is {{max}}. Put the details in a note: nod note {{id}} \"…\""
   },
   "duration": {
     "notADuration": "\"{{value}}\" is not a duration — e.g. 90s, 30m, 1h, 2d"

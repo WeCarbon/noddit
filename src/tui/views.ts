@@ -10,7 +10,7 @@ import { parseNotes } from '../core/parse.ts'
 import { refOf } from '../core/ref.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isStale, minutesSince } from '../core/staleness.ts'
-import { ITEM_STATUSES, deferHidden, deferredByAgent, delayOf, dependenciesOf, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel, waitingOnOwner } from '../core/status.ts'
+import { ITEM_STATUSES, WAIT_ON_MAX_COLS, deferHidden, deferredByAgent, delayOf, dependenciesOf, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps, stepProgress } from '../core/steps.ts'
 import type { Decision as Item } from '../core/types.ts'
 import { isRtl, lang, t } from '../i18n/index.ts'
@@ -990,13 +990,13 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
       if (isWaitDue(d, now)) {
         // Time to follow up: an inverse badge, the one thing in the row that stands out.
         const due: Segment = { text: ` ${t('bench.badge.checkBackDue')} `, color: 'magenta', inverse: true, bold: true }
-        if (d.waitingOn) forms.push([...fold, due, { text: ` ${t('bench.badge.checkOn', { who: d.waitingOn })}`, color: 'magenta' }])
+        if (d.waitingOn) forms.push([...fold, due, { text: ` ${t('bench.badge.checkOn', { who: waitOn(d) })}`, color: 'magenta' }])
         forms.push([due])
         break
       }
       const back = d.waitingUntil ? dayText(untilDay(d.waitingUntil) ?? d.waitingUntil) : ''
-      if (d.waitingOn && back) forms.push([...fold, { text: t('bench.badge.waitingOnUntil', { who: d.waitingOn, date: back }), color: 'magenta' }])
-      if (d.waitingOn) forms.push([...fold, { text: t('bench.badge.waitingOnSince', { who: d.waitingOn, since }), color: 'magenta' }])
+      if (d.waitingOn && back) forms.push([...fold, { text: t('bench.badge.waitingOnUntil', { who: waitOn(d), date: back }), color: 'magenta' }])
+      if (d.waitingOn) forms.push([...fold, { text: t('bench.badge.waitingOnSince', { who: waitOn(d), since }), color: 'magenta' }])
       forms.push([...fold, { text: back ? t('bench.badge.backOn', { date: back }) : `${statusLabel('waiting')} · ${since}`, color: 'magenta' }])
       break
     }
@@ -1043,6 +1043,9 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
   }
   return forms
 }
+
+/** 「等」 on one line: an old long one is cut at the limit new ones are held to. */
+const waitOn = (d: Item) => fit((d.waitingOn ?? '').replace(/\s+/g, ' '), WAIT_ON_MAX_COLS)
 
 function countBelow(d: Item, items: Item[]): number {
   const kids = childMap(items)

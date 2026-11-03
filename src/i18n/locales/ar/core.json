@@ -123,7 +123,8 @@
     "attachmentNotFound": "لا يوجد في {{ref}} مرفق اسمه {{name}}",
     "unholdNotWaiting": "{{ref}} ليس في الانتظار",
     "noEvery": "{{ref}} بلا R — عيّنه بـ nod edit {{ref}} --every 3d",
-    "alreadyFinishedNoHand": "{{ref}} منتهٍ أصلًا؛ لا شيء يُسلَّم"
+    "alreadyFinishedNoHand": "{{ref}} منتهٍ أصلًا؛ لا شيء يُسلَّم",
+    "waitOnTooLong": "--on يذكر من أو ما يُنتظر بكلمات قليلة — هنا {{cols}} عمودًا، والحد {{max}}. ضع التفاصيل في ملاحظة: nod note {{id}} \"…\""
   },
   "duration": {
     "notADuration": "\"{{value}}\" ليست مدة — مثل 90s أو 30m أو 1h أو 2d"

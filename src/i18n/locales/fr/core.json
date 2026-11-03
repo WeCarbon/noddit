@@ -114,7 +114,8 @@
     "attachmentNotFound": "{{ref}} n’a pas de pièce jointe nommée {{name}}",
     "unholdNotWaiting": "{{ref}} n’est pas en attente",
     "noEvery": "{{ref}} n’a pas de R — définissez-le avec nod edit {{ref}} --every 3d",
-    "alreadyFinishedNoHand": "{{ref}} est déjà terminé ; rien à confier"
+    "alreadyFinishedNoHand": "{{ref}} est déjà terminé ; rien à confier",
+    "waitOnTooLong": "--on dit qui ou quoi on attend, en quelques mots — ici {{cols}} colonnes, la limite est {{max}}. Mettez les détails dans une note : nod note {{id}} \"…\""
   },
   "duration": {
     "notADuration": "« {{value}} » n’est pas une durée — ex. 90s, 30m, 1h, 2d"

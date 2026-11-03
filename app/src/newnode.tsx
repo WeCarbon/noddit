@@ -159,15 +159,20 @@ export function NewNode(p: {
  * makes it an active wait (purple); a day alone, or nothing, a passive delay (grey). Emptying the
  * who on a node already waiting turns it into a passive delay (`passive`).
  */
+/** 「等」 is a few words — the limit `nod defer --on` holds to, in display columns (CJK counts two). */
+const WAIT_ON_MAX_COLS = 30
+const cols = (s: string) => [...s].reduce((n, c) => n + (/[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|[\u{1f300}-\u{1faff}\u{20000}-\u{3fffd}]/u.test(c) ? 2 : 1), 0)
+
 export function DelayDialog(p: { node: import('./types.ts').Node; busy: boolean; onClose: () => void; onDelay: (on: string | null, date: string | null, passive: boolean) => void }) {
   const waiting = p.node.status === 'waiting'
   const [on, setOn] = useState(waiting ? (p.node.waiting_on ?? '') : '')
   const [text, setText] = useState('')
   const [date, setDate] = useState<string | null>(null)
   const who = on.trim()
+  const tooLong = cols(who) > WAIT_ON_MAX_COLS
   const newWho = who && who !== (waiting ? (p.node.waiting_on ?? '') : '') ? who : null
   // A wait always has a day (on a node already waiting, the one it has); a passive delay may have none.
-  const ready = who ? Boolean(date || (newWho && waiting && p.node.waiting_until)) : Boolean(date) || !text.trim()
+  const ready = !tooLong && (who ? Boolean(date || (newWho && waiting && p.node.waiting_until)) : Boolean(date) || !text.trim())
   const go = () => ready && p.onDelay(newWho, date, waiting && !who)
   return (
     <div class="overlay" onClick={p.onClose}>
@@ -188,7 +193,7 @@ export function DelayDialog(p: { node: import('./types.ts').Node; busy: boolean;
             if (e.key === 'Enter') go()
           }}
         />
-        <p class="d">{who ? s('delayActiveHint') : s('delayPassiveHint')}</p>
+        <p class={`d ${tooLong ? 'c-red' : ''}`}>{tooLong ? s('delayOnTooLong', { max: String(WAIT_ON_MAX_COLS / 2) }) : who ? s('delayActiveHint') : s('delayPassiveHint')}</p>
         <div class="sheet-footer">
           <span class="grow" />
           <button class="ghost" onClick={p.onClose}>

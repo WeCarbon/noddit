@@ -66,6 +66,9 @@ export function deferredByAgent(i: Pick<Item, 'deferredAt' | 'notes'>): boolean 
   return i.notes.findLast((n) => n.kind === NOTE_KIND.deferred)?.role === 'agent'
 }
 
+/** 「等」 names who or what in a few words (about 15 CJK characters); the details go in a note. */
+export const WAIT_ON_MAX_COLS = 30
+
 /** Deferred `--until` a moment that has now come. */
 export function deferralOver(i: Partial<Pick<Item, 'deferredAt' | 'deferredUntil'>>, now = Date.now()): boolean {
   if (!i.deferredAt || !i.deferredUntil) return false

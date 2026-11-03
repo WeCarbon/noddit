@@ -16,7 +16,7 @@ description: nod 的完整用法（`decs` 仍是别名）——建节点/子节�
 | 想做的事 | 命令 |
 |---|---|
 | 还没有 `decisions/` | `nod init` |
-| 新建节点 / 子节点 | `nod add "<标题>" [--task] [--parent <id>] [--after <id>] [--est 30m]`；计划里还没开始的步骤都建成子节点 |
+| 新建节点 / 子节点 | `nod add "<标题>" [--task] [--parent <id>] [--after <id>] [--est 30m] [--due 周五] [--every 3d]`；计划里还没开始的步骤都建成子节点。`--est` 是负责做的那一方的时间（`--for me` 是负责人的，其余是 AI 的）；`--due` 到期日；`--every` 是 R（「延迟 R 天」的快捷量）。建好以后改用 `nod edit <id> --est / --due / --every`（`off` 清掉） |
 | 补一条记录 / 转记 owner 的话 | `nod note <id> --agent "…"` / `nod note <id> --human --by "owner（对话里说，<你> 转记）" "…"` |
 | 开始 / 做完 / 不做了 | `nod start` / `nod done --note` / `nod close --reason` |
 | 要 owner 拍板 / 再看一眼 | `nod ask <id> -o 1="…" 2="…"` / `nod ask <id>`；每个选项写清选了会怎样（花多久、谁来做、放弃什么、风险、能不能反悔）和推荐哪个、为什么——`-o` 只放短标签，说明用 heredoc 写在正文里，每个选项一节 `### 1 · <标签>`（app 把它挪到选项卡片上） |

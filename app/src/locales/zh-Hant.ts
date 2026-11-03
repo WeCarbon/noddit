@@ -206,6 +206,7 @@ export const zhHant: Strings = {
   delayOnPlaceholder: '在等誰、等什麼？（可空：Carol 回信、供應商報價）',
   delayActiveHint: '在等某人：顯示為紫色，到了那天提醒你去問。',
   delayPassiveHint: '不在等誰：顯示為灰色，到了那天恢復正常（不填日子 = 先放著）。',
+  delayOnTooLong: '只寫等誰、等什麼，約 {{max}} 個字以內——細節寫進回覆',
   assignMe: '我自己做',
   assignAi: '交給 AI',
   assignedMe: '現在是你的',

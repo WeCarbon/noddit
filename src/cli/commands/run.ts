@@ -7,9 +7,10 @@ import { guardOtherAuthor, rememberStarted, requireDecision, resolveAuthor, reso
 import { createEventTracker, finishSummary, type FinishEvent } from '../../core/events.ts'
 import { createThrottle } from '../../core/progress.ts'
 import { refOf } from '../../core/ref.ts'
-import { isTerminal } from '../../core/status.ts'
+import { WAIT_ON_MAX_COLS, isTerminal } from '../../core/status.ts'
 import type { Decision } from '../../core/types.ts'
 import { t } from '../../i18n/index.ts'
+import { fit } from '../../tui/width.ts'
 
 const help = () => t('cli.help.run')
 
@@ -218,8 +219,8 @@ export async function run(args: Args): Promise<number> {
   } else {
     node = store.note(node, { text: note, role: 'agent', author })
     // `--on` is free text, like a hand-written `nod hold --on "…"` — not a
-    // translated UI string, just a short reason for the "waiting" badge.
-    node = store.hold(node, `failing: ${failingOn(finish, exitCode)}`, author)
+    // translated UI string, just a short reason for the "waiting" badge; the note above has it all.
+    node = store.hold(node, fit(`failing: ${failingOn(finish, exitCode)}`, WAIT_ON_MAX_COLS), author)
     console.log(t('cli.run.failed', { ref: refOf(node), exitCode }))
   }
   if (!sawEvent && explicitEvents === undefined) {

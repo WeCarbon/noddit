@@ -108,7 +108,8 @@
     "attachmentNotFound": "{{ref}} 没有叫 {{name}} 的附件",
     "unholdNotWaiting": "{{ref}} 不在等待",
     "noEvery": "{{ref}} 没有设 R——用 nod edit {{ref}} --every 3d 设",
-    "alreadyFinishedNoHand": "{{ref}} 已经结束了，没有可交的"
+    "alreadyFinishedNoHand": "{{ref}} 已经结束了，没有可交的",
+    "waitOnTooLong": "--on 只写在等谁、等什么，几个字——这里有 {{cols}} 列，上限 {{max}}。细节写进备注：nod note {{id}} \"…\""
   },
   "duration": {
     "notADuration": "「{{value}}」不是一个时长——例如 90s、30m、1h、2d"

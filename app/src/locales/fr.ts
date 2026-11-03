@@ -207,6 +207,7 @@ export const fr: Strings = {
   delayOnPlaceholder: 'En attente de qui ou de quoi ? (facultatif : la réponse de Carol, le devis du fournisseur)',
   delayActiveHint: 'En attente de quelqu’un : affiché en violet, avec un rappel ce jour-là pour relancer.',
   delayPassiveHint: 'Rien à attendre : affiché en gris, de retour à la normale ce jour-là (vide = sans date).',
+  delayOnTooLong: 'Juste qui ou quoi, environ {{max}} caractères — les détails dans une réponse',
   assignMe: 'Je m’en charge',
   assignAi: 'Confier à une IA',
   assignedMe: 'À vous maintenant',
