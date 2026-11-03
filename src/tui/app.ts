@@ -1,10 +1,10 @@
 import { HUMAN, isHumanTask, isMilestone } from '../core/assignee.ts'
 import { briefTitle } from '../core/intake.ts'
-import { isListening } from '../core/listeners.ts'
+import { isListening, mainListener, type Listener } from '../core/listeners.ts'
 import { layoutFor, type Layout } from '../core/paths.ts'
 import { addProject, readProjects, removeProject } from '../core/config.ts'
 import { DEFAULT_LETTER, readProjectConfig, writeProjectConfig } from '../core/project.ts'
-import { agentArg, describeGoto, describeStart, gotoSession, startSession } from '../cli/commands/session.ts'
+import { agentArg, describeGoto, describeStart, gotoMainSession, gotoSession, startMainSession, startSession } from '../cli/commands/session.ts'
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -177,6 +177,9 @@ interface Snapshot {
   items: Decision[]
   sources: SourceSummary[]
   sessions: ProjectSessions[]
+  /** The cross-project main session (`nod session start --main`), live or not — same read as
+   *  any project's, just not narrowed to one root. */
+  main: Listener | null
   now: number
   /** The tab definitions as read this tick, so an edit to views.json redraws. */
   views: string
@@ -189,13 +192,15 @@ function snapshot(store: Store, project?: string): Snapshot {
     items: project ? all.filter((d) => d.project === store.projectKey(project)) : all,
     sources: listSources(store, now).filter((s) => !project || s.project === store.projectKey(project)),
     sessions: projectSessions(store, now).filter((p) => !project || p.project === store.projectKey(project)),
+    main: mainListener(now) ?? null,
     now,
     views: JSON.stringify(loadViews()),
   }
 }
 
 /** Who is connected, minus the heartbeat clock — a beat alone is not a change worth redrawing for. */
-const sessionsKey = (s: Snapshot) => JSON.stringify(s.sessions.map((p) => p.sessions.map((x) => [x.pid, x.role, x.author])))
+const sessionsKey = (s: Snapshot) =>
+  JSON.stringify([s.sessions.map((p) => p.sessions.map((x) => [x.pid, x.role, x.author])), s.main && [s.main.pid, s.main.author, Boolean(s.main.terminal)]])
 
 /** What changed between two reads, said in one line: new nodes, and nodes that just started waiting on the owner. */
 export function changeBanner(prev: Decision[], next: Decision[]): string | null {
@@ -222,7 +227,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const width = Math.max(20, cols - 1)
 
   const [snap, setSnap] = useState<Snapshot>(() => snapshot(store, project))
-  const { items, sources, sessions, now } = snap
+  const { items, sources, sessions, main, now } = snap
   const [view, setView] = useState<View>(initialView)
   // Folds persist per viewer across sessions (`$NODDIT_HOME/bench-state.json`).
   const [folds, setFolds] = useState<FoldMap>(() => ({ ...loadFolds(), ...(openDeferred ? { [DEFERRED_FOLD_KEY]: 'expanded' as const } : {}) }))
@@ -280,7 +285,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     bannerTimer.current = setTimeout(() => setBanner(null), 2600)
   }, [])
 
-  const overview = useMemo(() => buildOverview(items, now, sources, sessions), [items, now, sources, sessions])
+  const overview = useMemo(() => buildOverview(items, now, sources, sessions, main), [items, now, sources, sessions, main])
   const rootOf = useCallback((d: Decision) => store.layoutOf(d).projectRoot, [store])
   const { collapsed, expanded, openGroups } = useMemo(() => foldSets(items, folds, rootOf), [items, folds, rootOf])
   // The view's definition is re-read with the items, so an edited views.json shows on the next tick.
@@ -1708,10 +1713,41 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       return startText('brief')
     }
 
+    // Ctrl-L: the header's 「主智能体」 dot — bring its terminal forward when it's live
+    // (`nod session goto --main`), or open one when it isn't (`nod session start --main`),
+    // same as the app's pinned sidebar row. Checked before plain l/L below: ink reports the
+    // same input='l' either way, only key.ctrl differs, so this must come first to win it.
+    // m and M are already taken (toggle milestone, move mode).
+    if (key.ctrl && input === 'l') {
+      const mainName = t('cli.session.mainName')
+      try {
+        if (overview.main?.terminal) say(describeGoto(gotoMainSession(), mainName))
+        else {
+          const r = startMainSession(undefined, agentArg(undefined))
+          say(r.ok && r.started ? t('cli.session.mainStarted', { terminal: r.plan.terminal, agent: r.plan.agent, root: r.plan.root }) : describeStart(r, mainName))
+        }
+      } catch (e) {
+        say((e as Error).message)
+      }
+      return
+    }
+
     if (input === 'l' || input === 'L') {
       const layout = current ? store.layoutOf(current) : store.primary
       try {
         say(describeGoto(gotoSession(layout), store.projectName(layout)))
+      } catch (e) {
+        say((e as Error).message)
+      }
+      return
+    }
+
+    // t: `nod session start` for the cursor node's project, same as the app's project-menu
+    // "Start session…" — refuses (and says who) when a lead is already listening there.
+    if (input === 't') {
+      const layout = current ? store.layoutOf(current) : store.primary
+      try {
+        say(describeStart(startSession(layout, agentArg(undefined)), store.projectName(layout)))
       } catch (e) {
         say((e as Error).message)
       }
@@ -2143,6 +2179,15 @@ function orderedTabs(s: FrameInput, rtl: boolean, mode: BidiMode): { view: View;
   })
 }
 
+/** The header's 「主智能体」 dot, after the tabs: ● green when the cross-project main
+ *  session is live, ○ dim otherwise — Ctrl-L goes to it or starts one (app's pinned sidebar row). */
+function mainAgentSegments(main: Listener | null, rtl: boolean, mode: BidiMode): Segment[] {
+  const online = Boolean(main)
+  const dot: Segment = { text: online ? '●' : '○', color: online ? 'green' : undefined, dim: !online }
+  const label: Segment = { text: ` ${t('bench.mainAgent')}`, dim: !online }
+  return [{ text: '  ' }, dot, rtl ? mirrorSegment(label, mode) : label]
+}
+
 /** The `,` settings dialog: a centred box, drawn in `buildFrame` and
  *  measured here so a click and the drawing never disagree. */
 export interface SettingsModal {
@@ -2477,6 +2522,7 @@ export function buildFrame(s: FrameInput, g: Geometry = geometry(s)): Line[] {
     { text: 'decs', bold: true },
     { text: ' ' },
     ...orderedTabs(s, rtl, mode).map((tab) => tab.segment),
+    ...mainAgentSegments(s.overview.main, rtl, mode),
   ]
 
   if (s.mode === 'help') {

@@ -75,8 +75,8 @@ and its help screen (`src/i18n/locales/en/bench.json`, `helpScreen`).
 | Bring a project's own agent terminal forward | Right-click a project → go to session | `l` / `L` (current project) | |
 | See who's listening in each project | Dot per project + tooltip | Summary strip: `●` / `○` + project + who + how long | |
 | Project's pending-work count | Sidebar badge, per project | Summary strip's overall stale-task count | Coarser grain, not per project |
-| Cross-project "main agent": see if it's live, bring its terminal forward, or start one if offline | Sidebar's pinned "Main agent" row | *(none)* | **App only — gap.** No terminal-board key reaches it; `nod session goto --main` / `nod session start --main` work from a shell |
-| Start an agent session directly, without filing a brief first | Right-click a project → Start session | *(none — only offered right after filing a brief finds nobody listening)* | **App only — gap** |
+| Cross-project "main agent": see if it's live, bring its terminal forward, or start one if offline | Sidebar's pinned "Main agent" row | Header line's own dot (`● online` / `○ offline`); `Ctrl-L` goes to it or starts one (`m` / `M` are taken — toggle milestone / move mode) | Closed 2026-11-03 |
+| Start an agent session directly, without filing a brief first | Right-click a project → Start session | `t` (the cursor node's own project, or the primary project with nothing selected); refuses the same way `nod session start` does when a lead already listens there, saying who | Closed 2026-11-03 |
 | **Custom views (the view editor)** | | | |
 | Add / edit / reorder / delete a view: filter text, layout, grouping, sort, finished/deferred handling, live match-count preview | Gear icon in the sidebar, or right-click a view → "Edit this view" | `v` panel: `↑↓` picks, `Enter` edits its fields, `a` adds, `x` deletes (refuses the last one), `m` moves it | Closed 2026-11-03. The terminal editor doesn't expose the view's icon (cosmetic — not rendered in terminal tabs) or its `window-days` / `window-max` / `count` fields; set those with `nod view edit` |
 | **Settings** | | | |
@@ -89,10 +89,3 @@ and its help screen (`src/i18n/locales/en/bench.json`, `helpScreen`).
 | Banner window, global-hotkey summon, OS notification centre | Separate window / OS notification | *(none)* | **UI-only** — system notifications |
 | External source sync status (unhandled / owner / us buckets, stale heartbeat) | Sidebar panel, under the project list | Summary strip, under the tabs | |
 | `after`-cycle warning | Banner pinned above the list while any loop stands | Summary strip, in red | |
-
-## Known gaps
-
-Two rows above are real gaps, not UI-only differences: the cross-project "main agent" row and
-starting a session without filing a brief first exist in the app but have no terminal-board
-equivalent. Both were added to the app on 2026-11-03, after the rest of this audit closed its
-other gaps — they haven't been triaged into their own nod nodes yet.

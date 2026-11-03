@@ -242,7 +242,7 @@ test('App: d asks until when — blank defers (grey, stays in Available), a day 
   const c = store.start(store.create({ title: 'b second one', author: A, task: true }))
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a first one/))
-  assert.match(b.frame()[0], /^decs +Available 2 +Active 2 +Human work +Waiting +Live +All *$/)
+  assert.match(b.frame()[0], /^decs +Available 2 +Active 2 +Human work +Waiting +Live +All +[○●] Main agent *$/)
   await b.press('d')
   await b.until(has(b, new RegExp(`Delay X${a.id} until: `)))
   await b.press('\r')

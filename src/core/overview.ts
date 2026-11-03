@@ -6,7 +6,7 @@ import { deferHidden } from './status.ts'
 import { isStale, minutesSince } from './staleness.ts'
 import { listSources, type SourceSummary } from './sources.ts'
 import type { Store } from './store.ts'
-import { projectSessions } from './listeners.ts'
+import { mainListener, projectSessions, type Listener } from './listeners.ts'
 import type { Decision as Item } from './types.ts'
 
 export type { SourceSummary }
@@ -57,13 +57,22 @@ export interface Overview {
   cycles: Cycle[][]
   /** Per project: is a session's `nod monitor` running there (see core/listeners.ts)? */
   sessions: ProjectSessions[]
+  /** The cross-project main session (`nod session start --main`), live or not — the bench
+   *  header's 「主智能体」 dot reads this the same way `nod sessions --json`'s `main` does. */
+  main: Listener | null
   /** N47: not_started, not deferred — neither waiting on a decision nor being worked on. */
   staleTasks: number
 }
 
 export type ProjectSessions = ReturnType<typeof projectSessions>[number]
 
-export function buildOverview(items: Item[], now = Date.now(), sources: SourceSummary[] = [], sessions: ProjectSessions[] = []): Overview {
+export function buildOverview(
+  items: Item[],
+  now = Date.now(),
+  sources: SourceSummary[] = [],
+  sessions: ProjectSessions[] = [],
+  main: Listener | null = null,
+): Overview {
   // 延迟 nodes (and their subtrees) are put off: not asked of the owner, not "running".
   const hidden = deferHidden(items)
   const needsOwner = items
@@ -100,11 +109,12 @@ export function buildOverview(items: Item[], now = Date.now(), sources: SourceSu
     sources,
     cycles: findCycles(items),
     sessions,
+    main,
     staleTasks: staleTasksOf(items).length,
   }
 }
 
 /** The whole store's overview, sources included — what bench renders. */
 export function overviewOf(store: Store, now = Date.now()): Overview {
-  return buildOverview(store.all(), now, listSources(store, now), projectSessions(store, now))
+  return buildOverview(store.all(), now, listSources(store, now), projectSessions(store, now), mainListener(now) ?? null)
 }
