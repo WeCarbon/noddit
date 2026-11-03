@@ -357,6 +357,8 @@ export const en = {
   mainAgentStarting: 'Starting the main agent in a new terminal…',
   mainAgentOffline: 'Main agent is offline — start it in a terminal: nod session start --main',
   keyQuick: 'New for an AI',
+  selectedCount: '{{count}} selected',
+  keyExtend: 'Select more rows (also ⌘-click, ⇧-click, drag a box)',
 }
 
 export type Strings = Record<keyof typeof en, string>

@@ -359,4 +359,6 @@ export const ar: Strings = {
   mainAgentStarting: 'جارٍ تشغيل الوكيل الرئيسي في طرفية جديدة…',
   mainAgentOffline: 'الوكيل الرئيسي غير متصل — شغّله في طرفية: nod session start --main',
   keyQuick: 'مهمة جديدة لوكيل',
+  selectedCount: '{{count}} محددة',
+  keyExtend: 'تحديد صفوف أكثر (أيضًا ⌘-نقر، ⇧-نقر، سحب مربع)',
 }

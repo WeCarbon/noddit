@@ -360,4 +360,6 @@ export const fr: Strings = {
   mainAgentStarting: 'Lancement de l’agent principal dans un nouveau terminal…',
   mainAgentOffline: 'L’agent principal est hors ligne — lancez-le dans un terminal : nod session start --main',
   keyQuick: 'Nouveau pour une IA',
+  selectedCount: '{{count}} sélectionnés',
+  keyExtend: 'Sélectionner plusieurs lignes (aussi ⌘-clic, ⇧-clic, tracer un cadre)',
 }

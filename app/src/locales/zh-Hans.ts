@@ -359,4 +359,6 @@ export const zhHans: Strings = {
   mainAgentStarting: '正在新终端里启动主智能体…',
   mainAgentOffline: '主智能体不在线——在终端里运行 nod session start --main 启动',
   keyQuick: '派给 AI',
+  selectedCount: '已选 {{count}} 项',
+  keyExtend: '连着多选（也可 ⌘ 点击、⇧ 点击、拖框）',
 }

@@ -439,6 +439,15 @@ svg.lucide.ico {
   box-shadow: inset 0 0 0 1px var(--sel-ring);
 }
 
+.select-box {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  border: 1px solid var(--sel-ring);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--sel) 60%, transparent);
+}
+
 .row.header {
   min-height: 36px;
   padding-top: 10px;

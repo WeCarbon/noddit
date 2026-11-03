@@ -32,6 +32,7 @@ import { noticeTitle, plainReply } from './plain-reply.ts'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, heldAt, keepHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, type Held, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
+import { NONE, boxHits, boxed, extend, listed, range, toggle, type Selection } from './selection.ts'
 import { s } from './strings.ts'
 import { OTHER_KEY, type Attachment, type Bench as BenchData, type Node, type PreviousRound, type Project, type Row, type View, type ViewName } from './types.ts'
 
@@ -242,6 +243,12 @@ export function Bench(props: {
   const index = found >= 0 ? found : Math.min(lastIndex.current, selectable.length - 1)
   if (index >= 0) lastIndex.current = index
   const current: Row | undefined = deselected ? undefined : selectable[index]
+  // More than one row picked (⌘-click, ⇧-click, ⇧↑↓, a box): the right pane and the menu act on all of them.
+  const [selection, setSelection] = useState<Selection>(NONE)
+  const order = useMemo(() => rows.filter((r) => r.kind === 'node').map((r) => r.key), [rows])
+  const picked = listed(selection, order)
+  const multi = picked.length > 1
+  useEffect(() => setSelection(NONE), [where])
   const [archived, setArchived] = useState<Record<string, Node>>({})
   const nodeKey = current?.kind === 'node' ? current.node! : undefined
   const node: Node | undefined = nodeKey ? (bench.nodes[nodeKey] ?? archived[nodeKey]) : undefined
@@ -274,10 +281,62 @@ export function Bench(props: {
   }, [node?.key])
 
   useLayoutEffect(() => {
-    listRef.current?.querySelector('.row.sel')?.scrollIntoView({ block: 'nearest' })
+    listRef.current?.querySelector('.row.cursor')?.scrollIntoView({ block: 'nearest' })
   }, [prefs.selected, prefs.view])
 
-  const select = (key: string) => (setDeselected(false), setPrefs({ selected: key }))
+  const select = (key: string) => (setDeselected(false), setSelection(NONE), setPrefs({ selected: key }))
+  /** A new multi-selection, the cursor on `cursor` (or on the one row left picked). */
+  const pick = (next: Selection, cursor: string | null) => {
+    setSelection(next)
+    const to = next.keys.length === 1 ? next.keys[0] : cursor
+    if (to) (setDeselected(false), setPrefs({ selected: to }))
+  }
+  const cursorKey = current?.kind === 'node' ? current.key : null
+  const rowClick = (r: Row, e?: MouseEvent) => {
+    if (!isSelectable(r)) return
+    if (r.kind === 'node' && e && (e.metaKey || e.ctrlKey)) {
+      const next = toggle(selection, order, r.key, cursorKey)
+      return pick(next, next.keys.includes(r.key) ? r.key : (next.keys[next.keys.length - 1] ?? null))
+    }
+    if (r.kind === 'node' && e?.shiftKey) return pick(range(selection, order, r.key, cursorKey), r.key)
+    select(r.key)
+  }
+  const clearSelection = () => {
+    setSelection(NONE)
+    deselect()
+  }
+  /** Dragging a box from empty list space picks every row it touches (⌘ adds to what is picked). */
+  const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+  const boxedJustNow = useRef(false)
+  const startBox = (e: MouseEvent) => {
+    if (e.target !== e.currentTarget || e.button !== 0) return
+    const x0 = e.clientX
+    const y0 = e.clientY
+    const add = e.metaKey || e.ctrlKey
+    const base = selection
+    const keys = order
+    let last: Selection | null = null
+    const moveTo = (m: MouseEvent) => {
+      if (!last && Math.abs(m.clientX - x0) + Math.abs(m.clientY - y0) < 5) return
+      setBox({ x0, y0, x1: m.clientX, y1: m.clientY })
+      const bands = [...(listRef.current?.querySelectorAll<HTMLElement>('.row.node[data-key]') ?? [])].map((el) => {
+        const b = el.getBoundingClientRect()
+        return { key: el.dataset.key!, top: b.top, bottom: b.bottom }
+      })
+      last = boxed(base, keys, boxHits(bands, y0, m.clientY), add)
+      setSelection(last)
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', moveTo)
+      window.removeEventListener('mouseup', up)
+      setBox(null)
+      if (!last) return
+      boxedJustNow.current = true
+      if (last.keys.length) pick(last, last.keys[last.keys.length - 1])
+    }
+    window.addEventListener('mousemove', moveTo)
+    window.addEventListener('mouseup', up)
+  }
   const move = (delta: number) => {
     if (!selectable.length) return
     // Deselected: ↓ starts at the first row, ↑ at the last — not wherever the cursor was.
@@ -915,6 +974,7 @@ export function Bench(props: {
         }
         if (menu || letterFor || unlinkFor || renaming || quick || startFor || editing || editConflict || editingTitle || titleConflict || isTyping(e)) return
         if (error) return setError(null)
+        if (multi) return clearSelection()
         if (scope) return setScope(null)
         if (current && !deselected) return deselect()
         return
@@ -922,7 +982,7 @@ export function Bench(props: {
       if (palette || settingsOpen || menu || letterFor || unlinkFor || renaming || quick || startFor || newOpen || deferFor || editing || editConflict || editingTitle || titleConflict || viewEditor || isTyping(e)) return
       if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault()
-        return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.sel'))
+        return openMenuAt(listRef.current?.querySelector<HTMLElement>('.row.cursor'))
       }
       // The viewer takes its own keys (←→, O, Esc).
       if (viewer) return
@@ -964,11 +1024,13 @@ export function Bench(props: {
       if (meta || e.altKey) return
       switch (e.key) {
         case 'ArrowDown':
+        case 'ArrowUp': {
           e.preventDefault()
-          return move(1)
-        case 'ArrowUp':
-          e.preventDefault()
-          return move(-1)
+          const delta = e.key === 'ArrowDown' ? 1 : -1
+          if (!e.shiftKey) return move(delta)
+          const next = extend(selection, order, deselected ? null : cursorKey, delta)
+          return pick(next.sel, next.cursor)
+        }
         case 'ArrowRight':
           e.preventDefault()
           if (current && !isOpen(current)) setFold(current, true)
@@ -1171,7 +1233,17 @@ export function Bench(props: {
             ↑ {s('newAbove', { count: motion.above })}
           </button>
         )}
-        <div class="list" ref={listRef} role="listbox" onClick={(e) => (e.target === e.currentTarget ? deselect() : undefined)}>
+        <div
+          class="list"
+          ref={listRef}
+          role="listbox"
+          aria-multiselectable="true"
+          onMouseDown={startBox}
+          onClick={(e) => {
+            if (boxedJustNow.current) return void (boxedJustNow.current = false)
+            if (e.target === e.currentTarget) clearSelection()
+          }}
+        >
           {!rows.length && (
             <div class="empty">
               <Inbox size={28} strokeWidth={1.25} />
@@ -1184,21 +1256,33 @@ export function Bench(props: {
               row={r}
               drag={drag}
               arrived={motion.arrived.get(r.key)}
-              selected={current?.key === r.key}
+              selected={multi ? picked.includes(r.key) : current?.key === r.key}
+              cursor={current?.key === r.key}
               open={isOpen(r)}
               hidden={r.kind === 'node' && !isOpen(r) ? hiddenCount(view, view.rows.indexOf(r)) : 0}
-              onClick={() => (isSelectable(r) ? select(r.key) : undefined)}
+              onClick={(e) => rowClick(r, e)}
               onToggle={() => setFold(r, !isOpen(r))}
               onMore={(el) => openMenuAt(el)}
             />
           ))}
         </div>
+        {box && (
+          <div
+            class="select-box"
+            style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }}
+          />
+        )}
       </main>
 
       <section class="detail-pane">
         <Divider which="list" measure={measurePanes} onMove={setLivePanes} onDone={donePanes} onReset={resetPanes} />
         <div class="drag" data-tauri-drag-region />
-        {node ? (
+        {multi ? (
+          <div class="placeholder batch">
+            <div class="ph-glyph">◇</div>
+            <p class="ph-title">{s('selectedCount', { count: picked.length })}</p>
+          </div>
+        ) : node ? (
           <Detail
             key={node.key}
             node={node}
@@ -1388,13 +1472,13 @@ function importantTone(r: Row): 'waiting' | 'you' | 'ai' | null {
   return 'ai'
 }
 
-function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boolean; open: boolean; hidden: number; onClick: () => void; onToggle: () => void; onMore: (el: HTMLElement) => void }) {
+function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boolean; cursor: boolean; open: boolean; hidden: number; onClick: (e?: MouseEvent) => void; onToggle: () => void; onMore: (el: HTMLElement) => void }) {
   const r = p.row
   if (r.kind === 'header') return <div class="row header">{r.text}</div>
   const indent = { paddingInlineStart: `${12 + r.depth * 18}px` }
   if (r.kind === 'fold')
     return (
-      <div class={`row fold ${p.selected ? 'sel' : ''}`} style={indent} onClick={() => (p.onClick(), p.onToggle())}>
+      <div class={`row fold ${p.selected ? 'sel' : ''} ${p.cursor ? 'cursor' : ''}`} style={indent} onClick={() => (p.onClick(), p.onToggle())}>
         <span class={`caret ${p.open ? 'open' : ''}`}>›</span>
         <span class="fold-text">{r.text?.replace(/^[⏷⏵▾▸▼▶]\s*/u, '')}</span>
       </div>
@@ -1404,7 +1488,7 @@ function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boo
   const landing = d.key && d.over === r.key && d.key !== r.key ? (d.after ? 'drop-after' : 'drop-before') : ''
   return (
     <div
-      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} ${importantTone(r) ? `important-${importantTone(r)}` : ''} state-${r.state} ${d.key === r.key ? 'dragging' : ''} ${landing} ${p.arrived !== undefined ? 'arrived' : ''}`}
+      class={`row node ${p.selected ? 'sel' : ''} ${p.cursor ? 'cursor' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} ${importantTone(r) ? `important-${importantTone(r)}` : ''} state-${r.state} ${d.key === r.key ? 'dragging' : ''} ${landing} ${p.arrived !== undefined ? 'arrived' : ''}`}
       style={p.arrived !== undefined ? { ...indent, animationDelay: `${p.arrived}ms` } : indent}
       draggable={Boolean(r.scope)}
       onDragStart={(e) => {
@@ -1428,7 +1512,8 @@ function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boo
         d.set({ key: null, scope: null, over: null, after: false })
       }}
       onDragEnd={() => d.set({ key: null, scope: null, over: null, after: false })}
-      onClick={p.onClick}
+      onMouseDown={(e) => (e.shiftKey || e.metaKey || e.ctrlKey) && e.preventDefault()}
+      onClick={(e) => p.onClick(e)}
       role="option"
       aria-selected={p.selected}
       data-ctx="row"
@@ -1964,6 +2049,7 @@ function Palette({ rows, onPick, onClose }: { rows: Row[]; onPick: (key: string)
 function Help({ onClose }: { onClose: () => void }) {
   const keys: [string, string][] = [
     ['↑ ↓', s('keyMove')],
+    ['⇧↑ ⇧↓', s('keyExtend')],
     ['← →', s('keyFold')],
     ['⇥ / ⌘1–6', s('keyViews')],
     ['1 – 9', s('keyAnswer')],
