@@ -1,6 +1,6 @@
 {
   "name": "@wecarbon/noddit",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Noddit — where you and your AI hand work to each other: tasks and decisions as plain markdown files in your repo",
   "license": "MIT",
   "repository": {
