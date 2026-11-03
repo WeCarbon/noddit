@@ -20,6 +20,8 @@ export const ar: Strings = {
   changeAnswer: 'تغيير الإجابة',
   keepAnswer: 'الإبقاء على الإجابة',
   changeAnswerHint: 'اختر خيارًا آخر للإجابة من جديد.',
+  decisionBlock: 'تم القرار',
+  decisionChangedBlock: 'تم تغيير الإجابة',
   answerLockedHint: 'أُجيب بـ {{key}}. استخدم «تغيير الإجابة» للاختيار من جديد.',
   addNote: 'أضف ملاحظة (اختياري)',
   send: 'إرسال',

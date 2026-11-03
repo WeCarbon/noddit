@@ -12,7 +12,7 @@ import { parseBodyRefs, parseRef, refOf } from './ref.ts'
 import { dequeue, enqueue, readQueue } from './queue.ts'
 import { HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
 import { OPTIONS_HEADING_RE, optionsRoundOf, parseDecision, parseNoteHeading, parseNotes, parseOptions, sectionAttachments } from './parse.ts'
-import { WAIT_ON_MAX_COLS, deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
+import { WAIT_ON_MAX_COLS, awaitsDecision, deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel, withOpenQuestion } from './status.ts'
 import { checkSummary } from './summary.ts'
 import { isHumanTask } from './assignee.ts'
 import { everyUntil, untilDay } from './fuzzy-date.ts'
@@ -881,6 +881,8 @@ export class Store {
     const wasQueued = d.queued
     const next = (d: Decision): Decision => {
       if (d.state !== 'decided' && !(wasQueued && d.state === 'needs_decision')) return d
+      // The owner replied without picking an option: once collected, it is the owner's turn again.
+      if (awaitsDecision(d)) return { ...d, state: 'needs_decision' }
       return { ...d, state: isStartable(d, deps) ? 'in_progress' : 'not_started' }
     }
     return { ...this.mutate(d, (d) => ({ next: next(d) })), queued: undefined }
@@ -888,6 +890,8 @@ export class Store {
 
   /** A lane picks the node up. Refused while the owner still owes it an answer. */
   start(d: Decision, opts: { force?: boolean } = {}): Decision {
+    // Unanswered options keep it 待决策 whatever --force says.
+    if (awaitsDecision(d)) throw new Error(t('core.store.cantStartOpenOptions', { ref: refOf(d) }))
     if (d.state === 'needs_decision' && !opts.force)
       throw new Error(t('core.store.cantStartNeedsDecision', { ref: refOf(d) }))
     if (!opts.force && d.after?.length && !isStartable(d, this.all()))
@@ -1406,6 +1410,8 @@ export class Store {
       const target = d.notes[how.note - 1]
       if (!target) throw new Error(t('core.store.noSuchNote', { ref: refOf(d), n: how.note, count: d.notes.length }))
       if (target.role !== how.role && !how.force) throw new Error(t('core.store.notYourNote', { ref: refOf(d), n: how.note }))
+      // Every 已答 is a record of what was decided then; changing the answer appends a new one.
+      if (target.kind === NOTE_KIND.answered && !how.force) throw new Error(t('core.store.answerIsRecord', { ref: refOf(d), n: how.note }))
     }
     const body = how.note !== undefined ? replaceNoteText(d.body, how.note, how.text) : replaceDescription(d.body, how.text)
     if (body === null || body === d.body) return d
@@ -1512,7 +1518,7 @@ export class Store {
 
   /** Writes the node, then moves its whole tree between active/ and archived/ if asked. */
   private write(d: Decision, move?: 'archive' | 'unarchive'): Decision {
-    d = { ...d, updatedAt: nowStamp(new Date(), { ms: true }) }
+    d = { ...d, state: withOpenQuestion(d), updatedAt: nowStamp(new Date(), { ms: true }) }
     writeFileAtomic(d.file, serializeDecision(d))
     // A later read this same pass must see this write, not the walk cached before it.
     this.invalidateScan(this.layoutOf(d))

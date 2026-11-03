@@ -1119,6 +1119,21 @@ svg.lucide.ico {
   font-size: 13.5px;
 }
 
+/* Each answer is its own block in the thread: a changed answer adds one, never rewrites the last. */
+.note.decision {
+  background: var(--green-soft);
+  border-inline-start: 3px solid var(--green);
+}
+
+.note .decision-label {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-weight: 600;
+}
+
 .shot {
   margin: 4px 0 18px;
   cursor: zoom-in;

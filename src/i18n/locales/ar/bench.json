@@ -138,7 +138,9 @@
   },
   "note": {
     "user": "المستخدم",
-    "agent": "الوكيل"
+    "agent": "الوكيل",
+    "decided": "✓ تم القرار",
+    "answerChanged": "✎ تم تغيير الإجابة"
   },
   "summary": {
     "decideNone": " بانتظار قرار ",

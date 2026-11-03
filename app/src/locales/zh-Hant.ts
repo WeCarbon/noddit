@@ -20,6 +20,8 @@ export const zhHant: Strings = {
   changeAnswer: '更新答案',
   keepAnswer: '保留原答案',
   changeAnswerHint: '選另一個選項就會重新回答。',
+  decisionBlock: '已決定',
+  decisionChangedBlock: '更新答案',
   answerLockedHint: '已答 {{key}}。要改，先點「更新答案」。',
   addNote: '補一句（可不填）',
   send: '送出',

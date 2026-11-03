@@ -133,7 +133,9 @@
   },
   "note": {
     "user": "用户",
-    "agent": "AI"
+    "agent": "AI",
+    "decided": "✓ 已决定",
+    "answerChanged": "✎ 更新答案"
   },
   "summary": {
     "decideNone": " 待决 ",

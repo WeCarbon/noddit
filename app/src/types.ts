@@ -236,6 +236,8 @@ export interface Note {
    *  room for the whole reply — a notice, a note card's title, the TUI. Absent on a short note
    *  (which is its own summary) or one written before `--summary` existed. */
   summary?: string | null
+  /** A 已答 that replaces an earlier answer to the same round — drawn as its own block, labelled as a change. */
+  revises?: boolean
   /** This note's own attachments. */
   attachments?: Attachment[]
 }

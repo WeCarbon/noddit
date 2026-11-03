@@ -43,7 +43,7 @@ test('App: s on a node still needing a decision refuses, same as nod start', asy
   const b = bench(t, store, { view: 'all' })
   await b.until(has(b, /ship it or not/))
   await b.press('s')
-  await b.until(has(b, /still waiting on the owner.s decision, can.t start/))
+  await b.until(has(b, /still has options waiting on the owner/))
   assert.equal(store.get(asking.id)!.state, 'needs_decision')
 })
 
