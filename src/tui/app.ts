@@ -98,9 +98,9 @@ const MIN_PANEL_COLS = 12
 type Line = Segment[]
 export type Mode =
   | 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother'
-  | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project' | 'projects' | 'projectName' | 'projectAdd'
+  | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project' | 'projects' | 'projectName' | 'projectAdd' | 'attachPaths'
 /** Modes where keystrokes go into the prompt-line draft. */
-const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay', 'projectName', 'projectAdd']
+const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay', 'projectName', 'projectAdd', 'attachPaths']
 
 /** What `p` / `P` files: a brief for an AI to expand and confirm, a to-do for the owner, or a
  *  task an AI can just do — ⇥ cycles through them in this order. */
@@ -216,6 +216,10 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const [draft, setDraft] = useState('')
   const [caret, setCaret] = useState(0)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
+  /** Ctrl-A while writing a reply/answer: files staged to land in that same section once it's sent. */
+  const [attachPaths, setAttachPaths] = useState<string[]>([])
+  /** The reply/answer draft, set aside while `attachPaths` mode borrows the one shared draft buffer. */
+  const [composeStash, setComposeStash] = useState<{ mode: Mode; draft: string; caret: number } | null>(null)
   /** 派活 (`p` / `P`): where the new brief goes, and — once filed with nobody listening — which project to offer a session for. */
   const [briefAt, setBriefAt] = useState<{ parent?: Decision; layout: Layout; kind: BriefKind } | null>(null)
   const [sessionFor, setSessionFor] = useState<{ layout: Layout; project: string } | null>(null)
@@ -422,9 +426,10 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       const revising = current.status === 'answered'
       const qs = current.questions ?? []
       try {
+        let next: Decision
         if (qs.length && pendingKey === '2') {
           const notes = Object.fromEntries(Object.entries(qNotes).filter(([, v]) => v.trim()))
-          store.answer(current, {
+          next = store.answer(current, {
             answers: qPicks,
             answerNotes: Object.keys(notes).length ? notes : undefined,
             note: draft.trim() || undefined,
@@ -433,10 +438,11 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
           })
           say(t('bench.toast.answeredChoice', { ref: refOf(current), choice: picksSummary(qs, qPicks, notes) }))
         } else {
-          store.answer(current, { choice: pendingKey, note: draft.trim() || undefined, by: 'owner', role: 'human' })
+          next = store.answer(current, { choice: pendingKey, note: draft.trim() || undefined, by: 'owner', role: 'human' })
           const verb = revising ? t('bench.toast.answeredVerbChanged') : t('bench.toast.answeredVerbNew')
           say(t('bench.toast.answeredOption', { ref: refOf(current), verb, key: pendingKey }))
         }
+        attachStaged(next)
       } catch (e) {
         say((e as Error).message)
       }
@@ -447,13 +453,50 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     setMode('browse')
     setDraft('')
     setPendingKey(null)
+    setAttachPaths([])
     reload()
+  }
+
+  /** Whatever Ctrl-A staged, into the section `d`'s own write just landed in. */
+  const attachStaged = (d: Decision) => {
+    if (!attachPaths.length) return
+    store.attach(d, attachPaths, { to: 'last', by: 'owner' })
+  }
+
+  /** Ctrl-A while writing a reply/answer: the shared draft buffer is the compose text, so it's
+   *  set aside here and restored (text, caret, and mode) once a path (or Esc) hands it back. */
+  const startAttachPaths = () => {
+    if (mode !== 'note' && mode !== 'confirm') return
+    setComposeStash({ mode, draft, caret })
+    startText('attachPaths')
+  }
+
+  /** Esc from the attach prompt: back to composing, nothing added this time. */
+  const resumeCompose = () => {
+    const stash = composeStash
+    setComposeStash(null)
+    if (!stash) return setMode('browse')
+    setDraft(stash.draft)
+    setCaret(stash.caret)
+    setMode(stash.mode)
+  }
+
+  /** A source `store.attach` itself would accept: an existing local file, or a URL. */
+  const attachable = (src: string): boolean => /^[a-z][a-z0-9+.-]*:\/\//i.test(src) || existsSync(resolvePath(src))
+
+  const commitAttachPaths = () => {
+    const tokens = draft.trim().split(/\s+/).filter(Boolean)
+    const [ok, bad] = [tokens.filter(attachable), tokens.filter((p) => !attachable(p))]
+    if (ok.length) setAttachPaths((a) => [...a, ...ok])
+    if (bad.length) say(t('bench.toast.attachNotFound', { paths: bad.join(' ') }))
+    resumeCompose()
   }
 
   const commitNote = () => {
     if (current && draft.trim()) {
       try {
-        store.note(current, { text: draft.trim(), role: 'human', author: 'owner' })
+        const next = store.note(current, { text: draft.trim(), role: 'human', author: 'owner' })
+        attachStaged(next)
         say(t('bench.toast.notedReply', { ref: refOf(current) }))
       } catch (e) {
         say((e as Error).message)
@@ -461,6 +504,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     }
     setMode('browse')
     setDraft('')
+    setAttachPaths([])
     reload()
   }
 
@@ -1070,6 +1114,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         ? store.layouts.map((l) => ({ letter: readProjectConfig(l).letter ?? DEFAULT_LETTER, name: store.displayName(l) }))
         : undefined,
     projectIndex,
+    attachCount: attachPaths.length || undefined,
   }
   const geom = useMemo(
     () => geometry(frameInput),
@@ -1200,8 +1245,10 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
 
     if (TEXT_MODES.includes(mode)) {
       if (key.escape) {
+        if (mode === 'attachPaths') return resumeCompose()
         setDraft('')
         setBriefAt(null)
+        setAttachPaths([])
         if (mode === 'qnote' || mode === 'qother') return setMode('questions')
         if (mode === 'confirm' && current?.questions?.length && pendingKey === '2') return setMode('questions')
         if (mode === 'projectName' || mode === 'projectAdd') return setMode('projects')
@@ -1220,8 +1267,11 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         if (mode === 'retitle') return commitRetitle()
         if (mode === 'projectName') return commitProjectName()
         if (mode === 'projectAdd') return commitProjectAdd()
+        if (mode === 'attachPaths') return commitAttachPaths()
         return commitGoto()
       }
+      // Ctrl-A while writing a reply/answer: stage files to land in the same section.
+      if (key.ctrl && input === 'a' && (mode === 'note' || mode === 'confirm')) return startAttachPaths()
       // The add prompt: ⇥ switches between a brief for an AI and a to-do for the owner.
       if (key.tab && mode === 'brief') return setBriefAt((at) => (at ? { ...at, kind: nextBriefKind(at.kind) } : at))
       if (key.leftArrow) return setCaret((c) => Math.max(0, c - 1))
@@ -1453,7 +1503,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     [
       list, index, current, view, items, overview, now, backlinks, rows, width, listTop, offset, condensed, mode, draft, caret,
       imageSel, pendingKey, banner, geom, zoom, imgMeta, detailFocus, pickToOpen, qIndex, qPicks, qNotes, settingIndex, settingsVersion,
-      briefAt, sessionFor, textView, projectIndex,
+      briefAt, sessionFor, textView, projectIndex, attachPaths,
     ],
   )
   frameRef.current = frame
@@ -1529,6 +1579,8 @@ export interface FrameInput {
   projects?: { letter: string; name: string }[]
   /** `project` mode: which row of `projects` is highlighted. */
   projectIndex?: number
+  /** Ctrl-A on a reply/answer draft: how many files are staged to attach once it's sent. */
+  attachCount?: number
 }
 
 /** Below this, the full hint line (natural truncation aside) crowds out too
@@ -2298,12 +2350,16 @@ function promptPrefix(s: FrameInput): Line | null {
   }
   if (s.mode === 'projectName') return [{ text: t('bench.prompt.projectName', { project: (s.projects ?? [])[s.projectIndex ?? -1]?.name ?? '' }), color: 'blue', bold: true }]
   if (s.mode === 'projectAdd') return [{ text: t('bench.prompt.projectAdd'), color: 'blue', bold: true }]
+  if (s.mode === 'attachPaths') return [{ text: t('bench.prompt.attachPaths'), color: 'blue', bold: true }]
   if (!d) return null
+  // Ctrl-A staged at least one file: shown on the reply/answer prompt it will land with.
+  const staged: Segment[] = s.attachCount ? [{ text: ` ${t('bench.prompt.attachStaged', { count: s.attachCount })}`, dim: true }] : []
   if (s.mode === 'confirm') {
     const qs = d.questions ?? []
     if (qs.length && s.pendingKey === '2') {
       return [
         { text: t('bench.prompt.submit', { ref: refOf(d), summary: picksSummary(qs, s.qPicks ?? {}, s.qNotes ?? {}) }), color: 'green', bold: true },
+        ...staged,
         { text: t('bench.prompt.note'), dim: true },
       ]
     }
@@ -2311,10 +2367,11 @@ function promptPrefix(s: FrameInput): Line | null {
     const verb = d.status === 'answered' ? t('bench.prompt.answerVerbChange', { ref: refOf(d), from: d.answer?.choice ?? '—' }) : t('bench.prompt.answerVerbNew', { ref: refOf(d) })
     return [
       { text: `${verb} ${s.pendingKey} ${opt?.label ?? ''}`, color: 'green', bold: true },
+      ...staged,
       { text: t('bench.prompt.note'), dim: true },
     ]
   }
-  if (s.mode === 'note') return [{ text: t('bench.prompt.reply', { ref: refOf(d) }), color: 'cyan', bold: true }]
+  if (s.mode === 'note') return [{ text: t('bench.prompt.reply', { ref: refOf(d) }), color: 'cyan', bold: true }, ...staged]
   if (s.mode === 'qnote') {
     const q = d.questions?.[s.qIndex ?? 0]
     return [{ text: t('bench.prompt.qnote', { key: q?.key ?? '' }), color: 'magenta', bold: true }]
@@ -2372,6 +2429,7 @@ const PLACEHOLDER: Partial<Record<Mode, () => string>> = {
   delay: () => t('bench.placeholder.delay'),
   projectName: () => t('bench.placeholder.projectName'),
   projectAdd: () => t('bench.placeholder.projectAdd'),
+  attachPaths: () => t('bench.placeholder.attachPaths'),
 }
 
 function promptLine(s: FrameInput): Line {
