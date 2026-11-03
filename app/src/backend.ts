@@ -350,7 +350,7 @@ export async function settingsGet(): Promise<SettingsView> {
 
 export const settingsSet = (settings: AppSettings) => (inDesktop ? invoke<void>('settings_set', { settings }) : Promise.resolve())
 
-export const setPhrases = (phrases: { needsDecision: string; notCollected: string; milestoneDay: string; milestoneHour: string; milestone: string; agentReplied: string; open: string; settings: string; quit: string }) => (inDesktop ? invoke('set_phrases', { phrases }).catch(() => {}) : Promise.resolve())
+export const setPhrases = (phrases: { needsDecision: string; notCollected: string; milestoneDay: string; milestoneHour: string; milestone: string; dueDay: string; dueHour: string; agentReplied: string; open: string; settings: string; quit: string }) => (inDesktop ? invoke('set_phrases', { phrases }).catch(() => {}) : Promise.resolve())
 
 export const summoned = (what: string) => (inDesktop ? invoke('summoned', { what }).catch((e) => log(`summoned: ${e}`)) : Promise.resolve())
 

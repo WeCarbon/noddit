@@ -3,7 +3,7 @@ import { resolveStore } from '../context.ts'
 import { alignRow, summaryLine, toJSON } from '../../core/render.ts'
 import { isFlagged } from '../../core/order.ts'
 import { isStale } from '../../core/staleness.ts'
-import { deferHidden, isDeferred, statusLabel } from '../../core/status.ts'
+import { deferHidden, isDeferred, isTerminal, statusLabel } from '../../core/status.ts'
 import type { ListFilter } from '../../core/store.ts'
 import { ITEM_STATUSES, type ItemStatus } from '../../core/types.ts'
 import { lang, loadResources, t, type Lang } from '../../i18n/index.ts'
@@ -19,6 +19,7 @@ const SCOPES: Record<string, ListFilter> = {
   fyi: { status: 'all', archived: 'all' },
   deferred: { status: 'all', archived: false },
   flagged: { status: 'all', archived: false },
+  due: { status: 'all', archived: false },
 }
 
 const statusWordCache = new Map<Lang, Record<string, ItemStatus>>()
@@ -73,6 +74,8 @@ export function run(args: Args): number {
     .filter((d) => (scope === 'deferred' ? isDeferred(d) : scope === 'open' ? !hidden(d) : true))
     // What the owner marked important or as a milestone, still live and not put off.
     .filter((d) => (scope === 'flagged' ? isFlagged(d) && !hidden(d) : true))
+    // Anything with a due date, still live and not put off — what the app reminds the owner of.
+    .filter((d) => (scope === 'due' ? Boolean(d.due) && !isTerminal(d.state) && !hidden(d) : true))
 
   if (bool(args, 'json')) {
     console.log(JSON.stringify(list.map(toJSON)))

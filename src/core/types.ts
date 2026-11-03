@@ -196,7 +196,7 @@ export interface Decision {
   order?: number
   /** Absent = normal. See core/order.ts for how it sorts. */
   urgency?: Urgency
-  /** ISO time the proposer needs an answer by. */
+  /** 到期日: when the node is due — the work done, or the answer given, by then (once two meanings, now one; same key). ISO. */
   due?: string
   /** A key date the owner marked: `due` is the date, counted down on the bench. */
   milestone?: boolean

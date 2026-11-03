@@ -71,7 +71,9 @@
     "waitingOnUntil": "Waiting on {{who}} · back {{date}}",
     "backOn": "Back {{date}}",
     "todo": "To do",
-    "doing": "In progress"
+    "doing": "In progress",
+    "due": "Due {{when}}",
+    "overdue": "Overdue {{span}}"
   },
   "detail": {
     "aiStuck": "AI stuck",

@@ -71,7 +71,9 @@
     "waitingOnUntil": "Attend {{who}} · revoir {{date}}",
     "backOn": "Revoir {{date}}",
     "todo": "À faire",
-    "doing": "En cours"
+    "doing": "En cours",
+    "due": "Échéance {{when}}",
+    "overdue": "En retard de {{span}}"
   },
   "detail": {
     "aiStuck": "IA bloquée",

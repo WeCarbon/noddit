@@ -71,7 +71,9 @@
     "waitingOnUntil": "بانتظار {{who}} · المتابعة {{date}}",
     "backOn": "المتابعة {{date}}",
     "todo": "مهمتك",
-    "doing": "قيد التنفيذ"
+    "doing": "قيد التنفيذ",
+    "due": "يستحق {{when}}",
+    "overdue": "متأخر {{span}}"
   },
   "detail": {
     "aiStuck": "الوكيل متعطل",

@@ -10,6 +10,8 @@ export interface Notice {
   title: string
   /** milestone: `hour` or `day`. */
   which?: string
+  /** milestone: false for a plain due date, which is reminded of the same way. */
+  milestone?: boolean
   /** decision: how many more arrived with it. */
   more?: number
   /** replied: the reply itself, as plain text; shown (clamped to three lines) instead of "an AI replied". */
@@ -34,6 +36,7 @@ const WHAT: Record<Notice['kind'], StringKey> = {
 
 /** The line under the title: what happened, or what the AI said. */
 export function noticeWhat(n: Notice): string {
+  if (n.kind === 'milestone' && n.milestone === false) return s(n.which === 'hour' ? 'noticeDueHour' : 'noticeDueDay')
   if (n.kind === 'milestone') return s(n.which === 'hour' ? 'noticeMilestoneHour' : 'noticeMilestoneDay')
   if (n.text) return n.text
   const what = s(WHAT[n.kind])

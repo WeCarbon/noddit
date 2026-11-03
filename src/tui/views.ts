@@ -439,6 +439,17 @@ export function flagMark(d: Item, now = Date.now()): Segment | null {
   return null
 }
 
+/** 「Due tomorrow」 / 「Overdue 2 hours」 on any live node with a due date; a milestone has its own countdown. */
+export function dueMark(d: Item, now = Date.now()): Segment | null {
+  if (!d.due || d.milestone || isTerminal(d.state)) return null
+  const left = untilDue(d, now)
+  if (!Number.isFinite(left)) return null
+  if (left < 0) return { text: t('bench.badge.overdue', { span: agoSpan(-left / 60_000) }), color: 'red', bold: true }
+  const day = untilDay(d.due)
+  const soon = left < 86_400_000
+  return { text: t('bench.badge.due', { when: day ? dayFromToday(day, new Date(now)) : '' }), color: soon ? 'red' : 'yellow', bold: soon }
+}
+
 /** "in 3 days" / "overdue 2 hours" for a live milestone; null otherwise. */
 export function milestoneCountdown(d: Item, now = Date.now()): Segment | null {
   if (!d.milestone || !d.due || isTerminal(d.state)) return null
@@ -909,7 +920,7 @@ function refsShort(refs: string[], max = 2): string {
 export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
   const sep: Segment = { text: ' · ', dim: true }
   const lead = (forms: Segment[][], seg: Segment | null) => (seg ? [...forms.map((f) => [seg, sep, ...f]), [seg]] : forms)
-  const countdown = row?.touch ? null : milestoneCountdown(d, now)
+  const countdown = row?.touch ? null : (milestoneCountdown(d, now) ?? dueMark(d, now))
   return lead(stateSuffix(d, items, now, row), countdown)
 }
 

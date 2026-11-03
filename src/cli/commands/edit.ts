@@ -3,30 +3,34 @@ import { readStdin, requireDecision, resolveAuthor, resolveStore, shellRole } fr
 import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
 import { t } from '../../i18n/index.ts'
-import { everyArg } from './send.ts'
+import { dueOf, everyArg } from './send.ts'
 
 const help = () => t('cli.help.edit')
 
-const FIELDS = ['every'] as const
+const FIELDS = ['every', 'due'] as const
 const CLEAR = new Set(['off', 'none', 'no', '-', ''])
 
-/** `nod edit <id> --every 3d` (or `off`): the node's own fields, not its text. */
+/** `nod edit <id> --every 3d --due fri` (`off` clears one): the node's own fields, not its text. */
 function editFields(args: Args, ref: string): number {
   const raw = (k: (typeof FIELDS)[number]) => {
     const v = one(args, k)
     return v === undefined ? undefined : CLEAR.has(v.trim().toLowerCase()) ? null : v
   }
   const every = raw('every')
+  const due = raw('due')
   const store = resolveStore(args, { allowRegistry: true })
   const d = requireDecision(store, ref, args)
-  const next = store.setFields(d, { every: every === null ? null : everyArg(every) })
+  const next = store.setFields(d, { every: every === null ? null : everyArg(every), due: due === null ? null : dueOf(due) })
   if (bool(args, 'json')) console.log(JSON.stringify({ ...toJSON(next), changed: next !== d }))
   else console.log(t('cli.edit.fields', { ref: refOf(next), what: fieldsText(next) }))
   return 0
 }
 
-function fieldsText(d: { every?: string }): string {
-  return [d.every ? t('cli.edit.every', { every: d.every }) : t('cli.edit.noEvery')].join(' · ')
+function fieldsText(d: { every?: string; due?: string }): string {
+  return [
+    d.every ? t('cli.edit.every', { every: d.every }) : t('cli.edit.noEvery'),
+    d.due ? t('cli.edit.due', { due: d.due.slice(0, 16).replace('T', ' ') }) : t('cli.edit.noDue'),
+  ].join(' · ')
 }
 
 /**

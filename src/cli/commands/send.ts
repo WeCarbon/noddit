@@ -187,7 +187,6 @@ function yesNo(raw: string | undefined, flag: string): boolean | undefined {
   throw new Error(t('cli.send.badYesNo', { flag, value: raw }))
 }
 
-/** An ISO time, or a duration from now (`4h`) — stored as ISO either way. */
 /** `--every 3d`: R, normalized; an unreadable one is an error, not dropped. */
 export function everyArg(raw: string | undefined): string | undefined {
   if (raw === undefined) return undefined
@@ -196,13 +195,9 @@ export function everyArg(raw: string | undefined): string | undefined {
   return every
 }
 
-function dueOf(raw: string | undefined): string | undefined {
-  if (!raw) return undefined
-  if (/\d{4}-\d{2}-\d{2}/.test(raw)) {
-    if (Number.isNaN(Date.parse(raw))) throw new Error(t('cli.send.badDue', { value: raw }))
-    return raw
-  }
-  return milestoneDue(raw)
+/** `--due`: an ISO time, a loose day (fri, 15 nov — the end of it), or a span from now (`4h`) — stored as ISO either way. */
+export function dueOf(raw: string | undefined): string | undefined {
+  return raw ? milestoneDue(raw) : undefined
 }
 
 /** Runs `$NODDIT_NOTIFY_CMD` (or the older `$DECS_NOTIFY_CMD`) if set — no built-in channel, since pinging by default gets muted. */

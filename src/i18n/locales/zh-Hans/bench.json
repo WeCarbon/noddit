@@ -71,7 +71,9 @@
     "waitingOnUntil": "等 {{who}} · {{date}} 回来看",
     "backOn": "{{date}} 回来看",
     "todo": "待做",
-    "doing": "在做"
+    "doing": "在做",
+    "due": "{{when}}到期",
+    "overdue": "逾期 {{span}}"
   },
   "detail": {
     "aiStuck": "AI 卡着",

@@ -87,7 +87,7 @@ pub struct Waiting {
     urgent: bool,
 }
 
-/// A live node the owner marked as a milestone (`nod flag … milestone`).
+/// A live node with a due date (`nod show due`); `milestone` when the owner also marked it one (⚑).
 #[derive(Clone, Serialize)]
 pub struct Milestone {
     key: String,
@@ -96,6 +96,13 @@ pub struct Milestone {
     title: String,
     /// Milliseconds since the epoch.
     due: i64,
+    milestone: bool,
+}
+
+impl Milestone {
+    fn glyph(&self) -> &'static str {
+        if self.milestone { "⚑" } else { "⏰" }
+    }
 }
 
 /// Words the notifications use, in the window's language (it knows it; this side does not).
@@ -108,6 +115,9 @@ pub struct Phrases {
     milestone_day: String,
     milestone_hour: String,
     milestone: String,
+    /// "Due in a day" / "Due in an hour", for a due date that is not a milestone.
+    due_day: String,
+    due_hour: String,
     agent_replied: String,
     open: String,
     settings: String,
@@ -160,7 +170,6 @@ fn parse_milestones(json: &str) -> Vec<Milestone> {
     let Ok(Value::Array(items)) = serde_json::from_str::<Value>(json) else { return vec![] };
     items
         .iter()
-        .filter(|d| d["milestone"] == true)
         .filter_map(|d| {
             let due = chrono_ms(d["due"].as_str()?)?;
             Some(Milestone {
@@ -168,6 +177,7 @@ fn parse_milestones(json: &str) -> Vec<Milestone> {
                 reference: d["ref"].as_str().unwrap_or_default().to_string(),
                 title: d["title"].as_str().unwrap_or_default().to_string(),
                 due,
+                milestone: d["milestone"] == true,
             })
         })
         .collect()
@@ -241,7 +251,7 @@ fn remind(app: &AppHandle, milestones: &[Milestone]) {
     }
     if style == "banner" {
         for (m, which) in due {
-            notice(app, serde_json::json!({ "kind": "milestone", "which": which, "key": m.key, "ref": m.reference, "title": m.title }));
+            notice(app, serde_json::json!({ "kind": "milestone", "which": which, "milestone": m.milestone, "key": m.key, "ref": m.reference, "title": m.title }));
         }
         return;
     }
@@ -250,8 +260,13 @@ fn remind(app: &AppHandle, milestones: &[Milestone]) {
     }
     let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
     for (m, which) in due {
-        let head = if which == "hour" { phrase(&phrases.milestone_hour, "Milestone in an hour") } else { phrase(&phrases.milestone_day, "Milestone in a day") };
-        let _ = app.notification().builder().title(format!("⚑ {} · {head}", m.reference)).body(&m.title).show();
+        let head = match (m.milestone, which) {
+            (true, "hour") => phrase(&phrases.milestone_hour, "Milestone in an hour"),
+            (true, _) => phrase(&phrases.milestone_day, "Milestone in a day"),
+            (false, "hour") => phrase(&phrases.due_hour, "Due in an hour"),
+            (false, _) => phrase(&phrases.due_day, "Due in a day"),
+        };
+        let _ = app.notification().builder().title(format!("{} {} · {head}", m.glyph(), m.reference)).body(&m.title).show();
     }
 }
 
@@ -321,7 +336,7 @@ pub fn refresh(app: &AppHandle) {
             if !out.status.success() {
                 continue;
             }
-            let flagged = match decs_command(&env, &["show".into(), "flagged".into(), "--json".into()], None) {
+            let flagged = match decs_command(&env, &["show".into(), "due".into(), "--json".into()], None) {
                 Ok(mut cmd) => match cmd.output().await {
                     Ok(o) if o.status.success() => parse_milestones(&String::from_utf8_lossy(&o.stdout)),
                     _ => vec![],
@@ -537,7 +552,7 @@ fn draw_tray(app: &AppHandle, tray: &TrayIcon, waiting: &[Waiting], soon: &[Mile
     let build = || -> tauri::Result<Menu<tauri::Wry>> {
         let menu = Menu::new(app)?;
         for m in soon.iter().take(TRAY_ITEMS) {
-            menu.append(&MenuItem::with_id(app, format!("node:{}", m.key), format!("⚑ {}  {}", m.reference, m.title), true, None::<&str>)?)?;
+            menu.append(&MenuItem::with_id(app, format!("node:{}", m.key), format!("{} {}  {}", m.glyph(), m.reference, m.title), true, None::<&str>)?)?;
         }
         for w in waiting.iter().take(TRAY_ITEMS) {
             let label = format!("{}{}  {}", if w.urgent { "! " } else { "" }, w.reference, w.title);
