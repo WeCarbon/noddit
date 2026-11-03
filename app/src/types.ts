@@ -316,10 +316,15 @@ export interface NodsDay {
 export interface NodsSummary {
   today: number
   yesterday: number
-  /** Mean of `days` (7 local days, today included). */
+  /** Mean of `days` (7 local days, today included); kept raw (not floored) —
+   *  the sidebar floors it for display. */
   avg7: number
   /** Oldest first, 7 entries, the last one today. */
   days: NodsDay[]
+  /** Oldest first, one entry per day across the calendar modal's window
+   *  (53 Sunday-aligned weeks ending today, same as GitHub's own
+   *  contribution graph) — `core/nods.ts`'s `NodsSummary.history`. */
+  history: NodsDay[]
 }
 
 /**

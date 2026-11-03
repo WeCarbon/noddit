@@ -148,16 +148,16 @@ test('a jump lands in the current view when it lists the node, else Available, e
 // The App
 // ---------------------------------------------------------------------------
 
-test('App: opens in Available, Tab walks Available Active Decide Waiting Live All, and c does nothing', async (t) => {
+test('App: opens in Available, Tab walks Available Active Decide Waiting Live All, and b does nothing', async (t) => {
   const { store } = fixture(t)
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /a startable/))
   const header = () => b.frame()[0]
   assert.match(header(), /^decs +Available 8 +Active 7 +Human work 2 +Waiting 1/)
   const before = b.frame().join('\n')
-  await b.press('c')
+  await b.press('b')
   await b.quiet()
-  assert.equal(b.frame().join('\n'), before, 'c is gone: no banner, no change')
+  assert.equal(b.frame().join('\n'), before, 'b is gone: no banner, no change')
 
   const seen: string[] = []
   for (let i = 0; i < 6; i++) {

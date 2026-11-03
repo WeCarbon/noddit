@@ -33,6 +33,7 @@ import { SourcesPanel } from './sources.tsx'
 import { noticeTitle, plainReply } from './plain-reply.ts'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, heldAt, keepAllHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, runBatch, type BatchItem, type Held, type PendingOp } from './optimistic.ts'
+import { bumpNodsToday, displayNods, type NodsBump } from './nod-bump.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { NONE, batchActions, boxHits, boxed, extend, listed, range, toggle, type Selection } from './selection.ts'
 import { s } from './strings.ts'
@@ -109,7 +110,16 @@ export function Bench(props: {
       }),
     [readAt],
   )
-  const bench = useMemo(() => applyOps(props.bench, [...ops, ...(props.patches ?? [])], readAt), [props.bench, ops, props.patches, readAt])
+  // `start`, closing a node as obsolete, and "done" on a node with no note change nothing
+  // `computeNods` can see; the usual CLI round-trip lags the rest too. This floor (never
+  // below what a moment ago already showed, reset once a new day's own count catches up
+  // or begins) covers both, the same way `ops` above covers everything else about a node.
+  const [nodsBump, setNodsBump] = useState<NodsBump | null>(null)
+  const bumpNod = () => setNodsBump((b) => bumpNodsToday(b, props.bench.nods))
+  const bench = useMemo(() => {
+    const applied = applyOps(props.bench, [...ops, ...(props.patches ?? [])], readAt)
+    return applied.nods ? { ...applied, nods: displayNods(applied.nods, nodsBump) } : applied
+  }, [props.bench, ops, props.patches, readAt, nodsBump])
   // The sidebar picks one thing to show: a view across every project, or one project's
   // whole tree (live work, finished folded) — never the two combined. A project that is
   // gone (unlinked) falls back to the view.
@@ -451,24 +461,29 @@ export function Bench(props: {
     ),
     write: () => api.assign(rootOf(n), n.id, on ? 'milestone' : 'ai'),
   })
-  const startItem = (n: Node): BatchItem => ({
-    ref: n.ref,
-    patch: both(
-      patchNode(n.key, (x) => ({ ...x, status: 'in_progress' })),
-      // The owner's own to-do started is ⬖ in yellow (as the CLI draws it), an AI's is ◐ in cyan; the badge waits for the reload.
-      patchRows(n.key, (r) =>
-        r.human_task
-          ? { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '⬖', color: 'yellow', dim: false }, badge: [], badge_short: [] }
-          : { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '◐', color: 'cyan', dim: false } },
+  const startItem = (n: Node): BatchItem => {
+    bumpNod()
+    return {
+      ref: n.ref,
+      patch: both(
+        patchNode(n.key, (x) => ({ ...x, status: 'in_progress' })),
+        // The owner's own to-do started is ⬖ in yellow (as the CLI draws it), an AI's is ◐ in cyan; the badge waits for the reload.
+        patchRows(n.key, (r) =>
+          r.human_task
+            ? { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '⬖', color: 'yellow', dim: false }, badge: [], badge_short: [] }
+            : { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '◐', color: 'cyan', dim: false } },
+        ),
       ),
-    ),
-    write: () => api.start(rootOf(n), n.id),
-  })
+      write: () => api.start(rootOf(n), n.id),
+    }
+  }
   /** 归档 without asking why: decided work is marked seen, anything still open is closed as obsolete. */
-  const archiveItem = (n: Node): BatchItem =>
-    n.status === 'decided'
+  const archiveItem = (n: Node): BatchItem => {
+    bumpNod()
+    return n.status === 'decided'
       ? { ref: n.ref, patch: finished(n.key, 'completed'), write: () => api.seen(rootOf(n), n.id) }
       : { ref: n.ref, patch: finished(n.key, 'closed'), write: () => api.close(rootOf(n), n.id, 'obsolete') }
+  }
   /** 延迟到…: waiting on `on` (purple), or — no one named — a plain deferral (grey); `date` null = indefinitely. */
   const delayItem = (n: Node, on: string | null, date: string | null, passive: boolean): BatchItem & { active: boolean } => {
     const active = Boolean(on) || (n.status === 'waiting' && !passive)
@@ -558,6 +573,7 @@ export function Bench(props: {
     if (node.questions.length) {
       if (key === '1') {
         holdShown(node.key)
+        bumpNod()
         return act(() => api.answerDefaults(rootOf(node), node.id), s('sent'))
       }
       return detailRef.current?.querySelector<HTMLButtonElement>('.question .pick')?.focus()
@@ -577,13 +593,16 @@ export function Bench(props: {
     if (composer.kind === 'answer') {
       setUnlocked(null)
       holdShown(key)
+      bumpNod()
       return optimistic(answered(key, composer.key, text), () => api.answer(root, node.id, composer.key, text || undefined, files), s('sent'), reopen(composer))
     }
     if (composer.kind === 'free' && text) {
       holdShown(key)
+      bumpNod()
       return optimistic(answered(key, undefined, text), () => api.answerFreeText(root, node.id, text, files), s('sent'), reopen(composer))
     }
-    if (composer.kind === 'reply' && text)
+    if (composer.kind === 'reply' && text) {
+      bumpNod()
       return optimistic(
         patchNode(key, (n) => ({
           ...n,
@@ -600,8 +619,10 @@ export function Bench(props: {
         s('replied'),
         reopen(composer),
       )
+    }
     if (composer.kind === 'close') {
       holdShown(key)
+      bumpNod()
       return optimistic(finished(key, 'closed'), () => api.close(root, node.id, text || 'obsolete'), s('closed'), reopen(composer))
     }
   }
@@ -635,6 +656,7 @@ export function Bench(props: {
   const seen = () => {
     if (!node || node.terminal) return
     holdShown(node.key)
+    bumpNod()
     optimistic(finished(node.key, 'completed'), () => api.seen(rootOf(node), node.id), s('dismissed'))
   }
   const startClose = () => {
@@ -812,6 +834,7 @@ export function Bench(props: {
   const markDone = () => {
     if (!node) return
     holdShown(node.key)
+    bumpNod()
     optimistic(finished(node.key, 'completed'), () => api.done(rootOf(node), node.id), s('markedDone'))
   }
   const goParent = () => {
@@ -1469,7 +1492,7 @@ export function Bench(props: {
             onSaveEdit={(target, md) => saveEdit(node, target, md)}
             onCancelEdit={() => setEditing(null)}
             onFiles={(target, files) => void api.attachFiles(rootOf(node), node.id, files, target).then(() => (showToast(s('attachedFiles', { count: files.length })), refresh()), (e: Error) => setError(e.message))}
-            onQuestions={(picks, notes, note) => optimistic(answered(node.key), () => api.answerQuestions(rootOf(node), node.id, picks, notes, note), s('sent'))}
+            onQuestions={(picks, notes, note) => (bumpNod(), optimistic(answered(node.key), () => api.answerQuestions(rootOf(node), node.id, picks, notes, note), s('sent')))}
             editingTitle={editingTitle === node.key}
             onStartTitle={() => setEditingTitle(node.key)}
             onSaveTitle={(title) => saveTitle(node, title)}

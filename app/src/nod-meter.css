@@ -6,8 +6,16 @@
 .nod-meter-head {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 2px;
   width: 100%;
+}
+
+.nod-meter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
   height: 22px;
   padding-inline: 2px;
   border-radius: 6px;
@@ -17,8 +25,25 @@
   transition: background 120ms ease;
 }
 
-.nod-meter-head:hover {
+.nod-meter-toggle:hover {
   background: var(--hover);
+}
+
+.nod-cal-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-3);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.nod-cal-btn:hover {
+  background: var(--hover);
+  color: var(--text);
 }
 
 .nod-bolt {

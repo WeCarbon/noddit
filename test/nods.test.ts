@@ -5,7 +5,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { computeNods } from '../src/core/nods.ts'
+import { bumpNodsToday, computeNods, displayNods, nodsLevel } from '../src/core/nods.ts'
 import { NOTE_KIND } from '../src/core/format.ts'
 import { initLayout } from '../src/core/paths.ts'
 import { Store } from '../src/core/store.ts'
@@ -145,4 +145,58 @@ test('wired through the Store: a brief the owner filed and a decision the owner 
   const s = computeNods(store.all(), now)
   assert.equal(s.today, 2, `brief creation + decision answer: ${JSON.stringify(s)}`)
   assert.equal(brief.intake, true)
+})
+
+test('history is 53 Sunday-aligned weeks ending today, oldest first', () => {
+  const s = computeNods([], NOW)
+  assert.equal(s.history.at(-1)!.date, '2026-11-03', 'the window ends today')
+  assert.equal(new Date(`${s.history[0].date}T00:00:00`).getDay(), 0, 'it starts on a Sunday')
+  assert.ok(s.history.length > 364 - 7 && s.history.length <= 371, `~53 weeks: ${s.history.length} days`)
+  assert.deepEqual(new Set(s.history.map((d) => d.date)).size, s.history.length, 'no day repeats')
+})
+
+test('history reaches back further than the 7-day window, and agrees with it where they overlap', () => {
+  const farBack = item({ notes: [note({ at: '2026-08-15T09:00:00+08:00' })] }) // ~80 days back — outside `days`, inside `history`
+  const recent = item({ notes: [note({ at: '2026-11-02T09:00:00+08:00' })] }) // yesterday — inside both
+  const s = computeNods([farBack, recent], NOW)
+  assert.equal(s.days.some((d) => d.date === '2026-08-15'), false, '80 days back is outside the 7-day days window')
+  assert.equal(s.history.find((d) => d.date === '2026-08-15')?.count, 1, 'but inside the heatmap window')
+  assert.equal(s.history.find((d) => d.date === '2026-11-02')?.count, s.days.find((d) => d.date === '2026-11-02')?.count, 'the two windows agree where they overlap')
+})
+
+test('nodsLevel: no Nods is level 0, the busiest day in view is the top level, the rest scale between', () => {
+  assert.equal(nodsLevel(0, 10), 0)
+  assert.equal(nodsLevel(3, 0), 0, 'a day can\'t be relative to an empty window')
+  assert.equal(nodsLevel(10, 10), 4, 'the max itself always tops out')
+  assert.equal(nodsLevel(1, 10), 1)
+  assert.equal(nodsLevel(5, 10), 2)
+  assert.equal(nodsLevel(8, 10), 4)
+})
+
+test('bumpNodsToday: starts from the real count, then climbs by one per call, and resets on a new day', () => {
+  const s = computeNods([], NOW)
+  const once = bumpNodsToday(null, s)
+  assert.deepEqual(once, { date: '2026-11-03', count: 1 })
+  const twice = bumpNodsToday(once, s)
+  assert.deepEqual(twice, { date: '2026-11-03', count: 2 })
+  const tomorrow = computeNods([], NOW + 24 * 60 * 60 * 1000)
+  const freshDay = bumpNodsToday(twice, tomorrow)
+  assert.deepEqual(freshDay, { date: '2026-11-04', count: 1 }, 'yesterday\'s floor does not carry over')
+})
+
+test('displayNods: raises today (and the 7-day average behind it) to the bump, never below the real count', () => {
+  const s = computeNods([item({ notes: [note({ at: '2026-11-03T09:00:00+08:00' })] })], NOW) // today really is 1
+  const bump = { date: '2026-11-03', count: 3 }
+  const shown = displayNods(s, bump)
+  assert.equal(shown.today, 3)
+  assert.equal(shown.days.at(-1)!.count, 3)
+  assert.equal(shown.history.at(-1)!.count, 3)
+  assert.equal(shown.avg7, (s.avg7 * 7 - 1 + 3) / 7, 'the average moves by exactly the floor\'s own bump')
+})
+
+test('displayNods is a no-op once the real count catches up, is null, or is yesterday\'s floor', () => {
+  const s = computeNods([], NOW)
+  assert.equal(displayNods(s, null), s)
+  assert.equal(displayNods(s, { date: '2026-11-03', count: 0 }), s, 'the real count already matches the floor')
+  assert.equal(displayNods(s, { date: '2026-11-02', count: 9 }), s, 'a floor from a day that is not today')
 })

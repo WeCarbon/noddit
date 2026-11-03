@@ -14,7 +14,7 @@ import { Box, Text, useApp, useInput, useStdin, useStdout } from 'ink'
 import { targetPath } from '../cli/commands/open.ts'
 import { openerFor } from '../core/opener.ts'
 import { buildOverview, type Overview } from '../core/overview.ts'
-import { computeNods, type NodsSummary } from '../core/nods.ts'
+import { bumpNodsToday, computeNods, displayNods, nodsLevel, type NodsBump, type NodsDay, type NodsSummary } from '../core/nods.ts'
 import { refOf } from '../core/ref.ts'
 import { listSources, type SourceSummary } from '../core/sources.ts'
 import { projectSessions } from '../core/listeners.ts'
@@ -26,7 +26,7 @@ import { nowStamp, type Store } from '../core/store.ts'
 import { assertTitleFits } from '../core/title.ts'
 import { descriptionOf } from '../core/edit.ts'
 import { type Decision } from '../core/types.ts'
-import { isRtl, t } from '../i18n/index.ts'
+import { isRtl, lang, t } from '../i18n/index.ts'
 import { bidiMode, isolateLtr, reorderRuns, type BidiMode } from '../i18n/bidi.ts'
 import { SETTINGS, cycleSetting, settingValue, showValue } from '../core/settings.ts'
 import { fit, stringWidth, wrapToWidth } from './width.ts'
@@ -106,7 +106,7 @@ type Line = Segment[]
 export type Mode =
   | 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother'
   | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project' | 'projects' | 'projectName' | 'projectAdd' | 'attachPaths' | 'editConflict'
-  | 'views' | 'viewsMove' | 'viewEdit' | 'viewFieldText' | 'viewAddId'
+  | 'views' | 'viewsMove' | 'viewEdit' | 'viewFieldText' | 'viewAddId' | 'heatmap'
 /** Modes where keystrokes go into the prompt-line draft. */
 const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay', 'projectName', 'projectAdd', 'attachPaths', 'viewFieldText', 'viewAddId']
 
@@ -232,7 +232,13 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const width = Math.max(20, cols - 1)
 
   const [snap, setSnap] = useState<Snapshot>(() => snapshot(store, project))
-  const { items, sources, sessions, main, nods, now } = snap
+  const { items, sources, sessions, main, now } = snap
+  // `start`, closing a node as obsolete and the like leave no note `computeNods` can see —
+  // without this floor the ⚡ counter would never move for them, even once `reload` re-reads
+  // the store. Bumped once per node the instant such an action fires (`bumpNod` below).
+  const [nodsBump, setNodsBump] = useState<NodsBump | null>(null)
+  const nods = useMemo(() => displayNods(snap.nods, nodsBump), [snap.nods, nodsBump])
+  const bumpNod = useCallback(() => setNodsBump((b) => bumpNodsToday(b, snap.nods)), [snap.nods])
   const [view, setView] = useState<View>(initialView)
   // Folds persist per viewer across sessions (`$NODDIT_HOME/bench-state.json`).
   const [folds, setFolds] = useState<FoldMap>(() => ({ ...loadFolds(), ...(openDeferred ? { [DEFERRED_FOLD_KEY]: 'expanded' as const } : {}) }))
@@ -479,6 +485,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
           say(t('bench.toast.answeredOption', { ref: refOf(current), verb, key: pendingKey }))
         }
         attachStaged(next)
+        bumpNod()
       } catch (e) {
         say((e as Error).message)
       }
@@ -533,6 +540,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       try {
         const next = store.note(current, { text: draft.trim(), role: 'human', author: 'owner' })
         attachStaged(next)
+        bumpNod()
         say(t('bench.toast.notedReply', { ref: refOf(current) }))
       } catch (e) {
         say((e as Error).message)
@@ -588,12 +596,14 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         live(d)
         if (d.state === 'decided') store.dismiss(d)
         else store.close(d, reason)
+        bumpNod()
       })
     }
     if (current) {
       const reason = draft.trim() || 'obsolete'
       try {
         store.close(current, reason)
+        bumpNod()
         say(t('bench.toast.closed', { ref: refOf(current), reason }))
       } catch (e) {
         say((e as Error).message)
@@ -882,12 +892,14 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       return onMarked(t('bench.toast.batchStarted'), (d) => {
         if (d.state === 'in_progress' || d.state === 'decided' || isTerminal(d.state)) throw new Error(t('bench.toast.alreadyPendingChange', { ref: refOf(d), status: statusLabel(d.state) }))
         store.start(d, {})
+        bumpNod()
       })
     if (!current) return
     if (current.state === 'in_progress' || current.state === 'decided' || isTerminal(current.state))
       return say(t('bench.toast.alreadyPendingChange', { ref: refOf(current), status: statusLabel(current.state) }))
     try {
       const started = store.start(current, {})
+      bumpNod()
       say(t('bench.toast.started', { ref: refOf(started) }))
     } catch (e) {
       return say((e as Error).message)
@@ -986,13 +998,17 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const archive = () => {
     if (markedNodes.length) {
       if (!markedNodes.every((d) => d.state === 'decided')) return askForMarked('close')
-      return onMarked(t('bench.toast.batchArchived'), (d) => store.dismiss(d))
+      return onMarked(t('bench.toast.batchArchived'), (d) => {
+        store.dismiss(d)
+        bumpNod()
+      })
     }
     if (!current) return
     if (isTerminal(current.state)) return say(t('bench.toast.alreadyPendingChange', { ref: refOf(current), status: statusLabel(current.state) }))
     if (current.state === 'decided') {
       try {
         store.dismiss(current)
+        bumpNod()
         say(t('bench.toast.dismissed', { ref: refOf(current), id: current.id }))
       } catch (e) {
         say((e as Error).message)
@@ -1417,6 +1433,11 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
 
     if (mode === 'help') return setMode('browse')
 
+    if (mode === 'heatmap') {
+      if (key.escape || input === 'c') return setMode('browse')
+      return
+    }
+
     if (mode === 'settings') {
       if (input === ',' || key.escape) return setMode('browse')
       if (key.upArrow) return setSettingIndex((i) => Math.max(0, i - 1))
@@ -1704,6 +1725,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       setSettingIndex(0)
       return setMode('settings')
     }
+    if (input === 'c') return setMode('heatmap')
 
     if (input === 'p' || input === 'P') {
       // p: under the selected node (when it can still take children); P: at its project's top level.
@@ -2196,10 +2218,59 @@ function mainAgentSegments(main: Listener | null, rtl: boolean, mode: BidiMode):
 /** The header's ⚡ daily Nod counter, after the main-agent dot: today, yesterday, the
  *  7-day average — every registered project, archived included (`core/nods.ts`). */
 function nodsSegments(nods: NodsSummary, rtl: boolean, mode: BidiMode): Segment[] {
-  const avg7 = Number.isInteger(nods.avg7) ? String(nods.avg7) : nods.avg7.toFixed(1)
+  const avg7 = String(Math.floor(nods.avg7))
   const bolt: Segment = { text: '⚡', color: 'yellow' }
   const label: Segment = { text: ` ${t('bench.nods.header', { today: nods.today, yesterday: nods.yesterday, avg7 })}`, dim: true }
   return [{ text: '  ' }, bolt, rtl ? mirrorSegment(label, mode) : label]
+}
+
+/** A Sunday, so `WEEKDAY_BASE + n * 一天` is day `n` of the week whatever the local
+ *  time zone — formatted with `timeZone: 'UTC'` below so it never slips a day. */
+const WEEKDAY_BASE = Date.UTC(2023, 0, 1)
+
+const HEATMAP_BLOCKS = [' ', '░', '▒', '▓', '█']
+
+/** `c`: a text calendar heatmap of the ⚡ counter's own window — weeks as columns,
+ *  weekdays as rows, ░▒▓█ for a day's share of the busiest one in view (blank is
+ *  none); month initials above where one starts, a legend below. Mirrors the
+ *  app's calendar modal (`app/src/nod-calendar.tsx`), in text. */
+function heatmapLines(history: NodsDay[], rtl: boolean, mode: BidiMode): Line[] {
+  const weeks: (NodsDay | null)[][] = []
+  for (let i = 0; i < history.length; i += 7) {
+    const week: (NodsDay | null)[] = history.slice(i, i + 7)
+    while (week.length < 7) week.push(null)
+    weeks.push(week)
+  }
+  const max = Math.max(1, ...history.map((d) => d.count))
+  const today = history.at(-1)?.date
+  const weekdayLabel = (n: number) => new Intl.DateTimeFormat(lang(), { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(WEEKDAY_BASE + n * 86_400_000))
+  const monthLabel = (d: Date) => new Intl.DateTimeFormat(lang(), { month: 'short' }).format(d)
+  const months: Line = [{ text: '   ' }]
+  let lastMonth = ''
+  for (const week of weeks) {
+    const first = week.find((d): d is NodsDay => d !== null)
+    const d = first ? new Date(`${first.date}T00:00:00`) : null
+    const m = d ? monthLabel(d) : ''
+    const show = d !== null && d.getDate() <= 7 && m !== lastMonth
+    months.push({ text: show ? m.slice(0, 1) : ' ', dim: true })
+    if (show) lastMonth = m
+  }
+  const rows: Line[] = []
+  for (let wd = 0; wd < 7; wd++) {
+    const row: Line = [{ text: `${weekdayLabel(wd)}  `, dim: true }]
+    for (const week of weeks) {
+      const day = week[wd]
+      row.push(day ? { text: HEATMAP_BLOCKS[nodsLevel(day.count, max)], inverse: day.date === today } : { text: ' ' })
+    }
+    rows.push(row)
+  }
+  const legend: Line = [
+    { text: `${t('bench.nodsCalendar.less')} `, dim: true },
+    ...HEATMAP_BLOCKS.map((b) => ({ text: b })),
+    { text: ` ${t('bench.nodsCalendar.more')}`, dim: true },
+  ]
+  const body = [months, ...rows, [{ text: ' ' }], legend, [{ text: ' ' }], [{ text: t('bench.nodsCalendar.hint'), dim: true }]]
+  return rtl ? body.map((l) => mirrorLine(l, mode)) : body
 }
 
 /** The `,` settings dialog: a centred box, drawn in `buildFrame` and
@@ -2544,6 +2615,11 @@ export function buildFrame(s: FrameInput, g: Geometry = geometry(s)): Line[] {
     const rule: Line = [{ text: '─'.repeat(s.width), dim: true }]
     const body = helpText().map((l): Line => [{ text: l }])
     return clampFrame(rtl ? [header, rule, ...body.map((l) => mirrorLine(l, mode))] : [header, rule, ...body])
+  }
+
+  if (s.mode === 'heatmap') {
+    const rule: Line = [{ text: '─'.repeat(s.width), dim: true }]
+    return clampFrame([header, rule, ...heatmapLines(s.overview.nods.history, rtl, mode)])
   }
 
   if (s.mode === 'text' && s.textView) {
