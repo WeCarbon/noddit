@@ -2,11 +2,11 @@ import { HUMAN, isHumanTask } from '../core/assignee.ts'
 import { briefTitle } from '../core/intake.ts'
 import { isListening } from '../core/listeners.ts'
 import { layoutFor, type Layout } from '../core/paths.ts'
-import { addProject, removeProject } from '../core/config.ts'
+import { addProject, readProjects, removeProject } from '../core/config.ts'
 import { DEFAULT_LETTER, readProjectConfig, writeProjectConfig } from '../core/project.ts'
 import { agentArg, describeGoto, describeStart, gotoSession, startSession } from '../cli/commands/session.ts'
 import { spawn } from 'node:child_process'
-import { existsSync, watch, type FSWatcher } from 'node:fs'
+import { existsSync, realpathSync, watch, type FSWatcher } from 'node:fs'
 import { resolve as resolvePath } from 'node:path'
 import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, useApp, useInput, useStdout } from 'ink'
@@ -514,7 +514,14 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const unlinkProject = () => {
     const layout = store.layouts[projectIndex]
     if (!layout) return
-    removeProject(layout.projectRoot)
+    // `layout.projectRoot` is realpath-canonical (core/paths.ts); the registry stores whatever
+    // `nod projects add` resolved at the time, which through a symlink (macOS's /tmp, say) can
+    // read differently. Match the same way `nod projects rm` does, then remove by its own root,
+    // or `removeProject`'s own plain-resolve compare would silently keep a real symlinked entry.
+    const real = (p: string) => (existsSync(p) ? realpathSync.native(p) : p)
+    const here = real(layout.projectRoot)
+    const entry = readProjects().find((p) => real(p.root) === here)
+    removeProject(entry?.root ?? layout.projectRoot)
     say(t('cli.projects.removedKeep', { name: store.displayName(layout), root: layout.projectRoot }))
   }
 

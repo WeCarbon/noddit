@@ -1,5 +1,14 @@
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+// core/config.ts binds DECS_HOME to a constant the moment it is first imported, not read per
+// call — a test that only reassigns process.env.DECS_HOME later (the way bench() redirects fold
+// state) would still read and write the real ~/.decs/config.json. Set a throwaway one before
+// anything else in this process can import that module. ||= so a file that pins its own (the
+// way test/settings-dialog.test.ts must, before any of its own imports) still wins.
+const NOD_TEST_HOME = mkdtempSync(join(tmpdir(), 'nod-home-'))
+process.env.NODDIT_HOME ||= NOD_TEST_HOME
+process.env.DECS_HOME ||= NOD_TEST_HOME
 // The suite's expectations are written in English; tests about language pick their own.
 process.env.DECS_LANG ||= 'en'
 // Run as the lead even inside a teammate session, where the monitor would otherwise filter to that teammate.

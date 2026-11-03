@@ -1,9 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { addProject, readProjects } from '../src/core/config.ts'
 import { initLayout } from '../src/core/paths.ts'
 import { configPath, readProjectConfig, writeProjectConfig } from '../src/core/project.ts'
 import { Store } from '../src/core/store.ts'
@@ -12,15 +13,14 @@ import { bench, has, KEY } from './tui-harness.ts'
 const A = 'lead · tui projects test'
 
 /*
- * Rename and the letter live in the project's own decisions/decs.json (core/project.ts),
- * so bench() against a temp store exercises the real write, same as every other test here.
+ * Rename and the letter live in the project's own decisions/decs.json (core/project.ts).
  * Add/unlink go through core/config.ts's addProject/removeProject, which write the shared
- * ~/.decs/config.json registry — that path is bound once at import time (not re-read per
- * call), so no in-process test can point it at a temp dir the way bench() redirects fold
- * state; every existing test for them (test/project-name.test.ts) goes through a spawned
- * `nod` subprocess with its own DECS_HOME instead. Calling the real functions here would
- * write into the machine's real registry, so this file only exercises the UI up to the
- * point where it would — the prompts, the mode switch, Esc cancelling — never the commit.
+ * $DECS_HOME/config.json registry — that path is bound once at import time, not re-read per
+ * call, so pointing it at a temp dir only works if it happens before this process's first
+ * import of core/config.ts. test/setup.ts now does exactly that (a throwaway DECS_HOME for
+ * the whole suite), so this file can exercise the real functions; the registry is still one
+ * shared file across every test below (and, in principle, every other file sharing this
+ * process), so assertions key off each test's own root path rather than the registry's size.
  */
 
 function twoProjects(t: { after: (fn: () => void) => void }): Store {
@@ -90,6 +90,61 @@ test('App: Enter on "+ Add project" opens the add prompt; Esc cancels without re
   await b.until(has(b, /\+ Add project/))
   await b.press('\r')
   await b.until(has(b, /Add a project/))
-  await b.press(...'/nonexistent/path/nobody/registers'.split(''), '\x1b')
+  const path = '/nonexistent/path/nobody/registers'
+  await b.press(...path.split(''), '\x1b')
   await b.until(has(b, /Projects:/))
+  assert.ok(!readProjects().some((p) => p.root === path), 'Esc never committed the add')
+})
+
+test('App: "+ Add project" registers a real folder (one with decisions/), same as nod projects add', async (t) => {
+  const store = twoProjects(t)
+  const toAdd = mkdtempSync(join(tmpdir(), 'decs-tui-proj-add-'))
+  initLayout(toAdd) // creates decisions/active, the one thing addProject checks for
+  t.after(() => rmSync(toAdd, { recursive: true, force: true }))
+  const b = bench(t, store, { view: 'all' })
+  await b.quiet()
+  await b.press(';')
+  await b.until(has(b, /Projects:/))
+  await b.press(KEY.down, KEY.down)
+  await b.until(has(b, /\+ Add project/))
+  await b.press('\r')
+  await b.until(has(b, /Add a project/))
+  await b.press(...toAdd.split(''), '\r')
+  await b.until(has(b, new RegExp(`added ${toAdd}`)))
+  assert.ok(readProjects().some((p) => p.root === toAdd))
+})
+
+test('App: "+ Add project" refuses a folder with no decisions/, same as nod projects add', async (t) => {
+  const store = twoProjects(t)
+  const bare = mkdtempSync(join(tmpdir(), 'decs-tui-proj-bare-'))
+  t.after(() => rmSync(bare, { recursive: true, force: true }))
+  const b = bench(t, store, { view: 'all' })
+  await b.quiet()
+  await b.press(';')
+  await b.until(has(b, /Projects:/))
+  await b.press(KEY.down, KEY.down)
+  await b.until(has(b, /\+ Add project/))
+  await b.press('\r')
+  await b.until(has(b, /Add a project/))
+  await b.press(...bare.split(''), '\r')
+  await b.until(has(b, new RegExp(`${bare} has no decisions/`)))
+  assert.ok(!readProjects().some((p) => p.root === bare))
+})
+
+test('App: u on a project row unlinks it from the registry — its decisions/ folder is untouched', async (t) => {
+  const toUnlink = mkdtempSync(join(tmpdir(), 'decs-tui-proj-unlink-'))
+  const layout = initLayout(toUnlink)
+  t.after(() => rmSync(toUnlink, { recursive: true, force: true }))
+  addProject(toUnlink)
+  assert.ok(readProjects().some((p) => p.root === toUnlink), 'set up registered')
+
+  const store = new Store([layout])
+  const b = bench(t, store, { view: 'all' })
+  await b.quiet()
+  await b.press(';')
+  await b.until(has(b, /Projects:/))
+  await b.press('u')
+  await b.until(has(b, /unlinked/))
+  assert.ok(!readProjects().some((p) => p.root === toUnlink), 'dropped from the registry')
+  assert.ok(existsSync(layout.activeDir), 'its decisions/ is untouched')
 })
