@@ -2,7 +2,19 @@ import type { ComponentChildren } from 'preact'
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 export type MenuItem =
-  | { kind?: 'item'; label: string; icon?: ComponentChildren; shortcut?: string; run?: () => void; sub?: MenuItem[]; danger?: boolean; checked?: boolean; disabled?: boolean }
+  | {
+      kind?: 'item'
+      label: string
+      icon?: ComponentChildren
+      /** A bundle id: the native menu asks macOS for that app's own icon (falls back to `icon`, then text-only). Ignored outside the native menu. */
+      appIcon?: string
+      shortcut?: string
+      run?: () => void
+      sub?: MenuItem[]
+      danger?: boolean
+      checked?: boolean
+      disabled?: boolean
+    }
   | { kind: 'separator' }
   | { kind: 'header'; label: string }
 

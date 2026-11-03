@@ -333,7 +333,8 @@ export const en = {
   ctxStartSession: 'Start a session…',
   listening: '{{who}} is listening',
   notListening: 'No AI listening',
-  ctxGotoSession: 'Go to session',
+  ctxGotoSessionIterm2: 'Go to iTerm2 session',
+  ctxGotoSessionTerminal: 'Go to Terminal session',
   sessionGone: 'Session is gone',
   keyQuick: 'New for an AI',
 }

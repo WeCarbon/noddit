@@ -1,5 +1,6 @@
 mod noddit_env;
 mod resize;
+mod terminal_icon;
 mod watch;
 
 use serde::{Deserialize, Serialize};
@@ -460,6 +461,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, _, event| watch::on_hotkey(app, event.state)).build())
         .manage(watch::Watch::default())
         .manage(resize::ResizeStart::default())
+        .manage(terminal_icon::IconCache::default())
         .manage(AppState {
             started,
             #[cfg(debug_assertions)]
@@ -486,6 +488,7 @@ pub fn run() {
             save_upload,
             resize::resize_begin,
             resize::resize_to,
+            terminal_icon::terminal_icon,
             pick_folder,
             e2e_shot,
             watch::settings_get,

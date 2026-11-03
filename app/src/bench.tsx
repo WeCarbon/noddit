@@ -16,6 +16,7 @@ import {
 /** One size and stroke for every icon in a menu. */
 const I = (Icon: LucideIcon) => <Icon size={14} strokeWidth={1.75} />
 import { Bar, Glyph, Segs } from './segs.tsx'
+import { gotoSessionBundleId, gotoSessionLabelKey } from './goto-label.ts'
 import { hiddenCount, isSelectable, nodeCollapsed, reveal, scopeView, visibleRows, type Folds } from './rows.ts'
 import { ContextMenu, type MenuItem, type MenuState } from './menu.tsx'
 import { popupNative } from './native-menu.ts'
@@ -205,8 +206,8 @@ export function Bench(props: {
   }
   const listenerOf = (pr: Project) => live[pr.project]?.sessions.find((x) => x.role === 'lead') ?? null
   // The exact lead session `nod session goto` switches to (most recently seen, if several) is its
-  // call to make; here we only need to know whether any lead session has one at all, to show the item.
-  const canGotoSession = (pr: Project) => Boolean(live[pr.project]?.sessions.some((x) => x.role === 'lead' && x.terminal))
+  // call to make; here we only need one with a recorded terminal, to show the item and word it.
+  const leadTerminal = (pr: Project) => live[pr.project]?.sessions.find((x) => x.role === 'lead' && x.terminal)?.terminal
   const gotoSession = (pr: Project) => void api.gotoSession(pr.root).then((found) => { if (!found) showToast(s('sessionGone')) })
   const [renaming, setRenaming] = useState<string | null>(null)
   const [letterFor, setLetterFor] = useState<Project | null>(null)
@@ -680,16 +681,21 @@ export function Bench(props: {
     return items
   }
 
-  const projectMenu = (p: Project): MenuItem[] => [
-    ...(live[p.project] && !live[p.project].listening ? [{ label: s('ctxStartSession'), icon: I(SquareTerminal), run: () => setStartFor({ project: withLive(p), reason: 'menu' }) } as MenuItem, { kind: 'separator' } as MenuItem] : []),
-    ...(canGotoSession(p) ? [{ label: s('ctxGotoSession'), icon: I(SquareTerminal), run: () => gotoSession(p) } as MenuItem, { kind: 'separator' } as MenuItem] : []),
-    { label: s('ctxRename'), icon: I(PenLine), run: () => setRenaming(p.root) },
-    { label: s('ctxChangeLetter'), icon: I(CaseUpper), run: () => (setDialogError(null), setLetterFor(p)) },
-    { label: s('ctxUnlink'), icon: I(Unlink), danger: true, run: () => (setDialogError(null), setUnlinkFor(p)) },
-    { kind: 'separator' },
-    { label: revealLabel, icon: I(FolderSearch), run: () => void api.reveal(p.root) },
-    { label: s('ctxCopyPath'), icon: I(Copy), run: () => copy(p.root, p.root) },
-  ]
+  const projectMenu = (p: Project): MenuItem[] => {
+    const terminal = leadTerminal(p)
+    return [
+      ...(live[p.project] && !live[p.project].listening ? [{ label: s('ctxStartSession'), icon: I(SquareTerminal), run: () => setStartFor({ project: withLive(p), reason: 'menu' }) } as MenuItem, { kind: 'separator' } as MenuItem] : []),
+      ...(terminal
+        ? [{ label: s(gotoSessionLabelKey(terminal.type)), icon: I(SquareTerminal), appIcon: gotoSessionBundleId(terminal.type), run: () => gotoSession(p) } as MenuItem, { kind: 'separator' } as MenuItem]
+        : []),
+      { label: s('ctxRename'), icon: I(PenLine), run: () => setRenaming(p.root) },
+      { label: s('ctxChangeLetter'), icon: I(CaseUpper), run: () => (setDialogError(null), setLetterFor(p)) },
+      { label: s('ctxUnlink'), icon: I(Unlink), danger: true, run: () => (setDialogError(null), setUnlinkFor(p)) },
+      { kind: 'separator' },
+      { label: revealLabel, icon: I(FolderSearch), run: () => void api.reveal(p.root) },
+      { label: s('ctxCopyPath'), icon: I(Copy), run: () => copy(p.root, p.root) },
+    ]
+  }
 
   const fileMenu = (path: string, view: () => void = () => openView(node, path)): MenuItem[] => [
     { label: s('ctxOpen'), icon: I(Maximize2), run: view },

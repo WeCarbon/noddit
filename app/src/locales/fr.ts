@@ -336,7 +336,8 @@ export const fr: Strings = {
   ctxStartSession: 'Démarrer une session…',
   listening: '{{who}} écoute',
   notListening: 'Aucune IA à l’écoute',
-  ctxGotoSession: 'Aller à la session',
+  ctxGotoSessionIterm2: 'Aller à la session iTerm2',
+  ctxGotoSessionTerminal: 'Aller à la session Terminal',
   sessionGone: 'La session n’est plus là',
   keyQuick: 'Nouveau pour une IA',
 }
