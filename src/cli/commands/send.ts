@@ -7,6 +7,7 @@ import { briefTitle } from '../../core/intake.ts'
 import { isListening } from '../../core/listeners.ts'
 import { assigneeArg, HUMAN } from '../../core/assignee.ts'
 import { milestoneDue } from './flag.ts'
+import { parseEvery } from '../../core/fuzzy-date.ts'
 import { nodditEnv, setNodditEnv } from '../../core/env.ts'
 import { URGENCIES } from '../../core/order.ts'
 import { parseOptions, splitFrontMatter } from '../../core/parse.ts'
@@ -83,6 +84,7 @@ export async function run(args: Args): Promise<number> {
     parent: one(args, 'parent'),
     after: many(args, 'after').flatMap((s) => s.split(/[,\s]+/)).filter(Boolean),
     est: one(args, 'est'),
+    every: everyArg(one(args, 'every')),
     when: one(args, 'when'),
     staleAfter: one(args, 'stale-after'),
     // Which session wrote this, so a bad entry can be traced back to its transcript.
@@ -186,6 +188,14 @@ function yesNo(raw: string | undefined, flag: string): boolean | undefined {
 }
 
 /** An ISO time, or a duration from now (`4h`) — stored as ISO either way. */
+/** `--every 3d`: R, normalized; an unreadable one is an error, not dropped. */
+export function everyArg(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined
+  const every = parseEvery(raw)
+  if (!every) throw new Error(t('cli.send.badEvery', { value: raw }))
+  return every
+}
+
 function dueOf(raw: string | undefined): string | undefined {
   if (!raw) return undefined
   if (/\d{4}-\d{2}-\d{2}/.test(raw)) {

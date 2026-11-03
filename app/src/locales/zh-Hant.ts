@@ -197,6 +197,7 @@ export const zhHant: Strings = {
   deferUntilButton: '延後',
   deferredUntil: '延後到 {{date}}',
   deferMenu: '延後到…',
+  deferEvery: '延後 {{every}}',
   delayOnPlaceholder: '在等誰、等什麼？（可空：Carol 回信、供應商報價）',
   delayActiveHint: '在等某人：顯示為紫色，到了那天提醒你去問。',
   delayPassiveHint: '不在等誰：顯示為灰色，到了那天恢復正常（不填日子 = 先放著）。',

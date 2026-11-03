@@ -429,7 +429,7 @@ const KNOWN_KEYS = new Set([
   'id', 'title', 'author', 'status', 'created', 'updated_at', 'default', 'order', 'pin', 'pinned_at',
   'urgency', 'due', 'milestone', 'if_no_answer', 'reversible', 'kind', 'session', 'superseded_by', 'supersedes',
   'close_reason', 'waiting_on', 'waiting_until', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'answer', 'answered_by', 'answered_at', 'archived_at', 'reopened_at', 'tags',
-  'question_defaults', 'progress', 'progress_msg', 'after', 'est', 'when', 'stale_after', 'steps', 'owner_agent',
+  'question_defaults', 'progress', 'progress_msg', 'after', 'est', 'every', 'when', 'stale_after', 'steps', 'owner_agent',
   'approvals', 'intake', 'claimed_by', 'claimed_at',
 ])
 
@@ -495,6 +495,7 @@ export function parseDecision(
     progressMsg: str(data.progress_msg),
     after: strList(data.after),
     est: str(data.est),
+    every: str(data.every),
     when: str(data.when),
     staleAfter: str(data.stale_after),
     steps: data.steps ?? undefined,

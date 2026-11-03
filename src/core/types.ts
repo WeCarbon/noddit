@@ -217,6 +217,8 @@ export interface Decision {
   after?: string[]
   /** Estimate, free form: `2h`, `0.5 人日`. */
   est?: string
+  /** R: how often it comes round (`3d`, `1w`) — 「延迟 R 天」 puts it off to today + R. Only a shortcut for the defer date. */
+  every?: string
   /** When it is planned to happen, free form. */
   when?: string
   /** How long without an update counts as stuck: `90m`. */
@@ -305,6 +307,7 @@ export interface NewDecision {
   parent?: string
   after?: string[]
   est?: string
+  every?: string
   when?: string
   staleAfter?: string
   /** 派活: a brief for an AI to expand. The owner's words go under `## 原话`, verbatim. */

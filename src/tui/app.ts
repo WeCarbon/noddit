@@ -15,7 +15,7 @@ import { listSources, type SourceSummary } from '../core/sources.ts'
 import { projectSessions } from '../core/listeners.ts'
 import type { ProjectSessions } from '../core/overview.ts'
 import { delayOf, findRef, isDeferred, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
-import { splitWhen } from '../core/fuzzy-date.ts'
+import { splitWhen, untilDay } from '../core/fuzzy-date.ts'
 import { dayText } from '../i18n/time.ts'
 import { nowStamp, type Store } from '../core/store.ts'
 import { assertTitleFits } from '../core/title.ts'
@@ -491,6 +491,21 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       return reload()
     }
     startText('delay')
+  }
+
+  /** 「延迟 R 天」 (`D`): to today + the node's R; a wait keeps its who. */
+  const delayEvery = () => {
+    if (!current) return
+    if (isTerminal(current.state)) return say(t('bench.toast.cannotDeferTerminal'))
+    if (!current.every) return say(t('bench.toast.noEvery', { ref: refOf(current) }))
+    try {
+      const next = store.delayEvery(current, { by: 'owner', role: 'human' })
+      const day = untilDay(next.waitingUntil ?? next.deferredUntil ?? '')
+      say(t('bench.toast.delayedUntil', { ref: refOf(next), date: day ? dayText(day) : '' }))
+    } catch (e) {
+      say((e as Error).message)
+    }
+    reload()
   }
 
   /** `fri Carol to confirm`: until that day, waiting on Carol (purple); a day alone is passive (grey); blank is indefinitely. */
@@ -1105,6 +1120,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     }
     if (input === 'i') return enterDetail()
     if (input === 'd') return toggleDefer()
+    if (input === 'D') return delayEvery()
     if (input === 'H') {
       const idx = firstHtmlAttachmentIndex(current)
       if (idx === -1) return say(t('bench.toast.noHtmlAttachment'))

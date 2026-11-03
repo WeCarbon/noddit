@@ -139,6 +139,8 @@ export interface Node {
   /** A sub-question answered `OTHER_KEY`: the free text that was typed, keyed the same way as `answers`. */
   answer_notes: Record<string, string> | null
   deferred_at: string | null
+  /** R: 「延迟 R 天」 puts it off to today + this (`3d`, `1w`). */
+  every?: string | null
   parent: number | null
   children: number[]
   can_default: boolean

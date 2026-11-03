@@ -193,6 +193,8 @@ export function toJSON(d: Decision): Record<string, unknown> {
     progress: d.progress ?? null,
     progress_msg: d.progressMsg ?? null,
     est: d.est ?? null,
+    /** R: `nod defer --every` puts it off to today + this. */
+    every: d.every ?? null,
     when: d.when ?? null,
     stale_after: d.staleAfter ?? null,
     /** `fresh` unless `in_progress` and past its span (`stale_after`, else the `checkin-after` setting). */

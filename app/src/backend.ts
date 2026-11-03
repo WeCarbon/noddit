@@ -661,6 +661,9 @@ export const moveView = (id: string, n: number) => ok(['view', 'move', id, Strin
  * 延迟 (`nod defer`): `on` makes it a wait on someone or something; with `on` null a node already
  * waiting only moves its day, unless `passive` turns it into a plain deferral first.
  */
+/** 「延迟 R 天」 (`nod defer --every`): to today + the node's R. */
+export const delayEvery = (root: string, id: number) => ok(['defer', String(id), '--every', ...human, '--dir', root])
+
 export const delay = async (root: string, id: number, on: string | null, date: string | null, passive = false) => {
   if (passive) await defer(root, id, true)
   return ok(['defer', String(id), ...(on ? ['--on', on] : []), ...(date ? ['--until', date] : []), ...human, '--dir', root])

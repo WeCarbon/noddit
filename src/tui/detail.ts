@@ -100,6 +100,7 @@ export function metaLines(d: Item, items: Item[], now: number, width: number, ba
   if (isDeferred(d)) flags.push({ text: ` ${t('bench.detail.undefer', { label: deferredLabel(d, now) })}`, color: 'gray' })
   if (d.urgency === 'high') flags.push({ text: ` ★ ${t('bench.badge.urgent')}`, color: 'yellow', bold: true })
   if (d.urgency === 'low') flags.push({ text: ` ${t('bench.badge.notUrgent')}`, dim: true })
+  if (d.every && !isTerminal(d.state)) flags.push({ text: ` ${t('bench.detail.every', { every: d.every })}`, color: 'magenta' })
   if (d.due) flags.push({ text: ` ${t('bench.detail.due', { date: d.due.slice(5, 16).replace('T', ' ') })}`, color: overdue(d, now) ? 'red' : undefined })
   if (d.ifNoAnswer && !isTerminal(d.state)) {
     const rev = d.reversible === undefined ? '' : d.reversible ? t('bench.detail.reversible') : t('bench.detail.irreversible')

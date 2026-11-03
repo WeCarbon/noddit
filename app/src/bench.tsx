@@ -10,7 +10,7 @@ import { ViewEditor, ViewIcon } from './views.tsx'
 import {
   ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
   FolderSearch, Hash, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
-  Bot, Flag, Hourglass, RefreshCcw, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
+  Bot, Flag, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
 
 /** One size and stroke for every icon in a menu. */
@@ -467,6 +467,22 @@ export function Bench(props: {
       active ? s('heldUntil', { date: date ?? '' }) : date ? s('deferredUntil', { date }) : s('deferred'),
     )
   }
+  /** 「延迟 R 天」: to today + the node's R (`every`), a wait keeping its who. */
+  const delayEvery = (n: Node) => {
+    const m = /^(\d+)([dw])$/.exec(n.every ?? '')
+    if (!m) return
+    const at = new Date()
+    at.setDate(at.getDate() + Number(m[1]) * (m[2] === 'w' ? 7 : 1))
+    const date = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`
+    const waiting = n.status === 'waiting'
+    optimistic(
+      waiting
+        ? patchNode(n.key, (x) => ({ ...x, waiting_until: `${date}T00:00:00` }))
+        : both(patchNode(n.key, (x) => ({ ...x, deferred_at: now(), deferred_until: date })), dropRows(n.key, ['all', 'live']), patchRows(n.key, (r) => ({ ...r, deferred: true, delay: 'passive' }))),
+      () => api.delayEvery(rootOf(n), n.id),
+      waiting ? s('heldUntil', { date }) : s('deferredUntil', { date }),
+    )
+  }
   /** Lifts any 延迟 (a wait goes back to To do); with none, asks until when. */
   const toggleDefer = () => {
     if (!node || node.terminal) return
@@ -635,7 +651,7 @@ export function Bench(props: {
   const isMac = /Mac/.test(navigator.platform)
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
-  latest.current = { startAnswer, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign, setDeferFor } as never
+  latest.current = { startAnswer, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, setMilestoneFor, clearMilestone, reassign, setDeferFor, delayEvery } as never
 
   const nodeMenu = (n: Node | undefined, r: Row): MenuItem[] => {
     const L = () => latest.current as unknown as {
@@ -645,6 +661,7 @@ export function Bench(props: {
       clearMilestone: () => void
       reassign: () => void
       setDeferFor: (n: Node) => void
+      delayEvery: (n: Node) => void
       seen: () => void
       startClose: () => void
       toggleDefer: () => void
@@ -688,6 +705,7 @@ export function Bench(props: {
         label: s('defer'),
         icon: I(Timer),
         sub: [
+          ...(n.every ? [{ label: s('deferEvery', { every: n.every }), icon: I(Repeat), run: () => L().delayEvery(n) }] : []),
           { label: s('deferMenu'), icon: I(Hourglass), shortcut: delayed ? undefined : 'D', run: () => L().setDeferFor(n) },
           ...(delayed ? [{ label: s('undefer'), icon: I(TimerOff), shortcut: 'D', run: () => L().toggleDefer() }] : []),
         ],

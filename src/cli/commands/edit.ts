@@ -3,8 +3,31 @@ import { readStdin, requireDecision, resolveAuthor, resolveStore, shellRole } fr
 import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
 import { t } from '../../i18n/index.ts'
+import { everyArg } from './send.ts'
 
 const help = () => t('cli.help.edit')
+
+const FIELDS = ['every'] as const
+const CLEAR = new Set(['off', 'none', 'no', '-', ''])
+
+/** `nod edit <id> --every 3d` (or `off`): the node's own fields, not its text. */
+function editFields(args: Args, ref: string): number {
+  const raw = (k: (typeof FIELDS)[number]) => {
+    const v = one(args, k)
+    return v === undefined ? undefined : CLEAR.has(v.trim().toLowerCase()) ? null : v
+  }
+  const every = raw('every')
+  const store = resolveStore(args, { allowRegistry: true })
+  const d = requireDecision(store, ref, args)
+  const next = store.setFields(d, { every: every === null ? null : everyArg(every) })
+  if (bool(args, 'json')) console.log(JSON.stringify({ ...toJSON(next), changed: next !== d }))
+  else console.log(t('cli.edit.fields', { ref: refOf(next), what: fieldsText(next) }))
+  return 0
+}
+
+function fieldsText(d: { every?: string }): string {
+  return [d.every ? t('cli.edit.every', { every: d.every }) : t('cli.edit.noEvery')].join(' · ')
+}
 
 /**
  * `nod edit <id> --body` / `--note <n>`: the new text on stdin replaces that part of the
@@ -17,6 +40,7 @@ export async function run(args: Args): Promise<number> {
   }
   const [ref] = args._
   const noteRaw = one(args, 'note')
+  if (ref && !bool(args, 'body') && noteRaw === undefined && FIELDS.some((f) => one(args, f) !== undefined)) return editFields(args, ref)
   if (!ref || (!bool(args, 'body') && noteRaw === undefined)) throw new Error(`${t('cli.edit.which')}\n\n${help()}`)
   const note = noteRaw === undefined ? undefined : Number(noteRaw)
   if (note !== undefined && (!Number.isInteger(note) || note < 1)) throw new Error(t('cli.edit.badNote', { value: noteRaw }))

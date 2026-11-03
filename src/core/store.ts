@@ -14,7 +14,7 @@ import { HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './f
 import { OPTIONS_HEADING_RE, optionsRoundOf, parseDecision, parseNoteHeading, parseNotes, parseOptions, sectionAttachments } from './parse.ts'
 import { deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
 import { isHumanTask } from './assignee.ts'
-import { untilDay } from './fuzzy-date.ts'
+import { everyUntil, untilDay } from './fuzzy-date.ts'
 import { withDescription } from './intake.ts'
 import { list, t } from '../i18n/index.ts'
 import {
@@ -526,6 +526,7 @@ export class Store {
       created,
       after: input.after?.length ? input.after : undefined,
       est: input.est,
+      every: input.every,
       when: input.when,
       staleAfter: input.staleAfter,
       archivedAt: isTerminal(state) ? created : undefined,
@@ -1002,6 +1003,19 @@ export class Store {
     const on = opts.on?.trim() || undefined
     if (on || (d.state === 'waiting' && opts.until)) return this.hold(d, on, opts.by, { until: opts.until, role: opts.role })
     return this.defer(d, opts)
+  }
+
+  /** 「延迟 R 天」: delayed to the start of the day `every` (or the node's own R) after today — a wait keeps its who. */
+  delayEvery(d: Decision, opts: { by: string; role: NoteRole; every?: string }): Decision {
+    const every = opts.every ?? d.every
+    if (!every) throw new Error(t('core.store.noEvery', { ref: refOf(d) }))
+    return this.delay(d, { by: opts.by, role: opts.role, until: nowStamp(everyUntil(every)) })
+  }
+
+  /** Front-matter fields set after the fact (`nod edit --every / --due / --est`); null clears one. Not a request: nothing is queued. */
+  setFields(d: Decision, f: { every?: string | null; due?: string | null; est?: string | null }): Decision {
+    const pick = <K extends 'every' | 'due' | 'est'>(k: K): string | undefined => (f[k] === undefined ? d[k] : (f[k] ?? undefined))
+    return this.mutate(d, (d) => ({ next: { ...d, every: pick('every'), due: pick('due'), est: pick('est'), milestone: pick('due') ? d.milestone : undefined } }))
   }
 
   /** Lifts any 延迟: a plain deferral comes back as it was; a wait goes back to 待开始. */

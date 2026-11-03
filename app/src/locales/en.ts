@@ -195,6 +195,7 @@ export const en = {
   deferUntilButton: 'Defer',
   deferredUntil: 'Deferred until {{date}}',
   deferMenu: 'Defer until…',
+  deferEvery: 'Delay {{every}}',
   delayOnPlaceholder: 'Waiting on who or what? (optional: Carol’s reply, the vendor quote)',
   delayActiveHint: 'Waiting on someone: shown purple, and you are reminded to check on them that day.',
   delayPassiveHint: 'Nothing to wait on: shown grey, back to normal on that day (blank = indefinitely).',

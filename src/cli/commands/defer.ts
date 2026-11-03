@@ -8,6 +8,7 @@ import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
 import { type Decision, type NoteRole } from '../../core/types.ts'
 import { t } from '../../i18n/index.ts'
+import { everyArg } from './send.ts'
 
 const help = () => t('cli.help.defer')
 
@@ -38,15 +39,20 @@ export async function run(args: Args, verb = 'defer'): Promise<number> {
   const on = onRaw && onRaw !== 'true' ? onRaw.trim() : undefined
   if (onRaw === 'true') throw new Error(`${t('cli.lifecycle.needOn')}\n\n${t('cli.help.hold')}`)
   if (off && (untilRaw || on)) throw new Error(t('cli.defer.untilWithOff'))
+  const everyRaw = one(args, 'every')
+  if (everyRaw !== undefined && (untilRaw || on || off)) throw new Error(t('cli.defer.everyAlone'))
+  const every = everyRaw === undefined || everyRaw === 'true' ? undefined : everyArg(everyRaw)
   const until = untilRaw ? deferUntil(untilRaw) : undefined
   const store = resolveStore(args, { allowRegistry: true })
   for (const ref of args._) {
     const d = requireDecision(store, ref, args)
     if (!off && (on || (d.state === 'waiting' && until)) && !until && !(d.state === 'waiting' && d.waitingUntil))
       throw new Error(`${t('cli.lifecycle.needUntil')}\n\n${t('cli.help.hold')}`)
-    const next = off ? store.undelay(d, { by, role }) : store.delay(d, { by, role, until: until && nowStamp(until), on })
+    const byEvery = everyRaw !== undefined
+    const next = off ? store.undelay(d, { by, role }) : byEvery ? store.delayEvery(d, { by, role, every }) : store.delay(d, { by, role, until: until && nowStamp(until), on })
+    const back = byEvery ? new Date(next.waitingUntil ?? next.deferredUntil ?? '') : until
     if (bool(args, 'json')) console.log(JSON.stringify(toJSON(next)))
-    else console.log(`${refOf(next)} ${off ? offText(d) : delayText(d, next, until)} · ${statusLabel(next.state)}`)
+    else console.log(`${refOf(next)} ${off ? offText(d) : delayText(d, next, back)} · ${statusLabel(next.state)}`)
   }
   return 0
 }

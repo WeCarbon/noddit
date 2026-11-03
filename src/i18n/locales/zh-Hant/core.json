@@ -106,7 +106,8 @@
     "noSuchNote": "{{ref}} 沒有第 {{n}} 條（一共 {{count}} 條）",
     "notYourNote": "{{ref}}：第 {{n}} 條是別人寫的——確實要改，加 --force",
     "attachmentNotFound": "{{ref}} 沒有叫 {{name}} 的附件",
-    "unholdNotWaiting": "{{ref}} 不在等待"
+    "unholdNotWaiting": "{{ref}} 不在等待",
+    "noEvery": "{{ref}} 沒有設 R——用 nod edit {{ref}} --every 3d 設"
   },
   "duration": {
     "notADuration": "「{{value}}」不是一個時長——例如 90s、30m、1h、2d"

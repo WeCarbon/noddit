@@ -8,7 +8,7 @@ import type { Attachment, Decision, DecisionOption, NoteRole, AttachmentApproval
 /** Front matter key order — stable so diffs stay readable. */
 const KEY_ORDER = [
   'id', 'title', 'author', 'status', 'close_reason', 'waiting_on', 'waiting_until', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'created', 'updated_at',
-  'after', 'progress', 'progress_msg', 'est', 'when', 'stale_after', 'steps', 'owner_agent', 'intake', 'claimed_by', 'claimed_at',
+  'after', 'progress', 'progress_msg', 'est', 'every', 'when', 'stale_after', 'steps', 'owner_agent', 'intake', 'claimed_by', 'claimed_at',
   'kind', 'urgency', 'due', 'milestone', 'default', 'question_defaults', 'if_no_answer', 'reversible',
   'order', 'tags', 'session', 'supersedes', 'superseded_by', 'answer', 'approvals',
   'archived_at', 'reopened_at',
@@ -34,6 +34,7 @@ export function frontMatterOf(d: Decision): Record<string, unknown> {
   if (d.progress !== undefined) fm.progress = d.progress
   if (d.progressMsg) fm.progress_msg = d.progressMsg
   if (d.est) fm.est = d.est
+  if (d.every) fm.every = d.every
   if (d.when) fm.when = d.when
   if (d.staleAfter) fm.stale_after = d.staleAfter
   if (d.steps !== undefined) fm.steps = d.steps

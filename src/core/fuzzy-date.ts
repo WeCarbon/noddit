@@ -225,6 +225,20 @@ export function splitWhen(input: string, now: Date = new Date()): { when?: { day
   return { rest: words.join(' ') }
 }
 
+/** R (`--every`): `3d`, `2w`, `3`, `3天`, `2周` → `3d` / `2w`; undefined when it isn't a whole number of days or weeks. */
+export function parseEvery(raw: string): string | undefined {
+  const m = /^\s*(\d+)\s*(d|days?|天|w|weeks?|周|週)?\s*$/i.exec(raw)
+  if (!m || Number(m[1]) < 1) return undefined
+  return /^(w|week|weeks|周|週)$/i.test(m[2] ?? '') ? `${Number(m[1])}w` : `${Number(m[1])}d`
+}
+
+/** 「延迟 R 天」: the start of the day R after today. */
+export function everyUntil(every: string, now: Date = new Date()): Date {
+  const r = parseEvery(every)
+  const n = r ? Number(r.slice(0, -1)) * (r.endsWith('w') ? 7 : 1) : 1
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + n)
+}
+
 /** Ready-made picks offered while the owner types; each is a phrase `parseFuzzyDate` reads. */
 export const DATE_SUGGESTIONS: { key: string; phrase: string; hints: string[] }[] = [
   { key: 'tomorrow', phrase: 'tomorrow', hints: ['tomorrow', 'tom', 'tmr', '明天', '明', 'demain', 'غدا'] },
