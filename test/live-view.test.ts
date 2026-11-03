@@ -75,6 +75,21 @@ test('the row says what changed and when: a reply, progress, an answer, a state'
   assert.match(suffixOf(arow.node!, items, Date.now(), arow)[0].map((x) => x.text).join(''), /^Picked 1 · /)
 })
 
+test('N270: the row says what happened · how long ago, nothing more — not the current state too, even when it now differs from what happened', (t) => {
+  const s = store(t)
+  const diverged = s.create({ title: 'noted then closed', author: A, task: true })
+  s.note(diverged, { text: 'heads up', role: 'agent', author: A })
+  s.close(s.get(diverged.id)!, 'obsolete')
+  const items = s.all()
+  const row = rowsFor('live', items).find((x) => x.node?.id === diverged.id)!
+  const forms = suffixOf(row.node!, items, Date.now(), row)
+  const text = forms[0].map((x) => x.text).join('')
+  assert.match(text, /^Note · /, 'what happened leads')
+  assert.equal(text.split('·').length, 2, 'exactly one "·": what happened, how long ago — nothing else trails it')
+  assert.doesNotMatch(text, /Closed|closed|✕/, "closed now, but that's the glyph's job, not repeated in words here")
+  assert.equal(forms.length, 1, 'no shorter fallback form needed — this is already the short form')
+})
+
 test('finished, archived and deferred nodes stay in Live; writes older than 30 days fold into "Older N"', (t) => {
   const s = store(t)
   const done = s.create({ title: 'done', author: A, task: true })
