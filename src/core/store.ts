@@ -5,7 +5,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from 'node:p
 import { checkinsFileExists, readCheckinsMap, resetCheckin, UNANSWERED_AFTER } from './checkins.ts'
 import { createFileAtomic, withFileLock, writeFileAtomic } from './lock.ts'
 import { collapseDuplicateOptions, type DuplicateOptionsBlock } from './repair.ts'
-import { attachmentDir, childDirOf, entryFileName, listEntryFiles, toPosixPath, type Layout } from './paths.ts'
+import { attachmentDir, childDirOf, entryFileName, listEntryFiles, toPosixPath, type EntryFile, type Layout } from './paths.ts'
 import { benchOrder } from './order.ts'
 import { projectDisplayName, projectLetter, readProjectConfig } from './project.ts'
 import { parseBodyRefs, parseRef, refOf } from './ref.ts'
@@ -291,6 +291,41 @@ export class Store {
   /** The last `all()` result, handed back as the same array while nothing on disk changed. */
   private lastAll: { out: Decision[]; misses: number; paths: string } | null = null
 
+  /**
+   * Off by default: every `all()`/`queue()` walks disk fresh, exactly as
+   * before (a one-shot CLI command's Store, or a test's, never calls
+   * `rescan()` — so this never changes what either sees). A monitor pass
+   * calling `rescan()` once up front turns it on for that pass: every
+   * `listEntryFiles` call inside shares the one walk instead of re-walking
+   * per `store.all()` call (N255: readdir+stat was most of its CPU). The
+   * *next* `rescan()` (the next pass) starts over, so another process's
+   * write between passes is never missed; our own writes clear the layout
+   * they touched (`invalidateScan`) so a later read *in the same pass*
+   * still sees what was just written.
+   */
+  private scanCache: Map<Layout, EntryFile[]> | null = null
+
+  private scanned(l: Layout): EntryFile[] {
+    if (!this.scanCache) return listEntryFiles(l)
+    let files = this.scanCache.get(l)
+    if (!files) {
+      files = listEntryFiles(l)
+      this.scanCache.set(l, files)
+    }
+    return files
+  }
+
+  private invalidateScan(l: Layout): void {
+    this.scanCache?.delete(l)
+  }
+
+  /** Opens (or reopens) a scan window: every `all()`/`queue()` call shares
+   *  one directory walk per layout until the next `rescan()`. Call once per
+   *  monitor pass; nothing else needs it. */
+  rescan(): void {
+    this.scanCache = new Map()
+  }
+
   all(): Decision[] {
     return this.withCheckins(this.allCore())
   }
@@ -326,7 +361,7 @@ export class Store {
     let misses = 0
     for (const l of this.layouts) {
       const queued = new Set(readQueue(l))
-      for (const f of listEntryFiles(l)) {
+      for (const f of this.scanned(l)) {
         seen.add(f.path)
         try {
           const q = queued.has(f.id)
@@ -521,6 +556,7 @@ export class Store {
     try {
       mkdirSync(dirname(file), { recursive: true })
       createFileAtomic(file, serializeDecision(d))
+      this.invalidateScan(layout)
     } catch (e) {
       // The write itself failed: give the number back, same reason as above.
       rmSync(join(layout.idsDir, String(id)), { force: true })
@@ -750,7 +786,7 @@ export class Store {
       const project = this.projectName(l)
       if (filter.project && project !== this.projectKey(filter.project)) continue
       // Only the queued entries are read; the array order is the FIFO order.
-      const byId = new Map(listEntryFiles(l).map((f) => [f.id, f]))
+      const byId = new Map(this.scanned(l).map((f) => [f.id, f]))
       for (const id of readQueue(l)) {
         const f = byId.get(id)
         if (!f) continue
@@ -1358,6 +1394,8 @@ export class Store {
   private write(d: Decision, move?: 'archive' | 'unarchive'): Decision {
     d = { ...d, updatedAt: nowStamp(new Date(), { ms: true }) }
     writeFileAtomic(d.file, serializeDecision(d))
+    // A later read this same pass must see this write, not the walk cached before it.
+    this.invalidateScan(this.layoutOf(d))
     // Any write is a reply — clears a pending check-in ask (core/checkins.ts).
     resetCheckin(this.layoutOf(d), d.id)
     if (!move) return this.reread(d)
@@ -1397,6 +1435,7 @@ export class Store {
       if (existsSync(oldKids)) renameSync(oldKids, newKids)
       renameSync(oldFile, newFile)
     })
+    this.invalidateScan(layout)
     for (const old of [oldFile, ...moved]) {
       const now = old === oldFile ? newFile : newKids + old.slice(oldKids.length)
       const node = this.load(now, existsSync(now) && now.startsWith(layout.archivedDir + sep), layout)

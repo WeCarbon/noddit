@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, renameSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, sep } from 'node:path'
 import { DECS_HOME } from '../../core/config.ts'
@@ -188,6 +188,55 @@ function alive(pid: number): boolean {
   }
 }
 
+/** The backstop poll, when nothing nudges a pass sooner (N257). */
+export const DEFAULT_INTERVAL_MS = 30_000
+
+/** A pass is debounced this long after the first dirty event in a burst — several
+ *  saves/renames in a row (an editor's atomic write, `decs` moving a file between
+ *  active/archived) become one pass, not one per event. */
+const WATCH_DEBOUNCE_MS = 75
+
+/**
+ * Marks "something changed here, do a pass soon" on any create/write/rename
+ * under a project's `active/` tree — recursively, so a child node nested in
+ * `305-slug/` is covered too. `archived/` is deliberately left to the slow
+ * poll (N257): it rarely changes, and a human edit or AI reply always
+ * un-archives through `active/` first, so the one case genuinely missed —
+ * a write to an already-archived node that stays archived (e.g. `decs
+ * close` on something already filed away) — is rare enough to leave to it.
+ *
+ * Node's recursive watch isn't available everywhere (see the Node version in
+ * `package.json`'s `engines`): macOS and Windows have had it a long time;
+ * Linux has it too, as of the Node versions this project requires, via a
+ * JS-level inotify walk that is more error-prone than the native ones (watch
+ * errors are a documented rough edge there). Either way, a layout whose watch
+ * never starts, or that errors out later, just falls back to the interval
+ * poll alone — silently, since that poll is always running regardless.
+ */
+function watchActiveTrees(layouts: Layout[], dirty: () => void): () => void {
+  const watchers: FSWatcher[] = []
+  for (const l of layouts) {
+    let w: FSWatcher
+    try {
+      w = watch(l.activeDir, { recursive: true, persistent: false }, () => dirty())
+    } catch {
+      continue // not supported here, or the dir is gone — the poll still covers it
+    }
+    w.on('error', () => {
+      // The watched tree itself can misbehave after the fact too (removed
+      // mid-watch, a permission change, Linux's inotify-based recursive
+      // watch tripping on an entry it can't stat) — drop just this one
+      // layout's watch rather than let an uncaught error take the process
+      // down; the interval poll already covers it either way.
+      w.close()
+    })
+    watchers.push(w)
+  }
+  return () => {
+    for (const w of watchers) w.close()
+  }
+}
+
 export async function run(args: Args): Promise<number> {
   if (bool(args, 'help', 'h')) {
     console.log(help())
@@ -233,7 +282,10 @@ export async function run(args: Args): Promise<number> {
   const asJson = bool(args, 'json')
   const updates = bool(args, 'updates')
   const withSources = !bool(args, 'no-sources')
-  const interval = Math.max(200, Number(one(args, 'interval') ?? 2000) || 2000)
+  // The fallback cadence (N255/N257): real changes are caught by the file-system
+  // watch below within ~100ms; this is only the backstop for a watch that never
+  // fires (an unsupported platform, a network/synced filesystem, a missed event).
+  const interval = Math.max(200, Number(one(args, 'interval') ?? DEFAULT_INTERVAL_MS) || DEFAULT_INTERVAL_MS)
   const unclaimedMs = parseDuration(one(args, 'unclaimed-after') ?? settingValue('unclaimed-after').value)
   const sinceArg = one(args, 'since')
   const stateFile = cursorFile(store.layouts.map((l) => l.projectRoot), author)
@@ -274,13 +326,19 @@ export async function run(args: Args): Promise<number> {
    *  owner can see it on the bench, so the desktop app notifies on it too (N47). */
   const reportUpdates = (first: boolean) => {
     const changed: string[] = []
+    // Same set as `changed`, structured (N258): lets a reader that keeps its own
+    // copy of the bench (the desktop app) reload just these nodes instead of
+    // the whole thing — `key` matches `nod bench --json`'s own `nodes` map.
+    const changedNodes: { key: string; ref: string; id: number; project: string; file: string }[] = []
     const ownerFacing: string[] = []
     const now = new Map(store.all().filter((d) => !author || sameAgent(d.author, author)).map((d) => [`${d.project}#${d.id}`, d]))
     for (const [key, d] of now) {
       const version = JSON.stringify([d.updatedAt, d.state, d.archived, d.notes.length, d.answer?.at, d.deferredAt, d.progress, d.title])
       if (versions.get(key) !== version && !first) {
-        changed.push(refOfNode(d))
-        if (isLatestNoteOwnerFacing(d)) ownerFacing.push(refOfNode(d))
+        const ref = refOfNode(d)
+        changed.push(ref)
+        changedNodes.push({ key, ref, id: d.id, project: d.project, file: d.file })
+        if (isLatestNoteOwnerFacing(d)) ownerFacing.push(ref)
       }
       versions.set(key, version)
     }
@@ -290,7 +348,7 @@ export async function run(args: Args): Promise<number> {
     lastEventAt = Date.now()
     process.stdout.write(
       asJson
-        ? `${JSON.stringify({ event: 'updated', refs: changed, gone, owner_facing: ownerFacing, at: nowStamp(new Date(), { ms: true }) })}\n`
+        ? `${JSON.stringify({ event: 'updated', refs: changed, changed: changedNodes, gone, owner_facing: ownerFacing, at: nowStamp(new Date(), { ms: true }) })}\n`
         : `DECS-UPDATED ${changed.join(' ')}${ownerFacing.length ? `  (owner-facing: ${ownerFacing.join(' ')})` : ''}\n`,
     )
   }
@@ -370,6 +428,13 @@ export async function run(args: Args): Promise<number> {
   }
 
   const pass = (first = false) => {
+    // One directory walk for everything this pass does (N255/N256): every
+    // `store.all()`/`store.queue()` below shares it, instead of re-walking
+    // once per call. A fresh pass always re-walks — that's how it notices
+    // another process's writes; our own writes invalidate it immediately
+    // (Store.write/create/move) so a later call *in this same pass* still
+    // sees what we just wrote.
+    store.rescan()
     const startedAt = nowStamp(new Date(), { ms: true })
     // N187/N189: whether this pass has printed anything else yet — an
     // "attach" tidy nudge only rides along one of those, never fires alone.
@@ -604,6 +669,15 @@ export async function run(args: Args): Promise<number> {
   let lastBeat = Date.now()
   runSyncs()
   pass(true)
+  // N257: a file changing reacts within ~100ms instead of waiting for the next
+  // poll — `interval` below becomes purely the fallback for whatever the watch
+  // misses (an unsupported platform, archived/, a synced or network filesystem).
+  let watchDebounce: NodeJS.Timeout | undefined
+  const stopWatching = watchActiveTrees(store.layouts, () => {
+    clearTimeout(watchDebounce)
+    watchDebounce = setTimeout(pass, WATCH_DEBOUNCE_MS)
+  })
+  process.on('exit', stopWatching)
   const parent = Number(one(args, 'with-parent') ?? 0)
   setInterval(() => {
     if (heartbeat && Date.now() - lastBeat >= HEARTBEAT_MS) {
