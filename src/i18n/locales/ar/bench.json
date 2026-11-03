@@ -74,7 +74,9 @@
     "doing": "قيد التنفيذ",
     "due": "يستحق {{when}}",
     "overdue": "متأخر {{span}}",
-    "byAi": "أجّله وكيل"
+    "byAi": "أجّله وكيل",
+    "estHuman": "أنت {{span}}",
+    "estAi": "AI {{span}}"
   },
   "detail": {
     "aiStuck": "الوكيل متعطل",
@@ -119,7 +121,8 @@
     "attachmentsLabel": " المرفقات ",
     "staleSince": "لا حركة منذ أكثر من {{threshold}}",
     "veryStaleSince": "لا حركة منذ أكثر من ضعف {{threshold}}، قد يكون الوكيل قد انقطع",
-    "every": "↻ كل {{every}}"
+    "every": "↻ كل {{every}}",
+    "estimate": "التقدير {{est}}"
   },
   "note": {
     "user": "المستخدم",

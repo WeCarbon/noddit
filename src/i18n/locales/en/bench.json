@@ -74,7 +74,9 @@
     "doing": "In progress",
     "due": "Due {{when}}",
     "overdue": "Overdue {{span}}",
-    "byAi": "by an AI"
+    "byAi": "by an AI",
+    "estHuman": "you {{span}}",
+    "estAi": "AI {{span}}"
   },
   "detail": {
     "aiStuck": "AI stuck",
@@ -119,7 +121,8 @@
     "attachmentsLabel": " Attachments ",
     "staleSince": "no movement for over {{threshold}}",
     "veryStaleSince": "no movement for over 2×{{threshold}}, may have dropped off",
-    "every": "↻ every {{every}}"
+    "every": "↻ every {{every}}",
+    "estimate": "estimate {{est}}"
   },
   "note": {
     "user": "User",

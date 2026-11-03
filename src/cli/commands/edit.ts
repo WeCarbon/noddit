@@ -4,13 +4,14 @@ import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
 import { t } from '../../i18n/index.ts'
 import { dueOf, everyArg } from './send.ts'
+import { estWho } from '../../core/estimate.ts'
 
 const help = () => t('cli.help.edit')
 
-const FIELDS = ['every', 'due'] as const
+const FIELDS = ['every', 'due', 'est'] as const
 const CLEAR = new Set(['off', 'none', 'no', '-', ''])
 
-/** `nod edit <id> --every 3d --due fri` (`off` clears one): the node's own fields, not its text. */
+/** `nod edit <id> --est 2h --every 3d --due fri` (`off` clears one): the node's own fields, not its text. */
 function editFields(args: Args, ref: string): number {
   const raw = (k: (typeof FIELDS)[number]) => {
     const v = one(args, k)
@@ -18,16 +19,18 @@ function editFields(args: Args, ref: string): number {
   }
   const every = raw('every')
   const due = raw('due')
+  const est = raw('est')
   const store = resolveStore(args, { allowRegistry: true })
   const d = requireDecision(store, ref, args)
-  const next = store.setFields(d, { every: every === null ? null : everyArg(every), due: due === null ? null : dueOf(due) })
+  const next = store.setFields(d, { every: every === null ? null : everyArg(every), due: due === null ? null : dueOf(due), est: est === null ? null : est?.trim() })
   if (bool(args, 'json')) console.log(JSON.stringify({ ...toJSON(next), changed: next !== d }))
   else console.log(t('cli.edit.fields', { ref: refOf(next), what: fieldsText(next) }))
   return 0
 }
 
-function fieldsText(d: { every?: string; due?: string }): string {
+function fieldsText(d: { every?: string; due?: string; est?: string; assignee?: string }): string {
   return [
+    d.est ? t(estWho(d) === 'human' ? 'cli.edit.estHuman' : 'cli.edit.estAi', { est: d.est }) : t('cli.edit.noEst'),
     d.every ? t('cli.edit.every', { every: d.every }) : t('cli.edit.noEvery'),
     d.due ? t('cli.edit.due', { due: d.due.slice(0, 16).replace('T', ' ') }) : t('cli.edit.noDue'),
   ].join(' · ')

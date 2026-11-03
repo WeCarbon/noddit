@@ -10,7 +10,8 @@ import { type Decision as Item } from '../core/types.ts'
 import { OTHER_KEY, type DecisionQuestion } from '../core/questions.ts'
 import { t } from '../i18n/index.ts'
 import type { Segment } from './model.ts'
-import { GLYPH, ago, agoSpan, bar, glyphOf, keyOf, progressOf, unmetDeps, waitingSince } from './views.ts'
+import { GLYPH, ago, agoSpan, bar, estimateText, glyphOf, keyOf, progressOf, unmetDeps, waitingSince } from './views.ts'
+import { estimateTotal } from '../core/estimate.ts'
 import { stringWidth, wrapToWidth } from './width.ts'
 
 type Line = Segment[]
@@ -100,6 +101,8 @@ export function metaLines(d: Item, items: Item[], now: number, width: number, ba
   if (isDeferred(d)) flags.push({ text: ` ${deferredByAgent(d) ? `${t('bench.badge.byAi')} · ` : ''}${t('bench.detail.undefer', { label: deferredLabel(d, now) })}`, color: deferredByAgent(d) ? 'red' : 'gray' })
   if (d.urgency === 'high') flags.push({ text: ` ★ ${t('bench.badge.urgent')}`, color: 'yellow', bold: true })
   if (d.urgency === 'low') flags.push({ text: ` ${t('bench.badge.notUrgent')}`, dim: true })
+  const ahead = isTerminal(d.state) ? '' : estimateText(estimateTotal(d, items))
+  if (ahead) flags.push({ text: ` ${t('bench.detail.estimate', { est: ahead })}`, dim: true })
   if (d.every && !isTerminal(d.state)) flags.push({ text: ` ${t('bench.detail.every', { every: d.every })}`, color: 'magenta' })
   if (d.due) flags.push({ text: ` ${t('bench.detail.due', { date: d.due.slice(5, 16).replace('T', ' ') })}`, color: overdue(d, now) ? 'red' : undefined })
   if (d.ifNoAnswer && !isTerminal(d.state)) {

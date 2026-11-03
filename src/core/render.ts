@@ -10,6 +10,7 @@ import { isWaitDue } from './status.ts'
 import { formatRef, refOf } from './ref.ts'
 import { minutesSince, stalenessOf } from './staleness.ts'
 import { deferredByAgent, delayOf, isDeferred, statusLabel } from './status.ts'
+import { estMinutes, estWho } from './estimate.ts'
 import { lastHumanAt, reopenedAfterArchive } from './store.ts'
 import { type Attachment, type AttachmentApproval, type Decision } from './types.ts'
 
@@ -195,6 +196,9 @@ export function toJSON(d: Decision): Record<string, unknown> {
     progress: d.progress ?? null,
     progress_msg: d.progressMsg ?? null,
     est: d.est ?? null,
+    /** `est` read as minutes (null when free text it can't read), and whose time it is: the owner's (`human`) or an AI's. */
+    est_minutes: estMinutes(d.est) ?? null,
+    est_who: estWho(d),
     /** R: `nod defer --every` puts it off to today + this. */
     every: d.every ?? null,
     when: d.when ?? null,

@@ -187,6 +187,11 @@ export function NodeHeader({
         <Chip icon={<CalendarClock {...ICON} />} title={`${fullTime(n.created)}`} tone={stale ? 'c-red' : ''}>
           {ago(waitingSince ?? n.updated_at ?? n.created)}
         </Chip>
+        {n.est && !n.terminal && (
+          <Chip icon={n.est_who === 'human' ? <User {...ICON} /> : <Bot {...ICON} />} title={n.est}>
+            {s(n.est_who === 'human' ? 'estHuman' : 'estAi', { est: n.est })}
+          </Chip>
+        )}
         {n.due && !n.milestone && (
           <Chip icon={<Timer {...ICON} />} title={fullTime(n.due)} tone={Date.parse(n.due) < Date.now() ? 'c-red' : ''}>
             {ago(n.due)}

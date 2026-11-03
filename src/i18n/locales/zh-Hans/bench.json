@@ -74,7 +74,9 @@
     "doing": "在做",
     "due": "{{when}}到期",
     "overdue": "逾期 {{span}}",
-    "byAi": "AI 延迟的"
+    "byAi": "AI 延迟的",
+    "estHuman": "人 {{span}}",
+    "estAi": "AI {{span}}"
   },
   "detail": {
     "aiStuck": "AI 卡着",
@@ -119,7 +121,8 @@
     "attachmentsLabel": " 附件 ",
     "staleSince": "超过 {{threshold}} 没动静",
     "veryStaleSince": "超过 2×{{threshold}} 没动静，可能掉线了",
-    "every": "↻ 每 {{every}}"
+    "every": "↻ 每 {{every}}",
+    "estimate": "预估 {{est}}"
   },
   "note": {
     "user": "用户",

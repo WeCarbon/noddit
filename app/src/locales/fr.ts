@@ -201,6 +201,8 @@ export const fr: Strings = {
   deferUntilButton: 'Reporter',
   deferredUntil: 'Reporté jusqu’au {{date}}',
   deferMenu: 'Reporter jusqu’au…',
+  estHuman: 'Vous {{est}}',
+  estAi: 'IA {{est}}',
   deferEvery: 'Reporter de {{every}}',
   delayOnPlaceholder: 'En attente de qui ou de quoi ? (facultatif : la réponse de Carol, le devis du fournisseur)',
   delayActiveHint: 'En attente de quelqu’un : affiché en violet, avec un rappel ce jour-là pour relancer.',

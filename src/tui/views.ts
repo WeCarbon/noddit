@@ -3,6 +3,7 @@ import { untilDay } from '../core/fuzzy-date.ts'
 import { isUnclaimedBrief } from '../core/intake.ts'
 import { benchOrder, isFlagged, manualRank, untilDue, urgencyRank } from '../core/order.ts'
 import { parseDuration } from '../core/duration.ts'
+import { estimateTotal, fmtMinutes, type EstimateTotal } from '../core/estimate.ts'
 import { BUILTIN_IDS, builtinView, loadViews, type CondField, type Filter, type SortField, type SortKey, type ViewDef } from '../core/view-defs.ts'
 import { NOTE_KIND } from '../core/format.ts'
 import { parseNotes } from '../core/parse.ts'
@@ -921,7 +922,19 @@ export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segmen
   const sep: Segment = { text: ' · ', dim: true }
   const lead = (forms: Segment[][], seg: Segment | null) => (seg ? [...forms.map((f) => [seg, sep, ...f]), [seg]] : forms)
   const countdown = row?.touch ? null : (milestoneCountdown(d, now) ?? dueMark(d, now))
-  return lead(stateSuffix(d, items, now, row), countdown)
+  const est = row?.touch ? null : estimateMark(d, items)
+  return lead(lead(stateSuffix(d, items, now, row), est), countdown)
+}
+
+/** 「人 2h」 / 「AI 30m」: what is still ahead here, the subtree's total on a parent, split by whose time. */
+export function estimateMark(d: Item, items: Item[]): Segment | null {
+  if (isTerminal(d.state)) return null
+  const text = estimateText(estimateTotal(d, items))
+  return text ? { text, dim: true } : null
+}
+
+export function estimateText(e: EstimateTotal): string {
+  return [e.human ? t('bench.badge.estHuman', { span: fmtMinutes(e.human) }) : '', e.ai ? t('bench.badge.estAi', { span: fmtMinutes(e.ai) }) : ''].filter(Boolean).join(' · ')
 }
 
 function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][] {

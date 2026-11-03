@@ -200,6 +200,8 @@ export const ar: Strings = {
   deferUntilButton: 'تأجيل',
   deferredUntil: 'مؤجَّلة حتى {{date}}',
   deferMenu: 'تأجيل حتى…',
+  estHuman: 'أنت {{est}}',
+  estAi: 'AI {{est}}',
   deferEvery: 'تأجيل {{every}}',
   delayOnPlaceholder: 'بانتظار من أو ماذا؟ (اختياري: رد Carol، عرض المورّد)',
   delayActiveHint: 'بانتظار شخص: يظهر بالبنفسجي، ومع تذكير في ذلك اليوم للمتابعة.',

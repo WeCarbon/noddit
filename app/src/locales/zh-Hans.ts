@@ -200,6 +200,8 @@ export const zhHans: Strings = {
   deferUntilButton: '延迟',
   deferredUntil: '延迟到 {{date}}',
   deferMenu: '延迟到…',
+  estHuman: '人 {{est}}',
+  estAi: 'AI {{est}}',
   deferEvery: '延迟 {{every}}',
   delayOnPlaceholder: '在等谁、等什么？（可空：Carol 回信、供应商报价）',
   delayActiveHint: '在等某人：显示为紫色，到了那天提醒你去问。',

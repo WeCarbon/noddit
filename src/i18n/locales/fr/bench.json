@@ -74,7 +74,9 @@
     "doing": "En cours",
     "due": "Échéance {{when}}",
     "overdue": "En retard de {{span}}",
-    "byAi": "par une IA"
+    "byAi": "par une IA",
+    "estHuman": "vous {{span}}",
+    "estAi": "IA {{span}}"
   },
   "detail": {
     "aiStuck": "IA bloquée",
@@ -119,7 +121,8 @@
     "attachmentsLabel": " Pièces jointes ",
     "staleSince": "aucun mouvement depuis plus de {{threshold}}",
     "veryStaleSince": "aucun mouvement depuis plus de 2×{{threshold}}, peut-être décroché",
-    "every": "↻ tous les {{every}}"
+    "every": "↻ tous les {{every}}",
+    "estimate": "estimation {{est}}"
   },
   "note": {
     "user": "Vous",

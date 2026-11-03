@@ -198,6 +198,8 @@ export const en = {
   deferUntilButton: 'Defer',
   deferredUntil: 'Deferred until {{date}}',
   deferMenu: 'Defer until…',
+  estHuman: 'You {{est}}',
+  estAi: 'AI {{est}}',
   deferEvery: 'Delay {{every}}',
   delayOnPlaceholder: 'Waiting on who or what? (optional: Carol’s reply, the vendor quote)',
   delayActiveHint: 'Waiting on someone: shown purple, and you are reminded to check on them that day.',

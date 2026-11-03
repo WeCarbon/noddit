@@ -30,6 +30,8 @@ export interface Row {
   deferred?: boolean
   /** 延迟 on the node itself: `passive` (grey) or `active` (waiting on someone — purple). */
   delay?: 'passive' | 'active' | null
+  /** 预估 still ahead, in minutes: this node, or a parent's whole subtree, by whose time. */
+  estimate?: { human: number; ai: number } | null
   progress?: number | null
   badge?: Seg[]
   badge_short?: Seg[]
@@ -141,6 +143,9 @@ export interface Node {
   deferred_at: string | null
   /** The deferral on record was an agent's, not the owner's. */
   deferred_by_ai?: boolean
+  /** 预估, free form (`2h`): the assignee's time — the owner's (`est_who: human`) or an AI's. */
+  est?: string | null
+  est_who?: 'human' | 'ai'
   /** R: 「延迟 R 天」 puts it off to today + this (`3d`, `1w`). */
   every?: string | null
   parent: number | null

@@ -8,6 +8,7 @@ import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf } from '../core/sequence.ts'
 import { isHumanTask } from '../core/assignee.ts'
 import { builtinView, filterText, isPristine, loadViews, type ViewDef } from '../core/view-defs.ts'
+import { estimateTotal } from '../core/estimate.ts'
 import { delayOf, dependenciesOf, isDeferred, isTerminal, isWaitDue } from '../core/status.ts'
 import { projectSessions } from '../core/listeners.ts'
 import type { Store } from '../core/store.ts'
@@ -79,6 +80,8 @@ function rowJson(view: View, row: Row, items: Item[], now: number, fold: string 
     deferred: isDeferHidden(d, items),
     // 延迟 on the node itself: 'passive' (grey) or 'active' (waiting on someone — purple).
     delay: delayOf(d, now)?.kind ?? null,
+    // 预估 still ahead, in minutes, split by whose time: this node, or a parent's whole subtree.
+    estimate: isTerminal(d.state) ? null : estimateTotal(d, items),
     progress: progressOf(d) ?? null,
     badge: plain(forms[0] ?? []),
     badge_short: plain(forms.at(-1) ?? []),
