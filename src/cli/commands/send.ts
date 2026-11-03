@@ -1,6 +1,7 @@
 import { execSync, spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { bool, many, one, oneLine, optionsAndDefault, questionsFromArgs, type Args } from '../args.ts'
+import { optionsWithoutCost } from '../../core/option-costs.ts'
 import { readStdin, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
 import { briefTitle } from '../../core/intake.ts'
 import { isListening } from '../../core/listeners.ts'
@@ -108,6 +109,8 @@ export async function run(args: Args): Promise<number> {
   else {
     console.log(`${refOf(d)}  ${d.file}`)
     if (input.task && !assignee && !cliOptions.length && shellRole() === 'agent') console.error(dim(t('cli.send.taskNext', { ref: refOf(d) })))
+    const bare = shellRole() === 'agent' ? optionsWithoutCost(d) : []
+    if (bare.length) console.error(t('cli.send.optionsWithoutCost', { keys: bare.join(' '), id: d.id }))
   }
   if (bool(args, 'notify')) notify(d)
   return 0

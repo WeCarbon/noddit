@@ -6,6 +6,7 @@ import { isDeferred, statusLabel } from '../../core/status.ts'
 import { bool, many, one, optionsAndDefault, questionsFromArgs, type Args } from '../args.ts'
 import { guardOtherAuthor, readStdin, rememberStarted, requireDecision, resolveAuthor, resolveStore, shellRole, warnOtherAuthor } from '../context.ts'
 import { isHumanTask } from '../../core/assignee.ts'
+import { optionsWithoutCost } from '../../core/option-costs.ts'
 import { refOf } from '../../core/ref.ts'
 import { dim, toJSON } from '../../core/render.ts'
 import { type Decision } from '../../core/types.ts'
@@ -61,6 +62,8 @@ export async function run(args: Args, verb = ''): Promise<number> {
     }
     warnOtherAuthor(next.author, refOf(next), next.claimedBy)
     report(args, next, t('cli.lifecycle.waitingOnOwner', { count: next.options.length }))
+    const bare = shellRole() === 'agent' ? optionsWithoutCost(next) : []
+    if (bare.length) console.error(t('cli.send.optionsWithoutCost', { keys: bare.join(' '), id: next.id }))
     if (!bool(args, 'json') && shellRole() === 'agent') console.log(dim(t('cli.lifecycle.askNext')))
     return 0
   }
