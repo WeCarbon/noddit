@@ -2598,13 +2598,34 @@ figcaption {
   font-size: 12px;
 }
 
-/* 等待 whose day to check back has come: a purple row, and its own purple number on the tab. */
-.row.node.wait-due {
+/* 等待 whose day to check back has come: a purple row, and its own purple number on the tab.
+   An important row waiting on someone outside gets the same purple (see important-waiting below). */
+.row.node.wait-due,
+.row.node.important-waiting {
   background: color-mix(in srgb, var(--magenta) 14%, transparent);
 }
 
-.row.node.wait-due.sel {
+.row.node.wait-due.sel,
+.row.node.important-waiting.sel {
   background: color-mix(in srgb, var(--magenta) 22%, transparent);
+}
+
+/* An important row's background otherwise says who it's on: needs the owner — assigned to them
+   or a decision (yellow) — or an AI's own live work (blue). */
+.row.node.important-you {
+  background: color-mix(in srgb, var(--yellow) 16%, transparent);
+}
+
+.row.node.important-you.sel {
+  background: color-mix(in srgb, var(--yellow) 24%, transparent);
+}
+
+.row.node.important-ai {
+  background: color-mix(in srgb, var(--blue) 14%, transparent);
+}
+
+.row.node.important-ai.sel {
+  background: color-mix(in srgb, var(--blue) 22%, transparent);
 }
 
 .count.due {

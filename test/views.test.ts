@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { initLayout } from '../src/core/paths.ts'
 import { Store } from '../src/core/store.ts'
 import { groupFoldKey, loadFolds } from '../src/tui/folds.ts'
-import { GLYPH, HUMAN_GLYPH, VIEWS, doneGroupKey, glyphOf, glyphText, homeView, inView, nodeRowSegments, rowsFor, viewCount, type Row, type View } from '../src/tui/views.ts'
+import { GLYPH, HUMAN_GLYPH, VIEWS, doneGroupKey, flagMark, glyphOf, glyphText, homeView, importantTone, inView, nodeRowSegments, rowsFor, viewCount, type Row, type View } from '../src/tui/views.ts'
 import { statusSegments } from '../src/tui/detail.ts'
 import { helpText } from '../src/tui/app.ts'
 import { stringWidth } from '../src/tui/width.ts'
@@ -329,4 +329,24 @@ test('Available lists a node held up outside (waiting) alongside the ones that c
   const items = store.all()
   assert.ok(inView('available', items.find((d) => d.id === held.id)!, items))
   assert.ok(!inView('active', items.find((d) => d.id === held.id)!, items), 'Active stays executing + Decide only')
+})
+
+test('★ important is coloured by who it is on: waiting outside, needing the owner, or an AI\'s own work', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'decs-important-tone-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  const ai = store.create({ title: 'ai task', author: A, task: true, urgency: 'high' })
+  const decision = store.create({ title: 'a decision', author: A, options: opt, default: '1', urgency: 'high' })
+  const yours = store.create({ title: 'your to-do', author: 'owner', task: true, assignee: 'human', urgency: 'high' })
+  const waiting = store.hold(store.create({ title: 'waiting on someone', author: A, task: true, urgency: 'high' }), 'Carol', A)
+  const notImportant = store.create({ title: 'not flagged', author: A, task: true })
+  assert.equal(importantTone(ai), 'ai')
+  assert.equal(importantTone(decision), 'you')
+  assert.equal(importantTone(yours), 'you')
+  assert.equal(importantTone(waiting), 'waiting')
+  assert.deepEqual(flagMark(ai), { text: '★ ', color: 'blue', bold: true })
+  assert.deepEqual(flagMark(decision), { text: '★ ', color: 'yellow', bold: true })
+  assert.deepEqual(flagMark(yours), { text: '★ ', color: 'yellow', bold: true })
+  assert.deepEqual(flagMark(waiting), { text: '★ ', color: 'magenta', bold: true })
+  assert.equal(flagMark(notImportant), null)
 })

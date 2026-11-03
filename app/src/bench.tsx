@@ -1365,6 +1365,15 @@ interface DragState {
   drop: (key: string, target: string, after: boolean) => void
 }
 
+/** An important row's background says who it's on: waiting outside, needing the owner
+ *  (assigned to them, or a decision), or an AI's own live work. 等待 wins over 需要你 over AI. */
+function importantTone(r: Row): 'waiting' | 'you' | 'ai' | null {
+  if (r.flag !== 'important') return null
+  if (r.state === 'waiting') return 'waiting'
+  if (r.assignee === 'human' || r.state === 'needs_decision') return 'you'
+  return 'ai'
+}
+
 function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boolean; open: boolean; hidden: number; onClick: () => void; onToggle: () => void; onMore: (el: HTMLElement) => void }) {
   const r = p.row
   if (r.kind === 'header') return <div class="row header">{r.text}</div>
@@ -1381,7 +1390,7 @@ function ListRow(p: { row: Row; drag: DragState; arrived?: number; selected: boo
   const landing = d.key && d.over === r.key && d.key !== r.key ? (d.after ? 'drop-after' : 'drop-before') : ''
   return (
     <div
-      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} state-${r.state} ${d.key === r.key ? 'dragging' : ''} ${landing} ${p.arrived !== undefined ? 'arrived' : ''}`}
+      class={`row node ${p.selected ? 'sel' : ''} ${r.context ? 'context' : ''} ${r.deferred ? 'deferred' : ''} ${r.wait_due ? 'wait-due' : ''} ${importantTone(r) ? `important-${importantTone(r)}` : ''} state-${r.state} ${d.key === r.key ? 'dragging' : ''} ${landing} ${p.arrived !== undefined ? 'arrived' : ''}`}
       style={p.arrived !== undefined ? { ...indent, animationDelay: `${p.arrived}ms` } : indent}
       draggable={Boolean(r.scope)}
       onDragStart={(e) => {

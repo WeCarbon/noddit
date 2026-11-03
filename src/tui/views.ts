@@ -413,13 +413,24 @@ function flaggedNote(list: Item[]): string {
   return n ? t('bench.header.flagged', { count: n }) : ''
 }
 
+/** An important row's colour says who it's on: waiting outside, needing the owner — assigned
+ *  to them or a decision — or an AI's own live work. 等待 wins over 需要你 over AI; the app
+ *  draws the same three as a row background, this is its only equivalent in a terminal. */
+export function importantTone(d: Item): 'waiting' | 'you' | 'ai' {
+  if (d.state === 'waiting') return 'waiting'
+  if (isHumanTask(d) || d.state === 'needs_decision') return 'you'
+  return 'ai'
+}
+
+const IMPORTANT_COLOR: Record<ReturnType<typeof importantTone>, string> = { waiting: 'magenta', you: 'yellow', ai: 'blue' }
+
 /** ★ important, ⚑ a milestone — the owner's marks, drawn after the ref. */
 export function flagMark(d: Item, now = Date.now()): Segment | null {
   if (d.milestone && d.due && !isTerminal(d.state)) {
     const left = untilDue(d, now)
     return { text: '⚑ ', color: left < 86_400_000 ? 'red' : 'magenta', bold: left < 86_400_000 }
   }
-  if (d.urgency === 'high' && !isTerminal(d.state)) return { text: '★ ', color: 'yellow', bold: true }
+  if (d.urgency === 'high' && !isTerminal(d.state)) return { text: '★ ', color: IMPORTANT_COLOR[importantTone(d)], bold: true }
   return null
 }
 
