@@ -10,7 +10,7 @@ import { benchOrder } from './order.ts'
 import { projectDisplayName, projectLetter, readProjectConfig } from './project.ts'
 import { parseBodyRefs, parseRef, refOf } from './ref.ts'
 import { dequeue, enqueue, readQueue } from './queue.ts'
-import { DEFAULT_MARK, HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
+import { HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
 import { OPTIONS_HEADING_RE, optionsRoundOf, parseDecision, parseNoteHeading, parseNotes, parseOptions, sectionAttachments } from './parse.ts'
 import { deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
 import { isHumanTask } from './assignee.ts'
@@ -19,9 +19,11 @@ import { withDescription } from './intake.ts'
 import { list, t } from '../i18n/index.ts'
 import {
   checkQuestions,
+  OTHER_KEY,
   parseAnswerTokens,
   parseQuestions,
   questionOptions,
+  renderAnswerLines,
   renderQuestionsBlock,
   type DecisionQuestion,
 } from './questions.ts'
@@ -547,16 +549,20 @@ export class Store {
       let answerNotes: Record<string, string> | undefined
       const qs = d.questions ?? []
       if (qs.length) {
-        // Normalizes "1 / 2 / Q1=B" into per-question answers from any input source.
+        // Normalizes "1 / 2 / Q1=B / Q1=*:text" into per-question answers from any input source.
         const fromNote = a.answers ? { answers: {}, notes: {} } : parseAnswerTokens(a.note ?? '', qs)
         const given: Record<string, string> = choice === '1' ? {} : { ...fromNote.answers, ...a.answers }
+        const notes = { ...fromNote.notes, ...a.answerNotes }
         for (const [k, v] of Object.entries(given)) {
           const q = qs.find((x) => x.key === k)
           if (!q) throw new Error(t('core.store.noSubQuestion', { ref: refOf(d), key: k, keys: qs.map((x) => x.key).join(' ') }))
+          if (v === OTHER_KEY) {
+            if (!notes[k]?.trim()) throw new Error(t('core.store.subQuestionOtherNeedsText', { key: k }))
+            continue
+          }
           if (!q.options.some((o) => o.key === v)) throw new Error(t('core.store.subQuestionNoOption', { key: k, value: v, keys: q.options.map((o) => o.key).join(' ') }))
         }
         answers = Object.fromEntries(qs.map((q) => [q.key, given[q.key] ?? q.default!]))
-        const notes = { ...fromNote.notes, ...a.answerNotes }
         answerNotes = Object.keys(notes).length ? notes : undefined
         choice = qs.every((q) => answers![q.key] === q.default) && !answerNotes ? '1' : '2'
       }
@@ -569,15 +575,7 @@ export class Store {
       const role = a.role ?? roleOf(by)
       const chosen = d.options.find((o) => o.key === choice)
       const headline = choice ? `${choice}${chosen?.label ? ` —— ${chosen.label}` : ''}` : ''
-      const perQuestion = answers
-        ? qs
-            .map((q) => {
-              const o = q.options.find((x) => x.key === answers![q.key])
-              const note = answerNotes?.[q.key]
-              return `- ${q.key} = ${answers![q.key]} —— ${o?.label ?? ''}${answers![q.key] === q.default ? DEFAULT_MARK : ''}${note ? `：${note}` : ''}`
-            })
-            .join('\n')
-        : ''
+      const perQuestion = answers ? renderAnswerLines(qs, answers, answerNotes) : ''
       const text = [headline, perQuestion, a.note?.trim()].filter(Boolean).join('\n\n')
 
       const next: Decision = {

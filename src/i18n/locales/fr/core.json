@@ -63,6 +63,7 @@
     "answerNeedsChoiceOrNote": "une réponse a besoin d’une option ou d’une note",
     "noSubQuestion": "{{ref}} n’a pas de sous-question {{key}} (elle a : {{keys}})",
     "subQuestionNoOption": "{{key}} n’a pas d’option « {{value}} » (elle a : {{keys}})",
+    "subQuestionOtherNeedsText": "le « autre » de {{key}} a besoin du texte saisi — ex. {{key}}=*:votre réponse",
     "noOption": "{{ref}} n’a pas d’option « {{choice}} » (elle a : {{keys}})",
     "approveOnNeedsApprovalContent": "--approve-on va seulement avec --approval-content",
     "approvalContentNoUrl": "la cible de --approval-content doit être un fichier local, pas une URL",

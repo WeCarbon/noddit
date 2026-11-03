@@ -69,6 +69,7 @@
     "answerNeedsChoiceOrNote": "الرد يحتاج خيارًا أو ملاحظة",
     "noSubQuestion": "{{ref}} ليس فيها سؤال فرعي {{key}} (فيها: {{keys}})",
     "subQuestionNoOption": "{{key}} ليس فيه خيار \"{{value}}\" (فيه: {{keys}})",
+    "subQuestionOtherNeedsText": "\"غير ذلك\" في {{key}} يحتاج النص الذي كتبته — مثل {{key}}=*:إجابتك",
     "noOption": "{{ref}} ليس فيها خيار \"{{choice}}\" (فيها: {{keys}})",
     "approveOnNeedsApprovalContent": "--approve-on يُستخدم فقط مع --approval-content",
     "approvalContentNoUrl": "هدف --approval-content يجب أن يكون ملفًا محليًا، لا URL",

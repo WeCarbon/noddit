@@ -62,6 +62,10 @@ export const OPTION_LABEL = {
   reviewPass: '通过',
   reviewFail: '不通过',
   reviewChange: '改（答复里写改法）',
+  /** Written in place of an option's label when a sub-question was answered
+   *  free-text instead of picking one — a file-format word, not UI text, so
+   *  it reads the same whatever language wrote or reads it. */
+  other: '其他',
 } as const
 
 export function allDefaultsLabel(defaults: string): string {

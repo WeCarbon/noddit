@@ -59,6 +59,7 @@
     "answerNeedsChoiceOrNote": "答覆要有選項或者一句話",
     "noSubQuestion": "{{ref}} 沒有子問題 {{key}}（它有：{{keys}}）",
     "subQuestionNoOption": "{{key}} 沒有選項「{{value}}」（它有：{{keys}}）",
+    "subQuestionOtherNeedsText": "{{key}}「其他」要帶上寫的內容——例如 {{key}}=*:你的答案",
     "noOption": "{{ref}} 沒有選項「{{choice}}」（它有：{{keys}}）",
     "approveOnNeedsApprovalContent": "--approve-on 只配 --approval-content 用",
     "approvalContentNoUrl": "--approval-content 的目標必須是本地檔案，不能是 URL",

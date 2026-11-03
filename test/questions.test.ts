@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { parseArgs } from '../src/cli/args.ts'
 import { initLayout } from '../src/core/paths.ts'
 import { parsePreviousRounds } from '../src/core/parse.ts'
-import { parseAnswerTokens, parseQuestions, renderQuestionsBlock } from '../src/core/questions.ts'
+import { OTHER_KEY, parseAnswerTokens, parseQuestions, renderAnswerLines, renderQuestionsBlock } from '../src/core/questions.ts'
 import { Store } from '../src/core/store.ts'
 import { decs, decsResult, scratch } from './helpers.ts'
 
@@ -295,4 +295,70 @@ test('renderQuestionsBlock writes a round suffix once past round 1, and parses b
 test('parsePreviousRounds: no earlier round means no history', () => {
   assert.deepEqual(parsePreviousRounds(['## 选项', '', '### 1 · only round'].join('\n')), [])
   assert.deepEqual(parsePreviousRounds(''), [])
+})
+
+// N184: a sub-question answered free-text ("other") instead of picking an option.
+
+test('parseAnswerTokens: Qn=*:text keeps spaces, commas and Chinese punctuation, stopping at the next Qn= token', () => {
+  const qs = parseQuestions(['## 子问题', '', '### Q1 · x', '', '#### A · a', '#### B · b', '', '### Q2 · y', '', '#### A · a', '#### B · b'].join('\n'))
+  const r = parseAnswerTokens('Q1=B Q2=*:两个都不选，等下周决定, 先放一放 Q3=ignored-unknown-key', qs)
+  assert.deepEqual(r.answers, { Q1: 'B', Q2: OTHER_KEY })
+  assert.deepEqual(r.notes, { Q2: '两个都不选，等下周决定, 先放一放' })
+})
+
+test('parseAnswerTokens: Qn=* with no typed text is not an answer', () => {
+  const qs = parseQuestions(['## 子问题', '', '### Q1 · x', '', '#### A · a', '#### B · b'].join('\n'))
+  assert.deepEqual(parseAnswerTokens('Q1=*', qs).answers, {})
+  assert.deepEqual(parseAnswerTokens('Q1=* Q1=B', qs).answers, { Q1: 'B' }, 'the bare Q1=* match is dropped, Q1=B still counts')
+})
+
+test('renderAnswerLines: an other pick writes 其他 and the typed text; a normal pick is unchanged', () => {
+  const qs = parseQuestions(['## 子问题', '', '### Q1 · x', '', '#### A · a', '#### B · b', '', '### Q2 · y', '', '#### A · a', '#### B · b'].join('\n'), { Q1: 'A', Q2: 'A' })
+  const text = renderAnswerLines(qs, { Q1: 'A', Q2: OTHER_KEY }, { Q2: '两个都不要' })
+  assert.equal(text, '- Q1 = A —— a（默认）\n- Q2 = * —— 其他：两个都不要')
+})
+
+test('push Q2=*:<text with spaces/commas/Chinese punctuation> answers free-text; nod get shows it verbatim; nod read carries it to the AI', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ADD)
+
+  const typed = '两个都不选，再等一等；下周决定, thanks!'
+  decs(root, ['push', '1', 'Q1=B', `Q2=*:${typed}`, 'Q3=2'])
+  const answered = JSON.parse(decs(root, ['get', '1', '--json']))
+  assert.deepEqual(answered.answers, { Q1: 'B', Q2: OTHER_KEY, Q3: '2' })
+  assert.deepEqual(answered.answer_notes, { Q2: typed })
+  assert.equal(answered.answer.choice, '2')
+  assert.match(answered.body, /- Q1 = B —— change it back to Amount \[%\]\n- Q2 = \* —— 其他：两个都不选，再等一等；下周决定, thanks!\n- Q3 = 2/)
+
+  // The on-disk heading itself stays the file format untouched — only the line inside 已答 is new.
+  const text = readFileSync(answered.file, 'utf8')
+  assert.match(text, /## 已答（agent · cli-test · lane · /)
+
+  const read = decs(root, ['read', '1', '--peek'])
+  assert.match(read, /Q2 = \* —— 其他：两个都不选，再等一等；下周决定, thanks!/, 'the same text an AI reads via nod read')
+})
+
+test('push Qn=* without typed text is refused: 「其他」needs the content', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ADD)
+  const r = decsResult(root, ['push', '1', 'Q1=*', 'Q2=1', 'Q3=1'])
+  assert.equal(r.code, 1)
+  assert.match(r.stderr, /"other" needs the text you typed/)
+})
+
+test('an answered other pick survives a later round as history, same as a normal pick', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 'one question', '--question', 'Q1', 'x', '-o', 'Q1:A=a', 'Q1:B=b', '--default', 'Q1:A'])
+  decs(root, ['push', '1', 'Q1=*:free text from round 1'])
+  decs(root, ['ask', '1', '-o', '1=go', '2=wait'])
+  decs(root, ['push', '1', '1'])
+  const d = JSON.parse(decs(root, ['get', '1', '--json']))
+  assert.equal(d.previous_rounds.length, 1)
+  assert.deepEqual(d.previous_rounds[0].sub_answers, { Q1: OTHER_KEY })
 })

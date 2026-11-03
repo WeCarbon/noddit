@@ -3,6 +3,7 @@ import { bool, one, type Args } from '../args.ts'
 import { refOf } from '../../core/ref.ts'
 import { requireDecision, resolveAuthor, resolveStore } from '../context.ts'
 import { bold, dim, green, toJSON } from '../../core/render.ts'
+import { renderAnswerLines } from '../../core/questions.ts'
 import type { Decision } from '../../core/types.ts'
 import { t } from '../../i18n/index.ts'
 
@@ -15,6 +16,9 @@ function describe(d: Decision): string {
   if (d.status === 'answered') {
     lines.push(`${green(t('cli.read.answered', { choice: d.answer?.choice ? ` ${d.answer.choice}` : '' }))}${chosen?.label ? ` —— ${chosen.label}` : ''}`)
     if (chosen?.body) lines.push(dim(chosen.body))
+    // Sub-question nodes: the headline above is just "2 —— 逐条回复（…）" — the
+    // actual per-question picks, including any 「其他」free text, live here.
+    if (d.questions?.length && d.answer?.answers) lines.push(renderAnswerLines(d.questions, d.answer.answers, d.answer.answerNotes))
     if (d.answer?.note) lines.push('', `${d.answer.by}：${d.answer.note}`)
   }
 
