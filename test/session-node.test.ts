@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 
 import { BIN, decs, decsResult, scratch } from './helpers.ts'
 
@@ -215,4 +215,73 @@ test('the remembered author is per session identity: a different session (and th
   const other = p.result(['note', '1', 'from elsewhere', '--agent'], { DECS_AUTHOR: undefined, NODDIT_IDENTITY: 'lane-b#s2' })
   assert.notEqual(other.code, 0)
   assert.match(other.stderr, /who is writing this/)
+})
+
+// ---------------------------------------------------------------------------
+// N280: a sub-agent spawned inside the same agent process shares everything
+// sessionKey() used to key off (CLAUDE_CODE_SESSION_ID is set once for the
+// whole top-level harness process, not reassigned per agent inside it) — so
+// without more, it also shares the lead's current node and remembered
+// author. The fix folds the cwd's own git worktree root into the key too; a
+// lane working its own worktree now differs from its lead even under the
+// same identity, while two calls from the very same worktree still share.
+// ---------------------------------------------------------------------------
+
+/** Two linked worktrees of one repo — same `decisions/` (findLayout's main-worktree
+ *  rule), same `$NODDIT_HOME`, same pinned identity: everything a sub-agent sharing
+ *  its lead's agent process would also share, except the cwd itself. */
+function worktreeProject(t: { after: (fn: () => void) => void }) {
+  const root = scratch()
+  const laneParent = scratch()
+  const home = scratch()
+  t.after(() => {
+    rmSync(root, { recursive: true, force: true })
+    rmSync(laneParent, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  })
+  const git = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+  git(['init', '-q'])
+  git(['config', 'user.email', 'tester@example.com'])
+  git(['config', 'user.name', 'tester'])
+  writeFileSync(join(root, '.gitkeep'), '')
+  git(['add', '.gitkeep'])
+  git(['commit', '-q', '-m', 'init'])
+  const lane = join(laneParent, 'lane')
+  git(['worktree', 'add', '-q', '-b', 'lane', lane])
+
+  const base = { DECS_HOME: home, NODDIT_SESSION_NODES: join(home, 'session-nodes.json'), NODDIT_IDENTITY: 'lane-x#s1' }
+  const run = (cwd: string, args: string[], env: Record<string, string | undefined> = {}) => decs(cwd, args, { ...base, ...env })
+  const result = (cwd: string, args: string[], env: Record<string, string | undefined> = {}) => decsResult(cwd, args, { ...base, ...env })
+  const get = (id: number) => JSON.parse(run(root, ['get', String(id), '--json']))
+  run(root, ['init', '--no-register'])
+  return { root, lane, run, result, get }
+}
+
+test('N280: the same session identity in a different worktree sees neither the current node nor the remembered author', (t) => {
+  const p = worktreeProject(t)
+  p.run(p.root, ['add', 'ship the login page', '--task', '--author', 'lead · main'])
+  p.run(p.root, ['start', '1', '--author', 'lead · main'])
+
+  const elsewhereProgress = p.result(p.lane, ['progress', '10'])
+  assert.notEqual(elsewhereProgress.code, 0, 'a different worktree has no current node to default to')
+  assert.match(elsewhereProgress.stderr, /nod start <id> first/)
+
+  // The lane's own cwd is a git worktree too (branch `lane`), so resolveAuthor's
+  // last resort — the branch-name guess — succeeds here instead of erroring
+  // outright; what matters is that it's *that* guess, not the lead's "lead · main"
+  // leaking across the worktree boundary.
+  p.run(p.lane, ['note', '1', 'from another lane', '--agent'], { DECS_AUTHOR: undefined })
+  assert.equal(p.get(1).notes.at(-1).author, 'lane · lane', 'a different worktree does not inherit the lead’s remembered author')
+})
+
+test('N280: the same worktree still shares its current node and remembered author across calls', (t) => {
+  const p = worktreeProject(t)
+  p.run(p.root, ['add', 'ship the login page', '--task', '--author', 'lead · main'])
+  p.run(p.root, ['start', '1', '--author', 'lead · main'])
+
+  p.run(p.root, ['progress', '40'])
+  assert.equal(p.get(1).progress, 40, 'same worktree still defaults to the node nod start left it on')
+
+  p.run(p.root, ['note', '1', 'reuses the remembered author', '--agent'], { DECS_AUTHOR: undefined })
+  assert.equal(p.get(1).notes.at(-1).author, 'lead · main', 'same worktree still reuses the remembered author')
 })

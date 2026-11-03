@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -85,16 +86,43 @@ function update(fn: (s: State) => void): void {
 }
 
 /**
- * Which session is asking: the pinned identity, else the harness's own
- * session id, else its process. Undefined outside any agent session — the
- * owner's terminal has no "current node".
+ * This cwd's own worktree root (`git rev-parse --show-toplevel`), when one
+ * exists — unlike `core/paths.ts`'s `mainWorktree` (`--git-common-dir`),
+ * which names the one shared `.git` every linked worktree of a repo points
+ * at, this names the worktree itself, so two of them differ. Undefined
+ * outside git, or when `git` can't be run at all.
  */
-export function sessionKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
+function worktreeOf(cwd: string): string | undefined {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    return out || undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Which session is asking: the pinned identity, else the harness's own
+ * session id, else its process — then, when cwd is inside one, the
+ * worktree it's in. That last part (N280) is what keeps a lead and a
+ * sub-agent it spawned apart: a sub-agent in the same agent process shares
+ * everything else (`CLAUDE_CODE_SESSION_ID` is set once per top-level
+ * harness process, not reassigned per agent inside it), but a lane working
+ * its own worktree still has a cwd of its own. A sub-agent with no
+ * worktree of its own (sharing its lead's cwd too) still collides —
+ * nothing left to tell them apart — same as before this existed. Undefined
+ * outside any agent session — the owner's terminal has no "current node".
+ */
+export function sessionKey(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): string | undefined {
+  const scoped = (key: string) => {
+    const scope = worktreeOf(cwd)
+    return scope ? `${key}@${scope}` : key
+  }
   const identity = currentIdentity(env)
-  if (identity) return `id:${identity}`
-  if (env.CLAUDE_CODE_SESSION_ID) return `session:${env.CLAUDE_CODE_SESSION_ID}`
+  if (identity) return scoped(`id:${identity}`)
+  if (env.CLAUDE_CODE_SESSION_ID) return scoped(`session:${env.CLAUDE_CODE_SESSION_ID}`)
   const pid = harnessPid()
-  return pid ? `pid:${pid}` : undefined
+  return pid ? scoped(`pid:${pid}`) : undefined
 }
 
 const starterKey = (root: string, id: number) => `${root}#${id}`
