@@ -249,3 +249,30 @@ test('bench: ⇥ in the p prompt files a to-do for the owner instead of a brief'
   assert.equal(d.intake, undefined)
   assert.equal(d.author, 'owner')
 })
+
+test('bench: a second ⇥ in the p prompt files a direct AI task — no expand-and-confirm step; a third ⇥ wraps back to a brief', async (t) => {
+  const store = tmpStore(t)
+  store.create({ title: 'Existing work', author: A, task: true })
+  const b = bench(t, store, { view: 'available' })
+  await b.until(has(b, /Existing work/))
+  await b.press('P')
+  await b.until(has(b, /New brief for an AI/))
+  await b.press('\t')
+  await b.until(has(b, /New to-do for you/))
+  await b.press('\t')
+  await b.until(has(b, /New AI task/))
+  await b.press('Run the full gate', '\r')
+  await b.until(has(b, /listening in/))
+  const d = store.all().find((x) => x.title === 'Run the full gate')!
+  assert.equal(d.assignee, undefined)
+  assert.equal(d.intake, undefined, 'a direct task, not a brief needing expansion')
+  assert.equal(d.kind, 'task')
+  assert.equal(d.author, 'owner')
+  await b.press('n') // decline opening a session; nobody is listening in this test project
+
+  await b.press('P')
+  await b.until(has(b, /New brief for an AI/))
+  await b.press('\t', '\t', '\t')
+  await b.until(has(b, /New brief for an AI/)) // three ⇥ presses land back on brief
+  await b.press('\x1b')
+})
