@@ -75,6 +75,10 @@ export async function run(args: Args, verb = ''): Promise<number> {
       const node = d.intake ? store.claim(d, resolveAuthor(args), { force }).node : d
       report(args, store.start(node, { force }), t('cli.lifecycle.started'))
     }
+    else if (verb === 'hold' && bool(args, 'off')) {
+      const role = shellRole()
+      report(args, store.unhold(d, role === 'human' ? (one(args, 'by') ?? 'owner') : resolveAuthor(args), { role }), t('cli.lifecycle.holdOff'))
+    }
     else if (verb === 'hold') {
       const raw = one(args, 'on')
       const on = raw && raw !== 'true' ? raw : undefined

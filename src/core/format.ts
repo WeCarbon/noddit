@@ -84,6 +84,7 @@ export const NOTE_TEXT = {
   waitingOn: (on: string) => `等 ${on}`,
   waitingOnUntil: (on: string, day: string) => `等 ${on}，${day} 回来看`,
   waitingMoved: (day: string) => `改到 ${day} 回来看`,
+  notWaiting: () => '不再等待',
   checkBack: (on: string) => `到了回来看的日子：问问 ${on}。`,
   deferred: '后面再做。解除延迟之前先别动它。',
   undeferred: '可以接着做了。',

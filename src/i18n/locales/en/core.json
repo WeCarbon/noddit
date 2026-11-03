@@ -108,7 +108,8 @@
     "editStale": "{{ref}} changed since you opened it — reload and edit again",
     "noSuchNote": "{{ref}} has no note {{n}} (it has {{count}})",
     "notYourNote": "{{ref}}: note {{n}} was written by someone else — --force to edit it anyway",
-    "attachmentNotFound": "{{ref}} has no attachment called {{name}}"
+    "attachmentNotFound": "{{ref}} has no attachment called {{name}}",
+    "unholdNotWaiting": "{{ref}} isn't waiting"
   },
   "duration": {
     "notADuration": "\"{{value}}\" is not a duration — e.g. 90s, 30m, 1h, 2d"

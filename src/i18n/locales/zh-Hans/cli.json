@@ -34,7 +34,7 @@
     "start": "nod start <id>...              AI 开始做这个节点 → 执行中\n\n  --force   节点还在待决策、或排在没完成的节点后面，也开始",
     "done": "nod done <id>... [--note \"…\"]   做完了 → 已完成，收进 archived/\n\n  --note    记一句做了什么（智能体补充）\n  --force   连还在待决策的节点也算做完（很少是对的）\n\n做完以后，排在它后面、早就答复并取走了的节点会自动进入执行中。",
     "close": "nod close <id>... --reason <原因>   不做了 → 已关闭，收进 archived/\n\n  --reason  superseded | obsolete | merged-into:W15 | 任意一句话",
-    "hold": "nod hold <编号> --on \"<谁/什么>\" --until <日期>    卡在外部 → 等待\nnod hold <编号> --until <日期>                    已经在等：只改回来看的日子\n\n等同事、客户、供应商，或者等某个服务恢复。等负责人拍板用 nod ask，\n等别的节点用 --after，都不是这个。等待中的节点不算卡住；恢复用 nod start。\n\n每个等待都要有回来看的日子（--until：明天、周五、下周、3天后、11月15日、\n2026-11-15、next week…）。到了那天就「到期」：排在「等待」最上面并标出来，\nnod monitor 会提醒做这个节点的 AI 去问一次。这个规则之前就在等的节点没有日期，算到期。\n\n  nod hold 305 --on \"Carol 回信确认账单金额\" --until 周五",
+    "hold": "nod hold <编号> --on \"<谁/什么>\" --until <日期>    卡在外部 → 等待\nnod hold <编号> --until <日期>                    已经在等：只改回来看的日子\nnod hold <编号> --off                          其实不是在等外部 → 回到待开始\n\n等同事、客户、供应商，或者等某个服务恢复。等负责人拍板用 nod ask，\n等别的节点用 --after，都不是这个。等待中的节点不算卡住；恢复用 nod start。\n\n每个等待都要有回来看的日子（--until：明天、周五、下周、3天后、11月15日、\n2026-11-15、next week…）。到了那天就「到期」：排在「等待」最上面并标出来，\nnod monitor 会提醒做这个节点的 AI 去问一次。这个规则之前就在等的节点没有日期，算到期。\n\n  nod hold 305 --on \"Carol 回信确认账单金额\" --until 周五",
     "ask": "nod ask <id> -o 1=\"…\" 2=\"…\" [--default 1]    做着做着要负责人拍板 → 待决策\nnod ask <id>                                  不给 -o：把原来的问题再问一次\n                                               （例如负责人回复过的验收，改好了请他再看）\nnod ask <id> --question Q1 \"…\" -o Q1:A=\"…\" Q1:B=\"…\" --default Q1:A\n                                               这一轮自己的子问题 —— 写法同 nod add --question\n\n负责人一回复，节点就变成「待 AI 取走」——轮到 AI 了，不再算「待决」。\nAI 处理完要负责人再看时，用 nod ask 把它放回待决策。\n\n同一个节点变成待决策，不用另开一条。问题的背景从 stdin 或 --text 给；\n选项写成「## 选项（第 N 轮）」，上一轮的选项和答复留在正文里当历史。\n--question 用法同 nod add：这是本轮自己的子问题，不会从上一轮带过来——这一轮\n不给 --question 就没有子问题，哪怕上一轮有过。\n\n  nod ask 305 -o 1=\"继续用现在的 CDN\" 2=\"换新的 CDN\" --default 1 <<'EOF'\n  跑到一半发现新 CDN 在部分地区延迟更高……\n  EOF\n\n  --attach <文件>      草稿和提出它的这个问题写在一起（同一个段落）；\n  --approval-content / --approve-on / --label / --caption 同 nod attach",
     "retitle": "nod retitle <id> \"<新标题>\"     改标题\n\n标题上限 {{max}} 列（约 {{half}} 个汉字），只写要决什么。\n只改文件头里的 title；文件名不动，编号不变，所有引用照常有效。",
     "migrate": "nod migrate —— 把旧的 DECISIONS.md / DECISIONS.old.md 拆进 decisions/\n\n  nod migrate [--dir <项目根>] [--dry-run] [--force]\n  nod migrate --upgrade [--dry-run]         status: open/answered → 节点状态，写回文件；\n                                             老式编号列表的选项（1. 标签：代价）改写成 ### 1 · 标签\n  nod migrate --strip-prefix [--dry-run]    D305-….md → 305-….md，attachments/D305 → 305，改正文链接\n  nod migrate --attachments [--dry-run]     把一个旧的全局 ## 附件 块拆回每条记录真正该\n                                             在的段落（正文或某条追问）——看正文里有没有\n                                             直接提到，没有就看时间，还是看不出来就留在正文下面\n\n  --dir <路径>   从哪个项目根读 DECISIONS.md / DECISIONS.old.md（默认：当前目录）\n  --dry-run      只打印会写什么，什么都不动\n  --force        那个编号的节点文件已经存在时覆盖它\n\n旧文件不会被改动或删除——这里只读它们。",
@@ -210,7 +210,8 @@
     "closed": "关闭（{{reason}}）",
     "humanTask": "{{ref}} 是负责人自己的事——智能体不做（负责人让你做的话加 --force）",
     "needUntil": "要加 --until <日期>：回来看的日子（明天、周五、下周、3天后、2026-11-15）",
-    "waitingOnUntil": "等 {{on}} · {{date}} 回来看"
+    "waitingOnUntil": "等 {{on}} · {{date}} 回来看",
+    "holdOff": "回到待开始"
   },
   "retitle": {
     "usage": "用法：nod retitle 203 \"定价页文案怎么改\""

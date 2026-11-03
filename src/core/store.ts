@@ -912,6 +912,20 @@ export class Store {
     }))
   }
 
+  /** Waiting → back to 待开始: the wait was never on anyone outside. */
+  unhold(d: Decision, author: string, opts: { role?: NoteRole } = {}): Decision {
+    if (d.state !== 'waiting') throw new Error(t('core.store.unholdNotWaiting', { ref: refOf(d) }))
+    return this.mutate(d, (d) => ({
+      next: {
+        ...d,
+        state: 'not_started',
+        waitingOn: undefined,
+        waitingUntil: undefined,
+        body: appendSection(d.body, noteHeading(NOTE_KIND.addendum, opts.role ?? 'agent', author, nowStamp()), NOTE_TEXT.notWaiting()),
+      },
+    }))
+  }
+
   /**
    * Waiting nodes whose check-back day has come get one note signed `nod` — "time to check
    * on …" — the first time anything looks after that day (the monitor turns it into a

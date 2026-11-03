@@ -69,3 +69,16 @@ test('a node waiting from before check-back days counts as due', (t) => {
   writeFileSync(file, readFileSync(file, 'utf8').replace(/^waiting_until: .*\n/m, ''))
   assert.equal(get(root, 1).wait_due, true)
 })
+
+test('hold --off: a wait that was never on anyone outside goes back to To do', (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', '--task', 'ship it'])
+  decs(root, ['hold', '1', '--on', 'Carol', '--until', 'fri'])
+  decs(root, ['hold', '1', '--off'])
+  const d = JSON.parse(decs(root, ['get', '1', '--json']))
+  assert.equal(d.status, 'not_started')
+  assert.equal(d.waiting_on ?? null, null)
+  assert.equal(decsResult(root, ['hold', '1', '--off']).code, 1, 'not waiting any more')
+})
