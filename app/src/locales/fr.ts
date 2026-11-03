@@ -362,4 +362,13 @@ export const fr: Strings = {
   keyQuick: 'Nouveau pour une IA',
   selectedCount: '{{count}} sélectionnés',
   keyExtend: 'Sélectionner plusieurs lignes (aussi ⌘-clic, ⇧-clic, tracer un cadre)',
+  unimportant: 'Plus important',
+  deferEveryEach: 'Reporter chacun de son propre R',
+  ctxMoveTo: 'Déplacer sous…',
+  moveToPlaceholder: 'Le nouveau parent : un numéro ou des mots de son titre',
+  movedUnder: 'Déplacé sous {{ref}}',
+  ctxCopyRefs: 'Copier les {{count}} numéros',
+  batchDone: '{{what}} · {{count}} nœuds',
+  batchFailed: 'Non enregistré pour {{refs}} — le reste est passé',
+  batchHint: 'Clic droit sur une ligne choisie pour les mêmes actions · Échap pour tout désélectionner',
 }

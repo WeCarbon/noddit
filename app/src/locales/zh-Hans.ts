@@ -361,4 +361,13 @@ export const zhHans: Strings = {
   keyQuick: '派给 AI',
   selectedCount: '已选 {{count}} 项',
   keyExtend: '连着多选（也可 ⌘ 点击、⇧ 点击、拖框）',
+  unimportant: '取消重要',
+  deferEveryEach: '各延迟自己的 R 天',
+  ctxMoveTo: '移到父节点…',
+  moveToPlaceholder: '新的父节点：输入编号或标题里的字',
+  movedUnder: '已移到 {{ref}} 下面',
+  ctxCopyRefs: '复制编号（{{count}} 个）',
+  batchDone: '{{what}} · {{count}} 项',
+  batchFailed: '{{refs}} 没保存上，其余的都好了',
+  batchHint: '在选中的行上右键也是这些操作 · Esc 取消选择',
 }

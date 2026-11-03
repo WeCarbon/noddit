@@ -359,6 +359,15 @@ export const en = {
   keyQuick: 'New for an AI',
   selectedCount: '{{count}} selected',
   keyExtend: 'Select more rows (also ⌘-click, ⇧-click, drag a box)',
+  unimportant: 'Not important',
+  deferEveryEach: 'Delay each by its own R',
+  ctxMoveTo: 'Move under…',
+  moveToPlaceholder: 'The new parent: a number or words from its title',
+  movedUnder: 'Moved under {{ref}}',
+  ctxCopyRefs: 'Copy the {{count}} numbers',
+  batchDone: '{{what}} · {{count}} nodes',
+  batchFailed: 'Not saved for {{refs}} — the rest went through',
+  batchHint: 'Right-click a picked row for the same actions · Esc clears',
 }
 
 export type Strings = Record<keyof typeof en, string>

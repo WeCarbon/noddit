@@ -30,9 +30,9 @@ import { CycleBanner } from './cycles.tsx'
 import { SourcesPanel } from './sources.tsx'
 import { noticeTitle, plainReply } from './plain-reply.ts'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
-import { applyOps, both, dropRows, heldAt, keepHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, type Held, type PendingOp } from './optimistic.ts'
+import { applyOps, both, dropRows, heldAt, keepAllHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, runBatch, type BatchItem, type Held, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
-import { NONE, boxHits, boxed, extend, listed, range, toggle, type Selection } from './selection.ts'
+import { NONE, batchActions, boxHits, boxed, extend, listed, range, toggle, type Selection } from './selection.ts'
 import { s } from './strings.ts'
 import { OTHER_KEY, type Attachment, type Bench as BenchData, type Node, type PreviousRound, type Project, type Row, type View, type ViewName } from './types.ts'
 
@@ -125,7 +125,7 @@ export function Bench(props: {
   const setScope = (project: string | null) => props.setPrefs({ project })
   // The node the owner just answered, closed, finished or put off stays where it was, detail and
   // all, until they pick another node or list; only then does it leave by the list's own rules.
-  const [held, setHeld] = useState<Held | null>(null)
+  const [held, setHeld] = useState<{ rows: Held[]; batch: string | null } | null>(null)
   /** Clicked empty list space or Esc: no row highlighted, right pane empty. Counts as picking
    *  another node — same as `select` — so the held row (above) lets go of it too. */
   const [deselected, setDeselected] = useState(false)
@@ -134,7 +134,7 @@ export function Bench(props: {
     setHeld(null)
   }
   const where = `${scope ?? ''}|${view.view}`
-  const rows = useMemo(() => keepHeld(visibleRows(view, prefs.folds), held, where, bench), [view, prefs.folds, held, where, bench])
+  const rows = useMemo(() => keepAllHeld(visibleRows(view, prefs.folds), held?.rows ?? [], where, bench), [view, prefs.folds, held, where, bench])
   const liveList = !scope && view.view === 'live'
   // The composer belongs to the node it was opened on, so moving to another node closes it in the
   // same render — not in an effect that might land after the next keypress.
@@ -243,13 +243,21 @@ export function Bench(props: {
   const index = found >= 0 ? found : Math.min(lastIndex.current, selectable.length - 1)
   if (index >= 0) lastIndex.current = index
   const current: Row | undefined = deselected ? undefined : selectable[index]
+  const [archived, setArchived] = useState<Record<string, Node>>({})
   // More than one row picked (⌘-click, ⇧-click, ⇧↑↓, a box): the right pane and the menu act on all of them.
   const [selection, setSelection] = useState<Selection>(NONE)
   const order = useMemo(() => rows.filter((r) => r.kind === 'node').map((r) => r.key), [rows])
   const picked = listed(selection, order)
   const multi = picked.length > 1
   useEffect(() => setSelection(NONE), [where])
-  const [archived, setArchived] = useState<Record<string, Node>>({})
+  const pickedSig = multi ? picked.join(' ') : null
+  const pickedNodes = multi
+    ? picked.flatMap((k) => {
+        const key = rows.find((r) => r.key === k)?.node
+        const n = key ? (bench.nodes[key] ?? archived[key]) : undefined
+        return n ? [n] : []
+      })
+    : []
   const nodeKey = current?.kind === 'node' ? current.node! : undefined
   const node: Node | undefined = nodeKey ? (bench.nodes[nodeKey] ?? archived[nodeKey]) : undefined
   shownKey.current = node?.key
@@ -267,13 +275,20 @@ export function Bench(props: {
     if (current && current.key !== prefs.selected) setPrefs({ selected: current.key })
   }, [current?.key])
   useEffect(() => {
-    if (held && (held.where !== where || held.row.key !== prefs.selected)) setHeld(null)
-  }, [where, prefs.selected])
+    if (!held) return
+    const kept = held.batch !== null ? held.batch === pickedSig : !multi && held.rows[0]?.row.key === prefs.selected
+    if (!kept || held.rows.some((h) => h.where !== where)) setHeld(null)
+  }, [where, prefs.selected, pickedSig])
   const holdShown = (key: string) => {
     if (current?.kind !== 'node' || current.node !== key) return
     const i = rows.findIndex((r) => r.key === current.key)
-    if (i >= 0) setHeld(heldAt(rows, i, where))
+    if (i >= 0) setHeld({ rows: [heldAt(rows, i, where)], batch: null })
     if (prefs.selected !== current.key) setPrefs({ selected: current.key })
+  }
+  /** A batch's rows all stay where they were until the selection changes. */
+  const holdPicked = () => {
+    const at = picked.map((k) => rows.findIndex((r) => r.key === k)).filter((i) => i >= 0)
+    setHeld({ rows: at.map((i) => heldAt(rows, i, where)), batch: pickedSig })
   }
 
   useEffect(() => {
@@ -397,6 +412,100 @@ export function Bench(props: {
       patchRows(key, (r) => ({ ...r, state: 'decided', glyph: r.glyph && { ...r.glyph, color: 'green', bold: false, dim: false }, badge: [{ text: s('answered'), color: 'green' }], badge_short: [{ text: s('answered'), color: 'green' }] })),
     )
 
+  /** Each action on one node as its patch and its write: a single action runs one, a batch many. */
+  const flagItem = (n: Node, on: boolean): BatchItem => ({
+    ref: n.ref,
+    patch: both(patchNode(n.key, (x) => ({ ...x, urgency: on ? 'high' : 'normal', important: on })), patchRows(n.key, (r) => ({ ...r, flag: on ? 'important' : null }))),
+    write: () => api.flag(rootOf(n), n.id, on ? 'important' : 'normal'),
+  })
+  const assignItem = (n: Node, to: 'me' | 'ai'): BatchItem => ({
+    ref: n.ref,
+    patch: both(
+      patchNode(n.key, (x) => ({ ...x, assignee: to === 'me' ? 'human' : 'ai', human_task: to === 'me' })),
+      patchRows(n.key, (r) => ({ ...r, assignee: to === 'me' ? 'human' : 'ai', human_task: to === 'me' })),
+    ),
+    write: () => api.assign(rootOf(n), n.id, to),
+  })
+  const startItem = (n: Node): BatchItem => ({
+    ref: n.ref,
+    patch: both(
+      patchNode(n.key, (x) => ({ ...x, status: 'in_progress' })),
+      // The owner's own to-do started is ⬖ in yellow (as the CLI draws it), an AI's is ◐ in cyan; the badge waits for the reload.
+      patchRows(n.key, (r) =>
+        r.human_task
+          ? { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '⬖', color: 'yellow', dim: false }, badge: [], badge_short: [] }
+          : { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '◐', color: 'cyan', dim: false } },
+      ),
+    ),
+    write: () => api.start(rootOf(n), n.id),
+  })
+  /** 归档 without asking why: decided work is marked seen, anything still open is closed as obsolete. */
+  const archiveItem = (n: Node): BatchItem =>
+    n.status === 'decided'
+      ? { ref: n.ref, patch: finished(n.key, 'completed'), write: () => api.seen(rootOf(n), n.id) }
+      : { ref: n.ref, patch: finished(n.key, 'closed'), write: () => api.close(rootOf(n), n.id, 'obsolete') }
+  /** 延迟到…: waiting on `on` (purple), or — no one named — a plain deferral (grey); `date` null = indefinitely. */
+  const delayItem = (n: Node, on: string | null, date: string | null, passive: boolean): BatchItem & { active: boolean } => {
+    const active = Boolean(on) || (n.status === 'waiting' && !passive)
+    const until = date ? `${date}T00:00:00` : null
+    return {
+      ref: n.ref,
+      active,
+      patch: active
+        ? both(
+            patchNode(n.key, (x) => ({ ...x, status: 'waiting', deferred_at: null, waiting_on: on ?? x.waiting_on, waiting_until: until ?? x.waiting_until })),
+            patchRows(n.key, (r) => ({ ...r, state: 'waiting', delay: 'active', deferred: false, wait_due: false, waiting_until: until ?? r.waiting_until, glyph: r.glyph && { ...r.glyph, text: '⏸', color: 'magenta', dim: false } })),
+          )
+        : both(
+            patchNode(n.key, (x) => ({ ...x, ...(x.status === 'waiting' ? { status: 'not_started' as const, waiting_on: null } : {}), deferred_at: now(), deferred_until: date })),
+            dropRows(n.key, ['all', 'live']),
+            patchRows(n.key, (r) => ({ ...r, deferred: true, delay: 'passive' })),
+          ),
+      write: () => api.delay(rootOf(n), n.id, on, date, passive),
+    }
+  }
+  /** 「延迟 R 天」: to today + the node's R (`every`), a wait keeping its who. */
+  const everyItem = (n: Node): (BatchItem & { date: string; waiting: boolean }) | null => {
+    const m = /^(\d+)([dw])$/.exec(n.every ?? '')
+    if (!m) return null
+    const at = new Date()
+    at.setDate(at.getDate() + Number(m[1]) * (m[2] === 'w' ? 7 : 1))
+    const date = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`
+    const waiting = n.status === 'waiting'
+    return {
+      ref: n.ref,
+      date,
+      waiting,
+      patch: waiting
+        ? patchNode(n.key, (x) => ({ ...x, waiting_until: `${date}T00:00:00` }))
+        : both(patchNode(n.key, (x) => ({ ...x, deferred_at: now(), deferred_until: date })), dropRows(n.key, ['all', 'live']), patchRows(n.key, (r) => ({ ...r, deferred: true, delay: 'passive' }))),
+      write: () => api.delayEvery(rootOf(n), n.id),
+    }
+  }
+  const moveItem = (n: Node, parent: Node): BatchItem => ({
+    ref: n.ref,
+    patch: patchNode(n.key, (x) => ({ ...x, parent: parent.id })),
+    write: () => api.move(rootOf(n), n.id, parent.id),
+  })
+  /**
+   * The same action on every picked node: all show at once, written a few at a time; the
+   * ones that fail roll back and are named. `hold`: the rows stay put until the selection changes.
+   */
+  const batch = (items: BatchItem[], done: string, hold = false) => {
+    if (!items.length) return
+    if (hold) holdPicked()
+    const first = opSeq.current + 1
+    opSeq.current += items.length
+    setError(null)
+    showToast(s('batchDone', { what: done, count: items.length }))
+    void runBatch(items, setOps, first).then((failed) => {
+      void refresh()
+      if (!failed.length) return
+      setError(failed.map((f) => `${f.ref}: ${f.error.message.split('\n')[0]}`).join('\n'))
+      showToast(s('batchFailed', { refs: failed.map((f) => f.ref).join(' ') }))
+    })
+  }
+
   const act = async (fn: () => Promise<unknown>, done: string) => {
     setBusy(true)
     setError(null)
@@ -516,41 +625,16 @@ export function Bench(props: {
   }
   const [deferFor, setDeferFor] = useState<Node | null>(null)
   /** 延迟到…: waiting on `on` (purple), or — no one named — a plain deferral (grey); `date` null = indefinitely. */
+  const delayToast = (active: boolean, date: string | null) => (active ? s('heldUntil', { date: date ?? '' }) : date ? s('deferredUntil', { date }) : s('deferred'))
   const delayNode = (n: Node, on: string | null, date: string | null, passive: boolean) => {
     setDeferFor(null)
     holdShown(n.key)
-    const active = Boolean(on) || (n.status === 'waiting' && !passive)
-    const until = date ? `${date}T00:00:00` : null
-    optimistic(
-      active
-        ? both(
-            patchNode(n.key, (x) => ({ ...x, status: 'waiting', deferred_at: null, waiting_on: on ?? x.waiting_on, waiting_until: until ?? x.waiting_until })),
-            patchRows(n.key, (r) => ({ ...r, state: 'waiting', delay: 'active', deferred: false, wait_due: false, waiting_until: until ?? r.waiting_until, glyph: r.glyph && { ...r.glyph, text: '⏸', color: 'magenta', dim: false } })),
-          )
-        : both(
-            patchNode(n.key, (x) => ({ ...x, ...(x.status === 'waiting' ? { status: 'not_started' as const, waiting_on: null } : {}), deferred_at: now(), deferred_until: date })),
-            dropRows(n.key, ['all', 'live']),
-            patchRows(n.key, (r) => ({ ...r, deferred: true, delay: 'passive' })),
-          ),
-      () => api.delay(rootOf(n), n.id, on, date, passive),
-      active ? s('heldUntil', { date: date ?? '' }) : date ? s('deferredUntil', { date }) : s('deferred'),
-    )
+    const it = delayItem(n, on, date, passive)
+    optimistic(it.patch, it.write, delayToast(it.active, date))
   }
-  /** 「延迟 R 天」: to today + the node's R (`every`), a wait keeping its who. */
   const delayEvery = (n: Node) => {
-    const m = /^(\d+)([dw])$/.exec(n.every ?? '')
-    if (!m) return
-    const at = new Date()
-    at.setDate(at.getDate() + Number(m[1]) * (m[2] === 'w' ? 7 : 1))
-    const date = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`
-    const waiting = n.status === 'waiting'
-    optimistic(
-      waiting
-        ? patchNode(n.key, (x) => ({ ...x, waiting_until: `${date}T00:00:00` }))
-        : both(patchNode(n.key, (x) => ({ ...x, deferred_at: now(), deferred_until: date })), dropRows(n.key, ['all', 'live']), patchRows(n.key, (r) => ({ ...r, deferred: true, delay: 'passive' }))),
-      () => api.delayEvery(rootOf(n), n.id),
-      waiting ? s('heldUntil', { date }) : s('deferredUntil', { date }),
-    )
+    const it = everyItem(n)
+    if (it) optimistic(it.patch, it.write, it.waiting ? s('heldUntil', { date: it.date }) : s('deferredUntil', { date: it.date }))
   }
   /** Lifts any 延迟 (a wait goes back to To do); with none, asks until when. */
   const toggleDefer = () => {
@@ -637,26 +721,14 @@ export function Bench(props: {
   const toggleImportant = () => {
     if (!node || node.terminal) return
     const on = node.urgency !== 'high'
-    optimistic(
-      both(
-        patchNode(node.key, (n) => ({ ...n, urgency: on ? 'high' : 'normal', important: on })),
-        patchRows(node.key, (r) => ({ ...r, flag: on ? 'important' : null })),
-      ),
-      () => api.flag(rootOf(node), node.id, on ? 'important' : 'normal'),
-      on ? s('flaggedImportant') : s('unflaggedImportant'),
-    )
+    const it = flagItem(node, on)
+    optimistic(it.patch, it.write, on ? s('flaggedImportant') : s('unflaggedImportant'))
   }
   const reassign = () => {
     if (!node) return
     const to = node.assignee === 'human' ? 'ai' : 'me'
-    optimistic(
-      both(
-        patchNode(node.key, (n) => ({ ...n, assignee: to === 'me' ? 'human' : 'ai', human_task: to === 'me' })),
-        patchRows(node.key, (r) => ({ ...r, assignee: to === 'me' ? 'human' : 'ai', human_task: to === 'me' })),
-      ),
-      () => api.assign(rootOf(node), node.id, to),
-      to === 'me' ? s('assignedMe') : s('assignedAi'),
-    )
+    const it = assignItem(node, to)
+    optimistic(it.patch, it.write, to === 'me' ? s('assignedMe') : s('assignedAi'))
   }
   const [newOpen, setNewOpen] = useState(false)
   const [viewEditor, setViewEditor] = useState<{ start?: string } | null>(null)
@@ -694,21 +766,11 @@ export function Bench(props: {
       showToast(b.text)
     }
   }, [props.bench])
-  const markStart = () =>
-    node &&
-    optimistic(
-      both(
-        patchNode(node.key, (n) => ({ ...n, status: 'in_progress' })),
-        // The owner's own to-do started is ⬖ in yellow (as the CLI draws it), an AI's is ◐ in cyan; the badge waits for the reload.
-        patchRows(node.key, (r) =>
-          r.human_task
-            ? { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '⬖', color: 'yellow', dim: false }, badge: [], badge_short: [] }
-            : { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '◐', color: 'cyan', dim: false } },
-        ),
-      ),
-      () => api.start(rootOf(node), node.id),
-      s('started'),
-    )
+  const markStart = () => {
+    if (!node) return
+    const it = startItem(node)
+    optimistic(it.patch, it.write, s('started'))
+  }
   const markDone = () => {
     if (!node) return
     holdShown(node.key)
@@ -722,6 +784,54 @@ export function Bench(props: {
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
   latest.current = { startAnswer, archive, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, reassign, setDeferFor, delayEvery } as never
+  const batchRef = useRef(batch)
+  batchRef.current = batch
+  const [deferMany, setDeferMany] = useState<Node[] | null>(null)
+  const [moveMany, setMoveMany] = useState<Node[] | null>(null)
+
+  /** What fits every picked node — for the right-click menu and the right pane alike. */
+  const batchMenu = (nodes: Node[]): MenuItem[] => {
+    const a = batchActions(nodes)
+    const run = (items: BatchItem[], done: string, hold = false) => () => batchRef.current(items, done, hold)
+    const items: MenuItem[] = []
+    if (a.important !== null) {
+      const on = a.important
+      items.push({ label: on ? s('ctxImportant') : s('unimportant'), icon: I(Star), run: run(nodes.map((n) => flagItem(n, on)), on ? s('flaggedImportant') : s('unflaggedImportant')) })
+    }
+    if (a.start) items.push({ label: s('ctxStart'), icon: I(Play), run: run(nodes.map(startItem), s('started')) })
+    if (a.delay) {
+      const every = a.every ? nodes.flatMap((n) => everyItem(n) ?? []) : []
+      items.push({
+        label: s('defer'),
+        icon: I(Timer),
+        sub: [
+          ...(a.every ? [{ label: a.every.same ? s('deferEvery', { every: a.every.same }) : s('deferEveryEach'), icon: I(Repeat), run: run(every, s('deferred'), true) }] : []),
+          { label: s('deferMenu'), icon: I(Hourglass), run: () => setDeferMany(nodes) },
+        ],
+      })
+    }
+    for (const to of a.assign)
+      items.push({
+        label: to === 'ai' ? s('assignAi') : s('assignMe'),
+        icon: to === 'ai' ? I(Bot) : I(User),
+        run: run(nodes.filter((n) => (n.assignee === 'human') === (to === 'ai')).map((n) => assignItem(n, to)), to === 'me' ? s('assignedMe') : s('assignedAi')),
+      })
+    if (a.archive) items.push({ label: s('ctxArchive'), icon: I(Archive), run: run(nodes.map(archiveItem), s('ctxArchive'), true) })
+    items.push({ kind: 'separator' })
+    if (a.move) items.push({ label: s('ctxMoveTo'), icon: I(CornerLeftUp), run: () => setMoveMany(nodes) })
+    items.push({ label: s('ctxCopyRefs', { count: nodes.length }), icon: I(Copy), run: () => copy(nodes.map((n) => n.ref).join(' ')) })
+    return items
+  }
+  /** Where the picked nodes can go: a live node of their project that is none of them, nor under one. */
+  const moveTargets = (nodes: Node[]): Row[] => {
+    const keys = new Set(nodes.map((n) => n.key))
+    const under = (key: string): boolean => {
+      for (let n: Node | undefined = bench.nodes[key]; n; n = n.parent != null ? bench.nodes[`${n.project}#${n.parent}`] : undefined) if (keys.has(n.key)) return true
+      return false
+    }
+    const all = bench.views.find((v) => v.view === 'all')?.rows ?? []
+    return all.filter((r) => r.kind === 'node' && r.node && !r.context && bench.nodes[r.node]?.project === nodes[0]?.project && !bench.nodes[r.node].terminal && !under(r.node))
+  }
 
   const nodeMenu = (n: Node | undefined, r: Row): MenuItem[] => {
     const L = () => latest.current as unknown as {
@@ -856,6 +966,7 @@ export function Bench(props: {
       case 'row': {
         const r = view.rows.find((x) => x.key === d.key)
         if (!r || r.kind !== 'node') return null
+        if (multi && picked.includes(r.key)) return batchMenu(pickedNodes)
         select(r.key)
         return nodeMenu(bench.nodes[r.node!] ?? archived[r.node!], r)
       }
@@ -1022,6 +1133,8 @@ export function Bench(props: {
         return nudge(e.key === 'ArrowUp' ? -1 : 1)
       }
       if (meta || e.altKey) return
+      // With several rows picked, one node's keys would act on the cursor row alone: the pane and menu act on them all.
+      if (multi && /^([aAdeEnNr!1-9]|Enter)$/.test(e.key)) return
       switch (e.key) {
         case 'ArrowDown':
         case 'ArrowUp': {
@@ -1278,10 +1391,7 @@ export function Bench(props: {
         <Divider which="list" measure={measurePanes} onMove={setLivePanes} onDone={donePanes} onReset={resetPanes} />
         <div class="drag" data-tauri-drag-region />
         {multi ? (
-          <div class="placeholder batch">
-            <div class="ph-glyph">◇</div>
-            <p class="ph-title">{s('selectedCount', { count: picked.length })}</p>
-          </div>
+          <BatchPane count={picked.length} items={batchMenu(pickedNodes)} error={error} />
         ) : node ? (
           <Detail
             key={node.key}
@@ -1406,6 +1516,33 @@ export function Bench(props: {
           }}
         />
       )}
+      {deferMany && (
+        <DelayDialog
+          node={deferMany.every((n) => n.status === 'waiting') ? deferMany[0] : { ...deferMany[0], status: 'not_started', waiting_on: null }}
+          subject={s('selectedCount', { count: deferMany.length })}
+          busy={busy}
+          onClose={() => setDeferMany(null)}
+          onDelay={(on, date, passive) => {
+            const nodes = deferMany
+            setDeferMany(null)
+            const items = nodes.map((n) => delayItem(n, on, date, passive))
+            batch(items, delayToast(items.every((i) => i.active), date), true)
+          }}
+        />
+      )}
+      {moveMany && (
+        <Palette
+          rows={moveTargets(moveMany)}
+          placeholder={s('moveToPlaceholder')}
+          onClose={() => setMoveMany(null)}
+          onPick={(k) => {
+            const nodes = moveMany
+            const parent = bench.nodes[k]
+            setMoveMany(null)
+            if (parent) batch(nodes.map((n) => moveItem(n, parent)), s('movedUnder', { ref: parent.ref }))
+          }}
+        />
+      )}
       {deferFor && <DelayDialog node={deferFor} busy={busy} onClose={() => setDeferFor(null)} onDelay={(on, date, passive) => delayNode(deferFor, on, date, passive)} />}
       {startFor && (
         <StartSession
@@ -1450,6 +1587,37 @@ export function Bench(props: {
       {viewer && <Viewer items={viewer.items} at={viewer.at} onAt={(at) => setViewer({ ...viewer, at })} onClose={() => setViewer(null)} />}
       <div class={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </div>
+  )
+}
+
+/** The right pane with several rows picked: how many, and the actions that fit them all. */
+function BatchPane(p: { count: number; items: MenuItem[]; error: string | null }) {
+  const buttons = p.items.flatMap((i) => (i.kind === 'separator' || i.kind === 'header' ? [] : (i.sub ?? [i])))
+  return (
+    <>
+      <div class="placeholder batch">
+        <div class="ph-glyph">◇</div>
+        <p class="ph-title">{s('selectedCount', { count: p.count })}</p>
+        <div class="batch-actions">
+          {buttons.map((b) =>
+            b.kind === 'separator' || b.kind === 'header' ? null : (
+              <button key={b.label} class="ghost" onClick={b.run} disabled={b.disabled}>
+                {b.icon}
+                {b.label}
+              </button>
+            ),
+          )}
+        </div>
+        <p>{s('batchHint')}</p>
+      </div>
+      {p.error && (
+        <div class="dock">
+          <div class="error">
+            <b>{s('errorTitle')}</b> {p.error}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -2007,7 +2175,7 @@ function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubm
   )
 }
 
-function Palette({ rows, onPick, onClose }: { rows: Row[]; onPick: (key: string) => void; onClose: () => void }) {
+function Palette({ rows, onPick, onClose, placeholder }: { rows: Row[]; onPick: (key: string) => void; onClose: () => void; placeholder?: string }) {
   const [q, setQ] = useState('')
   const [at, setAt] = useState(0)
   const field = useRef<HTMLInputElement>(null)
@@ -2021,7 +2189,7 @@ function Palette({ rows, onPick, onClose }: { rows: Row[]; onPick: (key: string)
         <input
           ref={field}
           value={q}
-          placeholder={s('gotoPlaceholder')}
+          placeholder={placeholder ?? s('gotoPlaceholder')}
           onInput={(e) => (setQ((e.target as HTMLInputElement).value), setAt(0))}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') (e.preventDefault(), setAt(Math.min(hits.length - 1, at + 1)))

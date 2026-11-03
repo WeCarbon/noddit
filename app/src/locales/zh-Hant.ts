@@ -361,4 +361,13 @@ export const zhHant: Strings = {
   keyQuick: '派給 AI',
   selectedCount: '已選 {{count}} 項',
   keyExtend: '連著多選（也可 ⌘ 點擊、⇧ 點擊、拖框）',
+  unimportant: '取消重要',
+  deferEveryEach: '各延後自己的 R 天',
+  ctxMoveTo: '移到父節點…',
+  moveToPlaceholder: '新的父節點：輸入編號或標題裡的字',
+  movedUnder: '已移到 {{ref}} 下面',
+  ctxCopyRefs: '複製編號（{{count}} 個）',
+  batchDone: '{{what}} · {{count}} 項',
+  batchFailed: '{{refs}} 沒儲存，其餘的都好了',
+  batchHint: '在選取的列上右鍵也是這些操作 · Esc 取消選取',
 }

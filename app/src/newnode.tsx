@@ -153,7 +153,7 @@ export function NewNode(p: {
 /** 「等」 is a few words — the limit `nod defer --on` holds to, in display columns (CJK counts two). */
 const WAIT_ON_MAX_COLS = 30
 
-export function DelayDialog(p: { node: import('./types.ts').Node; busy: boolean; onClose: () => void; onDelay: (on: string | null, date: string | null, passive: boolean) => void }) {
+export function DelayDialog(p: { node: import('./types.ts').Node; subject?: string; busy: boolean; onClose: () => void; onDelay: (on: string | null, date: string | null, passive: boolean) => void }) {
   const waiting = p.node.status === 'waiting'
   const [on, setOn] = useState(waiting ? (p.node.waiting_on ?? '') : '')
   const [text, setText] = useState('')
@@ -168,9 +168,7 @@ export function DelayDialog(p: { node: import('./types.ts').Node; busy: boolean;
     <div class="overlay" onClick={p.onClose}>
       <div class="confirm hold-dialog" role="dialog" onClick={(e) => e.stopPropagation()}>
         <h3>{s('deferTitle')}</h3>
-        <p class="d">
-          {p.node.ref} {p.node.title}
-        </p>
+        <p class="d">{p.subject ?? `${p.node.ref} ${p.node.title}`}</p>
         <DateField value={text} onText={setText} onChange={setDate} onEnter={go} onEscape={p.onClose} autoFocus placeholder={s('deferPlaceholder')} />
         <input
           class="hold-on"

@@ -125,6 +125,9 @@ export const start = (root: string, id: number) => ok(['start', String(id), '--d
 
 export const done = (root: string, id: number) => ok(['done', String(id), '--dir', root])
 
+/** `nod move`: under another node of the same project, with its subtree. */
+export const move = (root: string, id: number, parent: number) => ok(['move', String(id), '--parent', String(parent), '--dir', root])
+
 /** Empty goes back to the folder name. */
 export const renameProject = (root: string, name: string) => ok(['config', 'name', ...(name ? [name] : ['--off']), '--dir', root])
 

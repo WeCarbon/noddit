@@ -1311,6 +1311,19 @@ svg.lucide.ico {
   margin: 0;
 }
 
+.placeholder.batch {
+  gap: 10px;
+  padding: 0 24px;
+}
+
+.batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 420px;
+}
+
 /* ---------- overlays ---------- */
 
 .overlay {
