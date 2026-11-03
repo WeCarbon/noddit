@@ -397,9 +397,9 @@ Les identifiants s’écrivent `305`, `W305` (lettre du projet), `web:305`
 | `Ctrl-L` | aller à l’agent principal multi-projets, ou en démarrer un s’il est hors ligne |
 | `N` | répondre sans décider (le nœud retourne à l’agent) |
 | `d` | reporter / reprendre |
-| `@` | change qui s’en charge : votre tâche ↔ celle d’une IA |
-| `m` | change si ce nœud est un jalon |
-| `Space` | marque / démarque une ligne ; avec plusieurs marquées, `d D s @ ! A` agissent sur toutes |
+| `@` | changer qui s’en charge : votre tâche ↔ celle d’une IA |
+| `m` | changer si ce nœud est un jalon |
+| `Space` | marquer / démarquer une ligne ; avec une ou plusieurs marquées, `d D s @ ! A` agissent sur toutes |
 | `X` · `A` | fermer avec un motif · marquer comme vu et archiver |
 | `M` | mode déplacement : ↑/↓ déplace le nœud parmi ses frères (ou son groupe dans une liste), ⏎ pour finir ; dans l’app, on glisse |
 | `i` · `o` | choisir et voir des images · ouvrir une pièce jointe |
