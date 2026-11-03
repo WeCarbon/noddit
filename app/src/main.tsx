@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { Bench, type Prefs } from './bench.tsx'
 import { coalesce } from './coalesce.ts'
+import { snapshotWriter } from './snapshot.ts'
 import { ResizeEdges } from './resize.tsx'
 import { Onboarding, envReady } from './onboarding.tsx'
 import { Banner } from './banner.tsx'
@@ -25,6 +26,13 @@ document.documentElement.dataset.platform = params.get('platform') ?? (/Mac/.tes
 const DEFAULT_PREFS: Prefs = { view: 'available', selected: null, folds: { nodes: {}, groups: {} }, onboarded: false }
 
 type Phase = { kind: 'boot' } | { kind: 'onboarding'; startAt?: 'welcome' | 'check' | 'add' } | { kind: 'bench' }
+
+const SNAPSHOT_EVERY_MS = 5 * 60_000
+const snapshots = snapshotWriter((json) => api.snapshotSave(json), SNAPSHOT_EVERY_MS)
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && snapshots.flush())
+  window.addEventListener('beforeunload', () => snapshots.flush())
+}
 
 function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }) {
   const [prefs, setPrefsState] = useState<Prefs>(prefs0)
@@ -60,7 +68,7 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
         const next = await readBench(api.loadBench)
         setLanguage(next.bench.lang, next.bench.rtl)
         setRead((shown) => newer(shown, next))
-        void api.snapshotSave(JSON.stringify(next.bench))
+        snapshots.offer(JSON.stringify(next.bench))
       } catch {
         /* keep what is on screen; the next event retries */
       }
