@@ -2,7 +2,7 @@ import { HUMAN, isHumanTask } from '../core/assignee.ts'
 import { briefTitle } from '../core/intake.ts'
 import { isListening } from '../core/listeners.ts'
 import type { Layout } from '../core/paths.ts'
-import { agentArg, describeStart, startSession } from '../cli/commands/session.ts'
+import { agentArg, describeGoto, describeStart, gotoSession, startSession } from '../cli/commands/session.ts'
 import { spawn } from 'node:child_process'
 import { existsSync, watch, type FSWatcher } from 'node:fs'
 import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -1177,6 +1177,16 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       const layout = current ? store.layoutOf(current) : store.primary
       setBriefAt({ parent, layout, kind: 'brief' })
       return startText('brief')
+    }
+
+    if (input === 'l' || input === 'L') {
+      const layout = current ? store.layoutOf(current) : store.primary
+      try {
+        say(describeGoto(gotoSession(layout), store.projectName(layout)))
+      } catch (e) {
+        say((e as Error).message)
+      }
+      return
     }
 
     if (!current) return
