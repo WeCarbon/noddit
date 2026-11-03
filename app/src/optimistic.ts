@@ -122,3 +122,45 @@ export function keepHeld(rows: Row[], held: Held | null, where: string, b: Bench
   const at = below >= 0 ? below : above >= 0 ? above + 1 : Math.min(held.index, rows.length)
   return [...rows.slice(0, at), row, ...rows.slice(at)]
 }
+
+/** `rows` with every held row back in its place, the earliest first so each finds its neighbours. */
+export const keepAllHeld = (rows: Row[], held: Held[], where: string, b: Bench): Row[] =>
+  [...held].sort((x, y) => x.index - y.index).reduce((acc, h) => keepHeld(acc, h, where, b), rows)
+
+/** One node's share of a batch action: what it shows at once, and the write behind it. */
+export interface BatchItem {
+  ref: string
+  patch: (b: Bench) => Bench
+  write: () => Promise<unknown>
+}
+
+/**
+ * Shows every item's patch at once, then writes them `limit` at a time. A write that
+ * finishes stamps its own patch; one that fails drops only its own (the rollback).
+ * Resolves to the items that failed, with why.
+ */
+export async function runBatch(
+  items: BatchItem[],
+  update: (fn: (ops: PendingOp[]) => PendingOp[]) => void,
+  firstId: number,
+  limit = 3,
+): Promise<{ ref: string; error: Error }[]> {
+  const ids = items.map((_, i) => firstId + i)
+  update((ops) => [...ops, ...items.map((item, i) => ({ id: ids[i], patch: item.patch }))])
+  const failed: { at: number; ref: string; error: Error }[] = []
+  let next = 0
+  const lane = async () => {
+    while (next < items.length) {
+      const at = next++
+      try {
+        await items[at].write()
+        update((ops) => ops.map((op) => (op.id === ids[at] ? { ...op, doneAt: nextStamp() } : op)))
+      } catch (e) {
+        update((ops) => ops.filter((op) => op.id !== ids[at]))
+        failed.push({ at, ref: items[at].ref, error: e instanceof Error ? e : new Error(String(e)) })
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, lane))
+  return failed.sort((a, b) => a.at - b.at).map(({ ref, error }) => ({ ref, error }))
+}

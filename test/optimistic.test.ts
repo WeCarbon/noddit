@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { applyOps, both, dropRows, heldAt, keepHeld, newer, nextStamp, patchNode, patchRows, pendingOver, readBench, type Held, type PendingOp, type Read } from '../app/src/optimistic.ts'
+import { applyOps, both, dropRows, heldAt, keepAllHeld, keepHeld, newer, nextStamp, patchNode, patchRows, pendingOver, readBench, runBatch, type Held, type PendingOp, type Read } from '../app/src/optimistic.ts'
 import type { Bench, Row } from '../app/src/types.ts'
 
 const benchWith = (status: Record<string, string>): Bench =>
@@ -169,4 +169,68 @@ test('a held row comes back only in its own list, never twice, and before the ro
   assert.deepEqual(keys(keepHeld(b.views[0].rows, held, '|decide', b)), ['r:c'], 'another list')
   assert.deepEqual(keys(keepHeld(b.views[0].rows, held, '|available', b)), ['r:b', 'r:c'], 'the row above went too')
   assert.deepEqual(keys(keepHeld([row('a'), row('b'), row('c')], held, '|available', b)), ['r:a', 'r:b', 'r:c'], 'still listed: not added again')
+})
+
+test('runBatch: every patch shows at once; a failed write rolls back only its own node and is reported', async () => {
+  const first = benchWith({ 'web#1': 'not_started', 'web#2': 'not_started', 'web#3': 'not_started' })
+  let ops: PendingOp[] = []
+  const update = (fn: (o: PendingOp[]) => PendingOp[]) => void (ops = fn(ops))
+  const gates = [deferred<void>(), deferred<void>(), deferred<void>()]
+  const keys = ['web#1', 'web#2', 'web#3']
+  const items = keys.map((key, i) => ({
+    ref: `W${i + 1}`,
+    patch: answered(key),
+    write: async () => {
+      await gates[i].promise
+      if (i === 1) throw new Error('locked by another writer\nmore detail')
+    },
+  }))
+  const done = runBatch(items, update, 100)
+
+  const shown = (at = 0) => keys.map((k) => applyOps(first, ops, at).nodes[k].status)
+  assert.deepEqual(shown(), ['decided', 'decided', 'decided'], 'all three show before any write returns')
+
+  for (const g of gates) g.resolve()
+  const failed = await done
+
+  assert.deepEqual(failed.map((f) => f.ref), ['W2'])
+  assert.match(failed[0].error.message, /^locked by another writer/)
+  assert.deepEqual(ops.map((o) => o.id), [100, 102], 'only the failed node’s patch is gone')
+  assert.ok(ops.every((o) => o.doneAt !== undefined), 'the others are stamped done')
+  assert.deepEqual(shown(), ['decided', 'not_started', 'decided'])
+  assert.deepEqual(shown(nextStamp()), ['not_started', 'not_started', 'not_started'], 'a read begun after the writes stands on its own')
+})
+
+test('runBatch: at most `limit` writes in flight at once, and every one runs', async () => {
+  let inFlight = 0
+  let peak = 0
+  const ran: string[] = []
+  const items = Array.from({ length: 7 }, (_, i) => ({
+    ref: `W${i}`,
+    patch: (b: Bench) => b,
+    write: async () => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise((r) => setTimeout(r, 5))
+      ran.push(`W${i}`)
+      inFlight--
+    },
+  }))
+  let ops: PendingOp[] = []
+  const failed = await runBatch(items, (fn) => void (ops = fn(ops)), 1, 3)
+  assert.deepEqual(failed, [])
+  assert.equal(peak, 3)
+  assert.equal(ran.length, 7)
+  assert.equal(ops.length, 7)
+})
+
+test('keepAllHeld: a batch’s rows that left the list all come back in their places, next to each other too', () => {
+  const row = (key: string) => ({ key, kind: 'node', node: key, depth: 0 }) as Row
+  const before = ['a', 'b', 'c', 'd', 'e'].map(row)
+  const held = [heldAt(before, 2, '|x'), heldAt(before, 1, '|x'), heldAt(before, 4, '|x')]
+  const empty = { nodes: {}, views: [] } as unknown as Bench
+  const back = keepAllHeld([row('a'), row('d')], held, '|x', empty)
+  assert.deepEqual(back.map((r) => r.key), ['a', 'b', 'c', 'd', 'e'])
+  assert.ok(back.filter((r) => ['b', 'c', 'e'].includes(r.key)).every((r) => r.context), 'held rows show dimmed')
+  assert.deepEqual(keepAllHeld([row('a'), row('d')], held, '|other', empty).map((r) => r.key), ['a', 'd'], 'only in the list they were held in')
 })
