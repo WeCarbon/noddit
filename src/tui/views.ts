@@ -950,9 +950,10 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
   const forms: Segment[][] = []
   const fold: Segment[] = row?.collapsed ? [{ text: `+${countBelow(d, items)} `, dim: true }] : []
   if (row?.touch) {
+    // What happened · how long ago, nothing more — the glyph already shows the current state,
+    // including when it now differs from what happened (e.g. a note landed, then it was closed).
     const when = ago(minutesSince({ updatedAt: row.touch.at, created: d.created }, now))
     const what = touchLabel(row.touch)
-    forms.push([{ text: `${what} · ${when}`, color: 'blue' }, { text: ` · ${statusLabel(d.state)}`, dim: true }])
     forms.push([{ text: `${what} · ${when}`, color: 'blue' }])
     return forms
   }
