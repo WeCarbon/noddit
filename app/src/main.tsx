@@ -5,6 +5,7 @@ import { Bench, type Prefs } from './bench.tsx'
 import { ResizeEdges } from './resize.tsx'
 import { Onboarding, envReady } from './onboarding.tsx'
 import { Banner } from './banner.tsx'
+import { newer, readBench, type Read } from './optimistic.ts'
 import { s, setLanguage, whenLanguageSet } from './strings.ts'
 import type { Bench as BenchData, ShellEnv } from './types.ts'
 import './style.css'
@@ -25,7 +26,8 @@ type Phase = { kind: 'boot' } | { kind: 'onboarding'; startAt?: 'welcome' | 'che
 
 function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }) {
   const [prefs, setPrefsState] = useState<Prefs>(prefs0)
-  const [bench, setBench] = useState<BenchData | null>(snapshot)
+  const [read, setRead] = useState<Read | null>(snapshot && { bench: snapshot, startedAt: 0 })
+  const bench = read?.bench ?? null
   const [env, setEnv] = useState<ShellEnv | null>(null)
   const [phase, setPhase] = useState<Phase>(snapshot && prefs0.onboarded ? { kind: 'bench' } : { kind: 'boot' })
   const [adding, setAdding] = useState(false)
@@ -51,10 +53,10 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
       do {
         again.current = false
         try {
-          const next = await api.loadBench()
-          setLanguage(next.lang, next.rtl)
-          setBench(next)
-          void api.snapshotSave(JSON.stringify(next))
+          const next = await readBench(api.loadBench)
+          setLanguage(next.bench.lang, next.bench.rtl)
+          setRead((shown) => newer(shown, next))
+          void api.snapshotSave(JSON.stringify(next.bench))
         } catch {
           /* keep what is on screen; the next event retries */
         }
@@ -115,8 +117,8 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
         onCancel={adding ? () => setAdding(false) : undefined}
       />
     )
-  if (phase.kind === 'bench' && bench)
-    return <Bench bench={bench} prefs={prefs} setPrefs={setPrefs} refresh={refresh} refreshing={refreshing} onAddProject={() => setAdding(true)} onNoProjects={() => setPhase({ kind: 'onboarding', startAt: 'add' })} />
+  if (phase.kind === 'bench' && read)
+    return <Bench bench={read.bench} readAt={read.startedAt} prefs={prefs} setPrefs={setPrefs} refresh={refresh} refreshing={refreshing} onAddProject={() => setAdding(true)} onNoProjects={() => setPhase({ kind: 'onboarding', startAt: 'add' })} />
   return <div class="boot" data-tauri-drag-region />
 }
 

@@ -25,7 +25,7 @@ import { useDialogFocus } from './focus.ts'
 import { useLiveMotion } from './motion.ts'
 import { NoticeStack, noticeWhat, useNoticeQueue, type Notice } from './notices.tsx'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
-import { applyOps, both, dropRows, moveRow, patchNode, patchRows, type PendingOp } from './optimistic.ts'
+import { applyOps, both, dropRows, moveRow, nextStamp, patchNode, patchRows, pendingOver, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
 import type { Attachment, Bench as BenchData, Node, PreviousRound, Project, Row, View, ViewName } from './types.ts'
@@ -75,6 +75,8 @@ const isTyping = (e: KeyboardEvent) => {
 
 export function Bench(props: {
   bench: BenchData
+  /** When the read that produced `bench` began (`nextStamp()`). */
+  readAt: number
   prefs: Prefs
   setPrefs: (p: Partial<Prefs>) => void
   refresh: () => Promise<void>
@@ -85,10 +87,16 @@ export function Bench(props: {
   const { prefs, setPrefs, refresh } = props
   // Actions show at once; the CLI catches up behind them (see optimistic.ts).
   const [ops, setOps] = useState<PendingOp[]>([])
-  const [loadedAt, setLoadedAt] = useState(() => Date.now())
-  useEffect(() => setLoadedAt(Date.now()), [props.bench])
-  useEffect(() => setOps((o) => (o.some((x) => x.doneAt && x.doneAt <= loadedAt) ? o.filter((x) => !x.doneAt || x.doneAt > loadedAt) : o)), [loadedAt])
-  const bench = useMemo(() => applyOps(props.bench, ops, loadedAt), [props.bench, ops, loadedAt])
+  const { readAt } = props
+  useEffect(
+    () =>
+      setOps((o) => {
+        const left = pendingOver(o, readAt)
+        return left.length === o.length ? o : left
+      }),
+    [readAt],
+  )
+  const bench = useMemo(() => applyOps(props.bench, ops, readAt), [props.bench, ops, readAt])
   // The sidebar picks one thing to show: a view across every project, or one project's
   // whole tree (live work, finished folded) — never the two combined. A project that is
   // gone (unlinked) falls back to the view.
@@ -266,7 +274,7 @@ export function Bench(props: {
     showToast(done)
     fn().then(
       () => {
-        setOps((o) => o.map((x) => (x.id === id ? { ...x, doneAt: Date.now() } : x)))
+        setOps((o) => o.map((x) => (x.id === id ? { ...x, doneAt: nextStamp() } : x)))
         void refresh()
       },
       (e: Error) => {

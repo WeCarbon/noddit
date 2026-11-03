@@ -2,19 +2,40 @@ import type { Bench, Node, Row, ViewName } from './types.ts'
 
 /**
  * An action shown before the CLI has done it. Its patch is laid over every bench that
- * arrives until the write has finished and a bench read after it has come in — so a
- * refresh landing mid-flight never flickers the old state back. A failed write drops
+ * arrives until the write has finished and a bench whose read began after it has come in —
+ * so a refresh landing mid-flight never flickers the old state back. A failed write drops
  * its patch, which is the rollback.
  */
 export interface PendingOp {
   id: number
   patch: (b: Bench) => Bench
-  /** When the CLI call returned; a bench loaded after this already shows the result. */
+  /** `nextStamp()` when the CLI call returned; a read begun after this shows the result. */
   doneAt?: number
 }
 
-export function applyOps(b: Bench, ops: PendingOp[], loadedAt: number): Bench {
-  return ops.filter((op) => !op.doneAt || op.doneAt > loadedAt).reduce((acc, op) => op.patch(acc), b)
+/** A bench and the `nextStamp()` its read began at: it shows every write finished before then. */
+export interface Read {
+  bench: Bench
+  startedAt: number
+}
+
+let stamps = 0
+/** Strictly increasing, so a write's end and a read's start never tie. */
+export const nextStamp = (): number => ++stamps
+
+export async function readBench(load: () => Promise<Bench>): Promise<Read> {
+  const startedAt = nextStamp()
+  return { bench: await load(), startedAt }
+}
+
+/** The read to show: a slower, older one arriving late never replaces a newer one. */
+export const newer = (shown: Read | null, next: Read): Read => (!shown || next.startedAt > shown.startedAt ? next : shown)
+
+/** The ops a bench read at `startedAt` doesn't show yet. */
+export const pendingOver = (ops: PendingOp[], startedAt: number): PendingOp[] => ops.filter((op) => !op.doneAt || op.doneAt > startedAt)
+
+export function applyOps(b: Bench, ops: PendingOp[], startedAt: number): Bench {
+  return pendingOver(ops, startedAt).reduce((acc, op) => op.patch(acc), b)
 }
 
 /** The node at `key`, changed by `fn`, wherever it is listed. */
