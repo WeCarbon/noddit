@@ -46,3 +46,26 @@ test('App: s on a node still needing a decision refuses, same as nod start', asy
   await b.until(has(b, /still waiting on the owner.s decision, can.t start/))
   assert.equal(store.get(asking.id)!.state, 'needs_decision')
 })
+
+test('App: @ flips who does it — a to-do for you hands to an AI as a reply (queued); an AI’s own node becomes your to-do', async (t) => {
+  const store = tmpStore(t)
+  const todo = store.create({ title: 'call the vendor', author: A, task: true, assignee: 'human' })
+  const aiTask = store.create({ title: 'run the gate', author: A, task: true })
+  const b = bench(t, store, { view: 'all' })
+  await b.until(has(b, /call the vendor/))
+
+  await b.press('g', ...`${todo.id}`.split(''), '\r')
+  await b.until(has(b, /call the vendor/))
+  await b.press('@')
+  await b.until(has(b, /X\d+ is an AI.s now/))
+  const handed = store.get(todo.id)!
+  assert.equal(handed.assignee, undefined)
+  assert.equal(handed.queued, true)
+  assert.match(handed.body, /交给 AI 了/, 'the note body is file-format content, always written in Chinese')
+
+  await b.press('g', ...`${aiTask.id}`.split(''), '\r')
+  await b.until(has(b, /run the gate/))
+  await b.press('@')
+  await b.until(has(b, /X\d+ is yours now/))
+  assert.equal(store.get(aiTask.id)!.assignee, 'human')
+})

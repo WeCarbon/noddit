@@ -1,4 +1,4 @@
-import { HUMAN } from '../core/assignee.ts'
+import { HUMAN, isHumanTask } from '../core/assignee.ts'
 import { briefTitle } from '../core/intake.ts'
 import { isListening } from '../core/listeners.ts'
 import type { Layout } from '../core/paths.ts'
@@ -501,6 +501,21 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     try {
       const started = store.start(current, {})
       say(t('bench.toast.started', { ref: refOf(started) }))
+    } catch (e) {
+      return say((e as Error).message)
+    }
+    reload()
+  }
+
+  /** `@`: flips who does it. Handing the owner's own to-do to an AI is a request (same
+   *  path `nod assign <id> ai` from the owner takes); taking an AI's node for yourself
+   *  is a plain reassignment — bench always answers as the owner, so there is no `--force` gate. */
+  const reassign = () => {
+    if (!current) return
+    try {
+      const toAi = isHumanTask(current)
+      const next = toAi ? store.handToAi(current, { by: 'owner' }) : store.assign(current, HUMAN)
+      say(t(toAi ? 'bench.toast.assignedAi' : 'bench.toast.assignedMe', { ref: refOf(next) }))
     } catch (e) {
       return say((e as Error).message)
     }
@@ -1136,6 +1151,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     if (input === 'd') return toggleDefer()
     if (input === 'D') return delayEvery()
     if (input === 's' || input === 'S') return startNode()
+    if (input === '@') return reassign()
     if (input === 'H') {
       const idx = firstHtmlAttachmentIndex(current)
       if (idx === -1) return say(t('bench.toast.noHtmlAttachment'))
