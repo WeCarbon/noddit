@@ -1,10 +1,13 @@
 import { HUMAN, isHumanTask } from '../core/assignee.ts'
 import { briefTitle } from '../core/intake.ts'
 import { isListening } from '../core/listeners.ts'
-import type { Layout } from '../core/paths.ts'
+import { layoutFor, type Layout } from '../core/paths.ts'
+import { addProject, removeProject } from '../core/config.ts'
+import { DEFAULT_LETTER, readProjectConfig, writeProjectConfig } from '../core/project.ts'
 import { agentArg, describeGoto, describeStart, gotoSession, startSession } from '../cli/commands/session.ts'
 import { spawn } from 'node:child_process'
 import { existsSync, watch, type FSWatcher } from 'node:fs'
+import { resolve as resolvePath } from 'node:path'
 import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, useApp, useInput, useStdout } from 'ink'
 import { targetPath } from '../cli/commands/open.ts'
@@ -93,9 +96,11 @@ export function repaintRows(frame: Line[], from: number, to: number): string {
 const MIN_PANEL_COLS = 12
 
 type Line = Segment[]
-export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother' | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project'
+export type Mode =
+  | 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother'
+  | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project' | 'projects' | 'projectName' | 'projectAdd'
 /** Modes where keystrokes go into the prompt-line draft. */
-const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay']
+const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay', 'projectName', 'projectAdd']
 
 /** What `p` / `P` files: a brief for an AI to expand and confirm, a to-do for the owner, or a
  *  task an AI can just do — ⇥ cycles through them in this order. */
@@ -483,6 +488,56 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     setMode('browse')
     setDraft('')
     reload()
+  }
+
+  /** `;`, on a project row: another registered project already showing `letter`, by its display name. */
+  const otherLetterOwner = (letter: string, exclude: Layout): string | undefined => {
+    const other = store.layouts.find((l) => l !== exclude && readProjectConfig(l).letter === letter)
+    return other ? store.displayName(other) : undefined
+  }
+
+  /** `;`, ←/→ on a project row: the next/previous A-Z letter, refused (not applied) on a clash. */
+  const cycleProjectLetter = (delta: 1 | -1) => {
+    const layout = store.layouts[projectIndex]
+    if (!layout) return
+    const current = readProjectConfig(layout).letter ?? DEFAULT_LETTER
+    const at = Math.max(0, current.charCodeAt(0) - 65)
+    const next = String.fromCharCode(65 + ((at + delta + 26) % 26))
+    const clash = otherLetterOwner(next, layout)
+    if (clash) return say(t('bench.toast.letterTaken', { letter: next, project: clash }))
+    writeProjectConfig(layout, { letter: next })
+    say(t('bench.toast.letterSet', { letter: next, project: store.displayName(layout) }))
+  }
+
+  /** `;`, u on a project row: drops it from the registry; its decisions/ folder is untouched —
+   *  the same message `nod projects unlink` prints. */
+  const unlinkProject = () => {
+    const layout = store.layouts[projectIndex]
+    if (!layout) return
+    removeProject(layout.projectRoot)
+    say(t('cli.projects.removedKeep', { name: store.displayName(layout), root: layout.projectRoot }))
+  }
+
+  const commitProjectName = () => {
+    const layout = store.layouts[projectIndex]
+    const name = draft.trim()
+    setDraft('')
+    setMode('projects')
+    if (!layout || !name) return
+    writeProjectConfig(layout, { name })
+    say(t('bench.toast.projectRenamed', { project: name }))
+  }
+
+  const commitProjectAdd = () => {
+    const path = draft.trim()
+    setDraft('')
+    setMode('projects')
+    if (!path) return
+    const root = resolvePath(path)
+    // Same checks and wording as `nod projects add`.
+    if (!existsSync(layoutFor(root).activeDir)) return say(t('cli.projects.noDecisions', { root }))
+    addProject(root)
+    say(t('cli.projects.added', { root }))
   }
 
   /** 延迟 (`d`): already delayed, it is lifted; otherwise a prompt asks until when, and on what. */
@@ -913,7 +968,12 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     briefTarget: briefAt ? (briefAt.parent ? refOf(briefAt.parent) : store.projectName(briefAt.layout)) : undefined,
     briefKind: briefAt?.kind,
     sessionProject: sessionFor?.project,
-    projects: mode === 'project' ? store.layouts.map((l) => ({ letter: store.letterOf(l), name: store.displayName(l) })) : undefined,
+    // `readProjectConfig` straight from disk, not `store.letterOf` — that caches a letter for the
+    // Store's whole lifetime, which would still show the old one right after this dialog writes a new one.
+    projects:
+      mode === 'project' || mode === 'projects' || mode === 'projectName' || mode === 'projectAdd'
+        ? store.layouts.map((l) => ({ letter: readProjectConfig(l).letter ?? DEFAULT_LETTER, name: store.displayName(l) }))
+        : undefined,
     projectIndex,
   }
   const geom = useMemo(
@@ -1011,6 +1071,23 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       return
     }
 
+    if (mode === 'projects') {
+      const last = store.layouts.length // the trailing "+ add project" row
+      if (input === ';' || key.escape) return setMode('browse')
+      if (key.upArrow) return setProjectIndex((i) => Math.max(0, i - 1))
+      if (key.downArrow) return setProjectIndex((i) => Math.min(last, i + 1))
+      if (key.return) {
+        if (projectIndex === last) return startText('projectAdd')
+        const layout = store.layouts[projectIndex]
+        return layout ? startText('projectName', store.displayName(layout)) : undefined
+      }
+      if (projectIndex === last) return // letter cycling and unlink only apply to a real project row
+      if (key.leftArrow) return cycleProjectLetter(-1)
+      if (key.rightArrow) return cycleProjectLetter(1)
+      if (input === 'u') return unlinkProject()
+      return
+    }
+
     if (mode === 'move') {
       if (key.escape || key.return || input === 'M') {
         setMode('browse')
@@ -1032,6 +1109,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         setBriefAt(null)
         if (mode === 'qnote' || mode === 'qother') return setMode('questions')
         if (mode === 'confirm' && current?.questions?.length && pendingKey === '2') return setMode('questions')
+        if (mode === 'projectName' || mode === 'projectAdd') return setMode('projects')
         setMode('browse')
         setPendingKey(null)
         return
@@ -1045,6 +1123,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         if (mode === 'delay') return commitDelay()
         if (mode === 'brief') return commitBrief()
         if (mode === 'retitle') return commitRetitle()
+        if (mode === 'projectName') return commitProjectName()
+        if (mode === 'projectAdd') return commitProjectAdd()
         return commitGoto()
       }
       // The add prompt: ⇥ switches between a brief for an AI and a to-do for the owner.
@@ -1204,6 +1284,11 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         say((e as Error).message)
       }
       return
+    }
+
+    if (input === ';') {
+      setProjectIndex(current ? store.layouts.indexOf(store.layoutOf(current)) : 0)
+      return setMode('projects')
     }
 
     if (!current) return
@@ -2101,6 +2186,8 @@ function promptPrefix(s: FrameInput): Line | null {
     const key = s.briefKind === 'todo' ? 'bench.prompt.todo' : s.briefKind === 'task' ? 'bench.prompt.task' : 'bench.prompt.brief'
     return [{ text: t(key, { target: s.briefTarget ?? '' }), color: 'blue', bold: true }]
   }
+  if (s.mode === 'projectName') return [{ text: t('bench.prompt.projectName', { project: (s.projects ?? [])[s.projectIndex ?? -1]?.name ?? '' }), color: 'blue', bold: true }]
+  if (s.mode === 'projectAdd') return [{ text: t('bench.prompt.projectAdd'), color: 'blue', bold: true }]
   if (!d) return null
   if (s.mode === 'confirm') {
     const qs = d.questions ?? []
@@ -2172,6 +2259,8 @@ const PLACEHOLDER: Partial<Record<Mode, () => string>> = {
   brief: () => t('bench.placeholder.brief'),
   retitle: () => t('bench.placeholder.retitle'),
   delay: () => t('bench.placeholder.delay'),
+  projectName: () => t('bench.placeholder.projectName'),
+  projectAdd: () => t('bench.placeholder.projectAdd'),
 }
 
 function promptLine(s: FrameInput): Line {
@@ -2199,6 +2288,16 @@ function promptLine(s: FrameInput): Line {
       ]
     })
     return [{ text: t('bench.prompt.project'), color: 'blue', bold: true }, ...entries, { text: t('bench.prompt.projectHint'), dim: true }]
+  }
+  if (s.mode === 'projects') {
+    const rows = s.projects ?? []
+    const entries = rows.flatMap((p, i): Segment[] => {
+      const selected = i === s.projectIndex
+      return [{ text: '  ' }, { text: `${p.letter}·${p.name}`, inverse: selected, bold: selected }]
+    })
+    const addSelected = s.projectIndex === rows.length
+    entries.push({ text: '  ' }, { text: t('bench.prompt.projectAddRow'), inverse: addSelected, bold: addSelected, color: addSelected ? undefined : 'green' })
+    return [{ text: t('bench.prompt.projects'), color: 'blue', bold: true }, ...entries, { text: t('bench.prompt.projectsHint'), dim: true }]
   }
   if (s.mode === 'browse' && s.detailFocus) {
     return [{ text: t('bench.prompt.imagePicker'), color: 'cyan', bold: true }]
