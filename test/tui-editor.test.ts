@@ -86,10 +86,12 @@ test("App: e opens the owner's own latest reply; there must be one, or it says s
   await b2.press('e')
   await b2.until(has(b2, /edited/))
   const after = store.get(d.id)!
-  // store.edit replaces the note's text in place and appends its own "edited note N." audit
-  // entry after it — the edited note stays at its original position, not at the end.
+  // store.edit replaces the note's text in place and appends its own audit entry after it —
+  // the edited note stays at its original position, not at the end; its own wording is
+  // core/store.ts's concern, not this test's.
   assert.equal(after.notes[0].text, 'the corrected reply text')
-  assert.match(after.notes.at(-1)!.text, /edited|改了第/)
+  assert.equal(after.notes.length, 2, 'the audit entry landed as a note of its own')
+  assert.notEqual(after.notes[1].text, 'the corrected reply text')
 })
 
 test('App: a file the editor left unchanged is never written', async (t) => {
