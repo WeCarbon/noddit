@@ -29,7 +29,8 @@ export const OPTIONS_HEADING_RE = /^##[ \t]+(?:选项|各选项|选项与代价|
 const OPTION_RE = /^###[ \t]+([A-Za-z0-9]{1,4})[ \t]*(?:[·:：．.\-—–]{1,2}[ \t]*(.*))?$/
 const H2_RE = /^##[ \t]+\S/
 export const ATTACHMENTS_HEADING_RE = /^##[ \t]+(附件|Attachments)[ \t　]*[:：]?[ \t]*$/
-export const ATTACHMENT_RE = /^[-*][ \t]+(!)?\[([^\]]*)\]\(([^)]+)\)/
+// The target may hold balanced parentheses — a file named `shot (1).png` is common.
+export const ATTACHMENT_RE = /^[-*][ \t]+(!)?\[([^\]]*)\]\(((?:[^()]|\([^()]*\))+)\)/
 /** `**选项 1**` on its own line — a group heading over the attachments below it. */
 export const ATTACHMENT_GROUP_RE = /^\*\*([^*]+)\*\*[ \t]*$/
 /** `  *caption text*` right under an attachment line — single `*`, not `**`. */

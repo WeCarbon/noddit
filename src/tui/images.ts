@@ -22,7 +22,7 @@ export interface NodeImage {
   caption?: string
 }
 
-const IMAGE_LINK = /!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g
+const IMAGE_LINK = /!\[([^\]]*)\]\(\s*<?((?:[^()\s>]|\([^()\s]*\))+)>?(?:\s+"[^"]*")?\s*\)/g
 const FENCE = /^\s*```/
 const ANY_H2 = /^##[ \t]+\S/
 

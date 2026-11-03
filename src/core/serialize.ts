@@ -215,7 +215,7 @@ export function noteHeading(kind: string, role: NoteRole, author: string, at: st
  * (`--strip-prefix`).
  */
 export function relinkBody(body: string, fromDir: string, toDir: string, rename: (abs: string) => string = (p) => p): string {
-  return body.replace(/(\]\()([^)\s]+)(\))/g, (_all, open: string, target: string, close: string) =>
+  return body.replace(/(\]\()((?:[^()\s]|\([^()\s]*\))+)(\))/g, (_all, open: string, target: string, close: string) =>
     `${open}${relinkTarget(target, fromDir, toDir, rename)}${close}`,
   )
 }
