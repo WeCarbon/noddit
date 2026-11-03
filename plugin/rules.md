@@ -6,6 +6,9 @@ nod is invisible to them. The commands teach the rest: each one prints its
 next step, and every `nod monitor` line says what to do about it. Unsure
 how? `nod <command> --help`; for the details, load the nod skill.
 
+- **The owner's briefs come first**: `nod briefs` lists work the owner
+  filed (also a `DECS-BRIEF` monitor line) — `nod claim` it and follow
+  what it prints, instead of filing your own node for the same thing.
 - **Record work as nodes before doing it.** A task and a decision are the
   same thing: `nod add --task "<short title>" --author "<you> · <doing
   what>"`, then `nod start <id>`. A lane's node goes under its lead's
