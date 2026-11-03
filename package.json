@@ -1,7 +1,7 @@
 {
   "name": "@wecarbon/noddit",
   "version": "0.1.1",
-  "description": "Noddit — a task & decision hub for long-running AI agents, stored as plain markdown files in your repo",
+  "description": "Noddit — where you and your AI hand work to each other: tasks and decisions as plain markdown files in your repo",
   "license": "MIT",
   "repository": {
     "type": "git",

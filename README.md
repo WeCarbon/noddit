@@ -2,6 +2,8 @@
 
 # Noddit
 
+*Where you and your AI hand work to each other.*
+
 You give an agent a two-hour job — or five agents, one each — and walk away.
 An hour later, three of them have been sitting on a question in chats you
 weren't watching, and you can't tell which one is still working.

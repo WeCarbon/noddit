@@ -2,6 +2,8 @@
 
 # Noddit
 
+*Where you and your AI hand work to each other.*
+
 Vous confiez à un agent une tâche de deux heures — ou à cinq agents, chacun
 la sienne — puis vous passez à autre chose. Une heure plus tard, trois
 d’entre eux attendent une réponse dans des conversations que vous ne

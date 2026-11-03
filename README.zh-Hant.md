@@ -2,6 +2,8 @@
 
 # Noddit
 
+*Where you and your AI hand work to each other.*
+
 你把一件兩小時的工作交給一個 AI 代理——或者五個 AI 代理，各管一塊——然後就不
 管了。一小時後，其中三個卡在一個問題上，等在你沒盯著的對話視窗裡，你連哪個
 還在跑都分不清。
