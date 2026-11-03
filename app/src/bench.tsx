@@ -1058,6 +1058,8 @@ export function Bench(props: {
       <aside class="sidebar" ref={sidebarRef}>
         <div class="drag" data-tauri-drag-region />
         <nav>
+          <MainAgentEntry onToast={showToast} />
+          <div class="nav-sep" />
           <div class="section-label with-tool">
             {s('views')}
             <button class="section-tool" onClick={() => setViewEditor({})} title={s('viewEditorTitle')} aria-label={s('viewEditorTitle')}>
@@ -1084,7 +1086,6 @@ export function Bench(props: {
               )}
             </button>
           ))}
-          <MainAgentEntry onToast={showToast} />
           <div class="section-label">{s('projects')}</div>
           {bench.projects.map((p, i) => (
             <div

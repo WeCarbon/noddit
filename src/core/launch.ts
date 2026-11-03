@@ -94,11 +94,20 @@ export function launchPlan(agent: AgentCli, root: string, env: LaunchEnv, prompt
   const command = `cd ${shQuote(root)} && ${pairs.map(([k, v]) => `${k}=${shQuote(v)} `).join('')}${args.map(shQuote).join(' ')}`
   if (env.platform === 'darwin') {
     if (env.has('iTerm.app')) {
+      // A new tab in the window already open; a cold start uses the window iTerm2 opens itself.
       const script = [
+        'set wasRunning to (application "iTerm" is running)',
         'tell application "iTerm"',
         '  activate',
-        '  set w to (create window with default profile)',
-        `  tell current session of w to write text ${asQuote(command)}`,
+        '  if wasRunning and (count of windows) > 0 then',
+        '    tell current window to set t to (create tab with default profile)',
+        `    tell current session of t to write text ${asQuote(command)}`,
+        '  else if (count of windows) > 0 then',
+        `    tell current session of current window to write text ${asQuote(command)}`,
+        '  else',
+        '    set w to (create window with default profile)',
+        `    tell current session of w to write text ${asQuote(command)}`,
+        '  end if',
         'end tell',
       ].join('\n')
       return { agent, root, command, terminal: 'iterm', exec: { file: 'osascript', args: ['-e', script] }, script }

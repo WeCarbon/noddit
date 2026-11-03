@@ -231,6 +231,17 @@ export async function startSession(root: string, agent: AgentKind): Promise<Sess
   }
 }
 
+/** Opens the cross-project main session (`nod session start --main`) in a new terminal. */
+export async function startMainSession(): Promise<SessionStart> {
+  if (!inDesktop) return { ok: true, started: true, dry_run: true }
+  const out = await run(['session', 'start', '--main', '--json'])
+  try {
+    return JSON.parse(out.stdout) as SessionStart
+  } catch {
+    throw new DecsError((out.stderr || out.stdout).replace(/^nod [a-z]+: /, '').trim())
+  }
+}
+
 /** Brings the project's main session's terminal window/tab to the front. `false` (never a thrown
  *  error) when it is no longer there — iTerm2/Terminal closed, or nothing was ever recorded. */
 export async function gotoSession(root: string): Promise<boolean> {

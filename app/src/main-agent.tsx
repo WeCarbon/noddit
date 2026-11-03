@@ -26,15 +26,22 @@ export function MainAgentEntry({ onToast }: { onToast: (text: string) => void })
   }, [])
   const online = Boolean(main)
   const terminal = main?.terminal
-  const title = !main ? s('mainAgentOffline') : terminal ? s(gotoSessionLabelKey(terminal.type)) : s('listening', { who: main.author ?? main.harness ?? 'AI' })
+  const title = !main ? s('mainAgentStart') : terminal ? s(gotoSessionLabelKey(terminal.type)) : s('listening', { who: main.author ?? main.harness ?? 'AI' })
+  // Live: bring its terminal forward. Not running: open one — the owner asked for it with this click.
   const go = () => {
-    if (!terminal) return
-    void api.gotoMainSession().then((found) => {
-      if (!found) onToast(s('sessionGone'))
-    })
+    if (main && terminal)
+      return void api.gotoMainSession().then((found) => {
+        if (!found) onToast(s('sessionGone'))
+      })
+    if (main) return
+    onToast(s('mainAgentStarting'))
+    void api.startMainSession().then(
+      () => setTimeout(() => void api.mainSession().then(setMain), 5000),
+      (e: Error) => onToast(e.message.split('\n')[0]),
+    )
   }
   return (
-    <div class={`project main-agent ${online ? '' : 'offline'}`} title={title} onClick={go} aria-disabled={!terminal}>
+    <div class={`project main-agent ${online ? '' : 'offline'}`} title={title} onClick={go} aria-disabled={Boolean(main) && !terminal}>
       <span class={`live-dot ${main === undefined ? 'unknown' : online ? 'on' : 'off'}`} />
       <span class="letter">
         <Bot size={12} strokeWidth={1.75} />

@@ -339,6 +339,8 @@ export const zhHans: Strings = {
   ctxGotoSessionTerminal: '转到终端会话',
   sessionGone: '会话已不在',
   mainAgent: '主智能体',
+  mainAgentStart: '启动主智能体',
+  mainAgentStarting: '正在新终端里启动主智能体…',
   mainAgentOffline: '主智能体不在线——在终端里运行 nod session start --main 启动',
   keyQuick: '派给 AI',
 }

@@ -337,6 +337,8 @@ export const en = {
   ctxGotoSessionTerminal: 'Go to Terminal session',
   sessionGone: 'Session is gone',
   mainAgent: 'Main agent',
+  mainAgentStart: 'Start the main agent',
+  mainAgentStarting: 'Starting the main agent in a new terminal…',
   mainAgentOffline: 'Main agent is offline — start it in a terminal: nod session start --main',
   keyQuick: 'New for an AI',
 }

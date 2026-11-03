@@ -339,6 +339,8 @@ export const ar: Strings = {
   ctxGotoSessionTerminal: 'الانتقال إلى جلسة Terminal',
   sessionGone: 'لم تعد الجلسة موجودة',
   mainAgent: 'الوكيل الرئيسي',
+  mainAgentStart: 'تشغيل الوكيل الرئيسي',
+  mainAgentStarting: 'جارٍ تشغيل الوكيل الرئيسي في طرفية جديدة…',
   mainAgentOffline: 'الوكيل الرئيسي غير متصل — شغّله في طرفية: nod session start --main',
   keyQuick: 'مهمة جديدة لوكيل',
 }

@@ -3090,3 +3090,10 @@ figcaption {
     animation: none;
   }
 }
+
+/* 主智能体 sits alone above the views. */
+.nav-sep {
+  height: 1px;
+  margin: 8px 10px 4px;
+  background: var(--line, rgba(127, 127, 127, 0.18));
+}

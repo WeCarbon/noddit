@@ -340,6 +340,8 @@ export const fr: Strings = {
   ctxGotoSessionTerminal: 'Aller à la session Terminal',
   sessionGone: 'La session n’est plus là',
   mainAgent: 'Agent principal',
+  mainAgentStart: 'Lancer l’agent principal',
+  mainAgentStarting: 'Lancement de l’agent principal dans un nouveau terminal…',
   mainAgentOffline: 'L’agent principal est hors ligne — lancez-le dans un terminal : nod session start --main',
   keyQuick: 'Nouveau pour une IA',
 }
