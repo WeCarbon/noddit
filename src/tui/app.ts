@@ -93,7 +93,7 @@ export function repaintRows(frame: Line[], from: number, to: number): string {
 const MIN_PANEL_COLS = 12
 
 type Line = Segment[]
-export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother' | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay'
+export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother' | 'close' | 'goto' | 'settings' | 'brief' | 'session' | 'retitle' | 'delay' | 'project'
 /** Modes where keystrokes go into the prompt-line draft. */
 const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief', 'retitle', 'delay']
 
@@ -231,6 +231,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const bannerTimer = useRef<NodeJS.Timeout | undefined>(undefined)
   /** The `,` dialog: which row is highlighted. */
   const [settingIndex, setSettingIndex] = useState(0)
+  /** `P` with more than one project open: which row of the project picker is highlighted. */
+  const [projectIndex, setProjectIndex] = useState(0)
   /** Settings live outside React state (config.json / env); bump this to
    *  force geometry/frame to recompute after one changes. */
   const [settingsVersion, setSettingsVersion] = useState(0)
@@ -889,6 +891,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     briefTarget: briefAt ? (briefAt.parent ? refOf(briefAt.parent) : store.projectName(briefAt.layout)) : undefined,
     briefKind: briefAt?.kind,
     sessionProject: sessionFor?.project,
+    projects: mode === 'project' ? store.layouts.map((l) => ({ letter: store.letterOf(l), name: store.displayName(l) })) : undefined,
+    projectIndex,
   }
   const geom = useMemo(
     () => geometry(frameInput),
@@ -967,6 +971,21 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       if (key.downArrow) return setSettingIndex((i) => Math.min(SETTINGS.length - 1, i + 1))
       if (key.leftArrow) return cycleSettingAt(settingIndex, -1)
       if (key.rightArrow || key.return) return cycleSettingAt(settingIndex, 1)
+      return
+    }
+
+    if (mode === 'project') {
+      if (key.escape) return setMode('browse')
+      if (key.upArrow) return setProjectIndex((i) => Math.max(0, i - 1))
+      if (key.downArrow) return setProjectIndex((i) => Math.min(store.layouts.length - 1, i + 1))
+      const pick = (i: number) => {
+        const layout = store.layouts[i]
+        if (!layout) return
+        setBriefAt({ parent: undefined, layout, kind: 'brief' })
+        startText('brief')
+      }
+      if (key.return) return pick(projectIndex)
+      if (/^[1-9]$/.test(input)) return pick(Number(input) - 1)
       return
     }
 
@@ -1144,8 +1163,13 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
 
     if (input === 'p' || input === 'P') {
       // p: under the selected node (when it can still take children); P: at its project's top level.
-      const layout = current ? store.layoutOf(current) : store.primary
       const parent = input === 'p' && current && !current.archived && !isTerminal(current.state) ? current : undefined
+      // Nothing to nest under and more than one project open: ask which one first.
+      if (!parent && store.layouts.length > 1) {
+        setProjectIndex(current ? store.layouts.indexOf(store.layoutOf(current)) : 0)
+        return setMode('project')
+      }
+      const layout = current ? store.layoutOf(current) : store.primary
       setBriefAt({ parent, layout, kind: 'brief' })
       return startText('brief')
     }
@@ -1217,7 +1241,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     [
       list, index, current, view, items, overview, now, backlinks, rows, width, listTop, offset, condensed, mode, draft, caret,
       imageSel, pendingKey, banner, geom, zoom, imgMeta, detailFocus, pickToOpen, qIndex, qPicks, qNotes, settingIndex, settingsVersion,
-      briefAt, sessionFor, textView,
+      briefAt, sessionFor, textView, projectIndex,
     ],
   )
   frameRef.current = frame
@@ -1287,6 +1311,10 @@ export interface FrameInput {
   sessionProject?: string
   /** An attachment read as text (mode 'text'). */
   textView?: { n: number; label: string; lines: string[]; truncated: boolean; top: number } | null
+  /** `project` mode (`P` with more than one project open): every open project, in `store.layouts` order. */
+  projects?: { letter: string; name: string }[]
+  /** `project` mode: which row of `projects` is highlighted. */
+  projectIndex?: number
 }
 
 /** Below this, the full hint line (natural truncation aside) crowds out too
@@ -2139,6 +2167,18 @@ function promptLine(s: FrameInput): Line {
   if (s.mode === 'session') return [{ text: t('bench.prompt.startSession', { project: s.sessionProject ?? '' }), color: 'yellow', bold: true }]
   if (s.mode === 'attach') {
     return [{ text: s.pickToOpen ? t('bench.prompt.attachPickOpen') : t('bench.prompt.attachPickView'), color: 'cyan' }]
+  }
+  if (s.mode === 'project') {
+    const entries = (s.projects ?? []).flatMap((p, i): Segment[] => {
+      const key = String(i + 1)
+      const selected = i === s.projectIndex
+      return [
+        { text: '  ' },
+        { text: key, bold: true, color: 'cyan' },
+        { text: ` ${p.letter}·${p.name}`, inverse: selected, bold: selected },
+      ]
+    })
+    return [{ text: t('bench.prompt.project'), color: 'blue', bold: true }, ...entries, { text: t('bench.prompt.projectHint'), dim: true }]
   }
   if (s.mode === 'browse' && s.detailFocus) {
     return [{ text: t('bench.prompt.imagePicker'), color: 'cyan', bold: true }]
