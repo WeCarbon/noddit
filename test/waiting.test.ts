@@ -55,7 +55,7 @@ test('the tabs are Available Active Human-work Waiting Live All, with counts on 
 
   assert.deepEqual(VIEWS.map((v) => VIEW_LABEL[v]), ['Available', 'Active', 'Human work', 'Waiting', 'Live', 'All'])
   const header = text(buildFrame(input(store, 'available'))[0])
-  assert.match(header, /^decs +Available 4 +Active 2 +Human work 1 +Waiting 2 +Live +All +[○●] Main agent *$/)
+  assert.match(header, /^decs +Available 4 +Active 2 +Human work 1 +Waiting 2 +Live +All +[○●] Main agent +⚡/)
   assert.doesNotMatch(header, /waiting for you|finished|working|timeline/)
   assert.equal(viewFromArg('waiting'), 'waiting')
 })

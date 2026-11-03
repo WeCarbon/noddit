@@ -14,6 +14,7 @@ import { Box, Text, useApp, useInput, useStdin, useStdout } from 'ink'
 import { targetPath } from '../cli/commands/open.ts'
 import { openerFor } from '../core/opener.ts'
 import { buildOverview, type Overview } from '../core/overview.ts'
+import { computeNods, type NodsSummary } from '../core/nods.ts'
 import { refOf } from '../core/ref.ts'
 import { listSources, type SourceSummary } from '../core/sources.ts'
 import { projectSessions } from '../core/listeners.ts'
@@ -180,6 +181,9 @@ interface Snapshot {
   /** The cross-project main session (`nod session start --main`), live or not — same read as
    *  any project's, just not narrowed to one root. */
   main: Listener | null
+  /** ⚡ the daily Nod counter — every registered project, archived included, same as `main`:
+   *  never narrowed to whichever one project the bench is scoped to. */
+  nods: NodsSummary
   now: number
   /** The tab definitions as read this tick, so an edit to views.json redraws. */
   views: string
@@ -193,6 +197,7 @@ function snapshot(store: Store, project?: string): Snapshot {
     sources: listSources(store, now).filter((s) => !project || s.project === store.projectKey(project)),
     sessions: projectSessions(store, now).filter((p) => !project || p.project === store.projectKey(project)),
     main: mainListener(now) ?? null,
+    nods: computeNods(all, now),
     now,
     views: JSON.stringify(loadViews()),
   }
@@ -227,7 +232,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
   const width = Math.max(20, cols - 1)
 
   const [snap, setSnap] = useState<Snapshot>(() => snapshot(store, project))
-  const { items, sources, sessions, main, now } = snap
+  const { items, sources, sessions, main, nods, now } = snap
   const [view, setView] = useState<View>(initialView)
   // Folds persist per viewer across sessions (`$NODDIT_HOME/bench-state.json`).
   const [folds, setFolds] = useState<FoldMap>(() => ({ ...loadFolds(), ...(openDeferred ? { [DEFERRED_FOLD_KEY]: 'expanded' as const } : {}) }))
@@ -285,7 +290,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     bannerTimer.current = setTimeout(() => setBanner(null), 2600)
   }, [])
 
-  const overview = useMemo(() => buildOverview(items, now, sources, sessions, main), [items, now, sources, sessions, main])
+  const overview = useMemo(() => buildOverview(items, now, sources, sessions, main, nods), [items, now, sources, sessions, main, nods])
   const rootOf = useCallback((d: Decision) => store.layoutOf(d).projectRoot, [store])
   const { collapsed, expanded, openGroups } = useMemo(() => foldSets(items, folds, rootOf), [items, folds, rootOf])
   // The view's definition is re-read with the items, so an edited views.json shows on the next tick.
@@ -2188,6 +2193,15 @@ function mainAgentSegments(main: Listener | null, rtl: boolean, mode: BidiMode):
   return [{ text: '  ' }, dot, rtl ? mirrorSegment(label, mode) : label]
 }
 
+/** The header's ⚡ daily Nod counter, after the main-agent dot: today, yesterday, the
+ *  7-day average — every registered project, archived included (`core/nods.ts`). */
+function nodsSegments(nods: NodsSummary, rtl: boolean, mode: BidiMode): Segment[] {
+  const avg7 = Number.isInteger(nods.avg7) ? String(nods.avg7) : nods.avg7.toFixed(1)
+  const bolt: Segment = { text: '⚡', color: 'yellow' }
+  const label: Segment = { text: ` ${t('bench.nods.header', { today: nods.today, yesterday: nods.yesterday, avg7 })}`, dim: true }
+  return [{ text: '  ' }, bolt, rtl ? mirrorSegment(label, mode) : label]
+}
+
 /** The `,` settings dialog: a centred box, drawn in `buildFrame` and
  *  measured here so a click and the drawing never disagree. */
 export interface SettingsModal {
@@ -2523,6 +2537,7 @@ export function buildFrame(s: FrameInput, g: Geometry = geometry(s)): Line[] {
     { text: ' ' },
     ...orderedTabs(s, rtl, mode).map((tab) => tab.segment),
     ...mainAgentSegments(s.overview.main, rtl, mode),
+    ...nodsSegments(s.overview.nods, rtl, mode),
   ]
 
   if (s.mode === 'help') {

@@ -1,4 +1,5 @@
 import { staleTasksOf } from './checkins.ts'
+import { computeNods, type NodsSummary } from './nods.ts'
 import { compareUrgency } from './order.ts'
 import { refOf } from './ref.ts'
 import { buildSchedule, dependentsOf, findCycles, type Cycle, type ScheduleRow } from './sequence.ts'
@@ -62,6 +63,9 @@ export interface Overview {
   main: Listener | null
   /** N47: not_started, not deferred — neither waiting on a decision nor being worked on. */
   staleTasks: number
+  /** ⚡ the daily Nod counter — every registered project, archived included; never
+   *  narrowed to whichever one project a view is scoped to (see `core/nods.ts`). */
+  nods: NodsSummary
 }
 
 export type ProjectSessions = ReturnType<typeof projectSessions>[number]
@@ -72,6 +76,9 @@ export function buildOverview(
   sources: SourceSummary[] = [],
   sessions: ProjectSessions[] = [],
   main: Listener | null = null,
+  // Callers that already read every project (the TUI's own snapshot, `overviewOf`)
+  // pass their own; anything else falls back to counting just the `items` given.
+  nods: NodsSummary = computeNods(items, now),
 ): Overview {
   // 延迟 nodes (and their subtrees) are put off: not asked of the owner, not "running".
   const hidden = deferHidden(items)
@@ -111,10 +118,12 @@ export function buildOverview(
     sessions,
     main,
     staleTasks: staleTasksOf(items).length,
+    nods,
   }
 }
 
 /** The whole store's overview, sources included — what bench renders. */
 export function overviewOf(store: Store, now = Date.now()): Overview {
-  return buildOverview(store.all(), now, listSources(store, now), projectSessions(store, now), mainListener(now) ?? null)
+  const all = store.all()
+  return buildOverview(all, now, listSources(store, now), projectSessions(store, now), mainListener(now) ?? null, computeNods(all, now))
 }

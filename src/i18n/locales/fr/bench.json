@@ -25,6 +25,9 @@
   },
   "legacyViewError": "--view ne peut être que {{views}} (les anciens tree|owner|running|timeline|done et --scope open|queued|all|archived fonctionnent aussi)",
   "mainAgent": "Agent principal",
+  "nods": {
+    "header": "Aujourd’hui {{today}} · Hier {{yesterday}} · Moy. 7 j {{avg7}}"
+  },
   "header": {
     "viewCount": "{{letter}} · {{project}}  {{count}} {{label}}",
     "inProgress": "{{letter}} · {{project}}  {{count}} en cours",

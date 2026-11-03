@@ -16,6 +16,7 @@ import './header.css'
 import './quick.css'
 import './menu.css'
 import './main-agent.css'
+import './nod-meter.css'
 
 const params = new URLSearchParams(location.search)
 const forcedTheme = params.get('theme')

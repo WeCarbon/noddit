@@ -7,6 +7,7 @@ import { descriptionOf } from '../core/edit.ts'
 import { readProjectConfig } from '../core/project.ts'
 import { dependentsOf, findCycles } from '../core/sequence.ts'
 import { listSources } from '../core/sources.ts'
+import { computeNods } from '../core/nods.ts'
 import { isHumanTask } from '../core/assignee.ts'
 import { builtinView, filterText, isPristine, loadViews, type ViewDef } from '../core/view-defs.ts'
 import { estimateTotal } from '../core/estimate.ts'
@@ -343,6 +344,9 @@ export function benchJson(store: Store, opts: { project?: string; now?: number; 
     back_from_deferral: (opts.back ?? []).map((d) => ({ key: keyOf(d), ref: refOf(d), title: d.title, text: t('bench.toast.backFromDeferral', { refs: refOf(d) }) })),
     cycles,
     sources,
+    // The daily Nod counter (⚡): every registered project, archived nodes
+    // included — never just the one `project` this read is scoped to.
+    nods: computeNods(all, now),
     nodes,
   }
 }

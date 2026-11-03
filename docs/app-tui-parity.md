@@ -7,8 +7,8 @@ changed in either one gets a row here in the same change (see `AGENTS.md`).
 
 Read from the code, not from memory: the app's menus/keys live in `app/src/bench.tsx`,
 `header.tsx`, `newnode.tsx`, `quick.tsx`, `settings.tsx`, `views.tsx`, `viewer.tsx`,
-`main-agent.tsx`, `sources.tsx`, `cycles.tsx`; the terminal board's keys live in `src/tui/app.ts`
-and its help screen (`src/i18n/locales/en/bench.json`, `helpScreen`).
+`main-agent.tsx`, `nod-meter.tsx`, `sources.tsx`, `cycles.tsx`; the terminal board's keys live in
+`src/tui/app.ts` and its help screen (`src/i18n/locales/en/bench.json`, `helpScreen`).
 
 | Feature | App (where) | Terminal board (key) | Note |
 |---|---|---|---|
@@ -76,6 +76,7 @@ and its help screen (`src/i18n/locales/en/bench.json`, `helpScreen`).
 | See who's listening in each project | Dot per project + tooltip | Summary strip: `●` / `○` + project + who + how long | |
 | Project's pending-work count | Sidebar badge, per project | Summary strip's overall stale-task count | Coarser grain, not per project |
 | Cross-project "main agent": see if it's live, bring its terminal forward, or start one if offline | Sidebar's pinned "Main agent" row | Header line's own dot (`● online` / `○ offline`); `Ctrl-L` goes to it or starts one (`m` / `M` are taken — toggle milestone / move mode) | Closed 2026-11-03 |
+| Daily Nod counter: how many owner actions (a reply, a decision answered, a node they filed themselves) landed each day | Sidebar's ⚡ row above "Views": today's count, a 3-bar chart (today / yesterday / 7-day average), click to expand the last 7 days | Header line, after the main-agent dot: `⚡ Today N · Yesterday M · 7d avg K` | Closed 2026-11-03. Every registered project, archived nodes included; AI writes never count; `nod bench --json`'s `nods` field (`core/nods.ts`) |
 | Start an agent session directly, without filing a brief first | Right-click a project → Start session | `t` (the cursor node's own project, or the primary project with nothing selected); refuses the same way `nod session start` does when a lead already listens there, saying who | Closed 2026-11-03 |
 | **Custom views (the view editor)** | | | |
 | Add / edit / reorder / delete a view: filter text, layout, grouping, sort, finished/deferred handling, live match-count preview | Gear icon in the sidebar, or right-click a view → "Edit this view" | `v` panel: `↑↓` picks, `Enter` edits its fields, `a` adds, `x` deletes (refuses the last one), `m` moves it | Closed 2026-11-03. The terminal editor doesn't expose the view's icon (cosmetic — not rendered in terminal tabs) or its `window-days` / `window-max` / `count` fields; set those with `nod view edit` |

@@ -192,7 +192,7 @@ test('bench: the tabs are the user\'s views, and Tab walks them', async (t) => {
   saveViews([validateView({ id: 'mine', name: 'Mine', filter: 'assignee:human' }), ...BUILTIN_VIEWS.filter((v) => v.id !== 'live' && v.id !== 'all')])
   const b = bench(t, store, { view: 'available' })
   await b.until(has(b, /Write release notes/))
-  assert.match(b.frame()[0], /^decs +Mine 1 +Available \d+ +Active \d+ +Human work \d+ +Waiting 1 +[○●] Main agent *$/)
+  assert.match(b.frame()[0], /^decs +Mine 1 +Available \d+ +Active \d+ +Human work \d+ +Waiting 1 +[○●] Main agent +⚡/)
   await b.press('\t', '\t', '\t', '\t')
   await b.until(() => /Call the vendor/.test(b.frame().join('\n')) && !/Write release notes/.test(b.frame().slice(2).map((l) => l.split('│')[0]).join('\n')))
 })

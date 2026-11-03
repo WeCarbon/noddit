@@ -18,6 +18,7 @@ const I = (Icon: LucideIcon) => <Icon size={14} strokeWidth={1.75} />
 import { Bar, Glyph, Segs } from './segs.tsx'
 import { gotoSessionBundleId, gotoSessionLabelKey } from './goto-label.ts'
 import { MainAgentEntry } from './main-agent.tsx'
+import { NodMeter } from './nod-meter.tsx'
 import { hiddenCount, isSelectable, nodeCollapsed, reveal, scopeView, visibleRows, type Folds } from './rows.ts'
 import { ContextMenu, type MenuItem, type MenuState } from './menu.tsx'
 import { popupNative } from './native-menu.ts'
@@ -1256,6 +1257,7 @@ export function Bench(props: {
         <nav>
           <MainAgentEntry onToast={showToast} />
           <div class="nav-sep" />
+          <NodMeter nods={bench.nods} />
           <div class="section-label with-tool">
             {s('views')}
             <button class="section-tool" onClick={() => setViewEditor({})} title={s('viewEditorTitle')} aria-label={s('viewEditorTitle')}>

@@ -25,6 +25,9 @@
   },
   "legacyViewError": "--view 只能是 {{views}}（老的 tree|owner|running|timeline|done 和 --scope open|queued|all|archived 也认）",
   "mainAgent": "主智能体",
+  "nods": {
+    "header": "今天 {{today}} · 昨天 {{yesterday}} · 7天均 {{avg7}}"
+  },
   "header": {
     "viewCount": "{{letter}} · {{project}}  {{count}} 个{{label}}",
     "inProgress": "{{letter}} · {{project}}  {{count}} 个进行中",

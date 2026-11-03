@@ -25,6 +25,9 @@
   },
   "legacyViewError": "--view يمكن أن يكون فقط {{views}} (القيم القديمة tree|owner|running|timeline|done و --scope open|queued|all|archived تعمل أيضًا)",
   "mainAgent": "الوكيل الرئيسي",
+  "nods": {
+    "header": "اليوم {{today}} · أمس {{yesterday}} · متوسط 7 أيام {{avg7}}"
+  },
   "header": {
     "viewCount": "{{letter}} · {{project}}  {{label}} {{count}}",
     "inProgress": "{{letter}} · {{project}}  {{count}} قيد التنفيذ",

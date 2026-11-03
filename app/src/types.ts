@@ -301,6 +301,23 @@ export interface Bench {
   cycles?: CycleNode[][]
   /** Registered external sources (issues/mail/feedback), cleared or not. */
   sources?: Source[]
+  /** ⚡ the daily Nod counter — every registered project, archived nodes
+   *  included (`core/nods.ts`'s `NodsSummary`). */
+  nods: NodsSummary
+}
+
+export interface NodsDay {
+  date: string
+  count: number
+}
+
+export interface NodsSummary {
+  today: number
+  yesterday: number
+  /** Mean of `days` (7 local days, today included). */
+  avg7: number
+  /** Oldest first, 7 entries, the last one today. */
+  days: NodsDay[]
 }
 
 /**
