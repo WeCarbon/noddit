@@ -40,7 +40,8 @@ pub struct SoundSettings {
 
 impl Default for SoundSettings {
     fn default() -> Self {
-        SoundSettings { update_on: true, decide_on: true, volume: 0.6, update_variant: "A".into(), decide_variant: "A".into() }
+        // N291: the owner picked update B / decide A after listening to all four — still switchable in Settings.
+        SoundSettings { update_on: true, decide_on: true, volume: 0.6, update_variant: "B".into(), decide_variant: "A".into() }
     }
 }
 

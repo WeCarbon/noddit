@@ -83,6 +83,7 @@ Read from the code, not from memory: the app's menus/keys live in `app/src/bench
 | **Settings** | | | |
 | Shared settings (language, right-to-left text, mouse, idle-exit, …) | Settings dialog (`⌘,`) | `,` panel | Both read the same `nod config` list |
 | Notification style (system / banner / off) | Settings dialog | *(none)* | **UI-only** — a terminal has no independent notification system |
+| Notification sounds: "update" / "decide" chimes, each on/off, an A/B variant, one volume slider, preview | Settings dialog — synthesized live with Web Audio, no audio file | *(none)* | **UI-only** — a terminal has no audio API. A bell for "decide" behind its own setting would be possible, but isn't built here: it would touch `src/tui`, `src/core/settings.ts` and all five locale `bench.json` files, left for a separate change rather than risk a conflict with the TUI work landing alongside this one |
 | Global hotkey to summon the app | Settings dialog, recorded live | *(none)* | **UI-only** — global hotkey |
 | Keep the app running in the tray | Settings dialog, checkbox | *(none)* | **UI-only** — tray |
 | **Notifications & external sources** | | | |

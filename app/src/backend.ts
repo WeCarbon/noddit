@@ -357,7 +357,8 @@ export interface SoundSettings {
   decideVariant: Variant
 }
 
-export const DEFAULT_SOUND_SETTINGS: SoundSettings = { updateOn: true, decideOn: true, volume: 0.6, updateVariant: 'A', decideVariant: 'A' }
+// N291: the owner picked update B / decide A after listening to all four — still switchable in Settings.
+export const DEFAULT_SOUND_SETTINGS: SoundSettings = { updateOn: true, decideOn: true, volume: 0.6, updateVariant: 'B', decideVariant: 'A' }
 
 export interface AppSettings {
   notify: NotifyStyle
