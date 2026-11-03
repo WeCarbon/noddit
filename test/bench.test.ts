@@ -590,6 +590,29 @@ test('a bench answer approves attached content, because bench always answers as 
   assert.match(text(approvalLines(store.get(d.id)!)[0]), /approved/)
 })
 
+test('A merges seen and close into one archive key: decided archives right away, anything else asks why first', async (t) => {
+  const store = tmpStore(t)
+  const decided = store.create({ title: 'already answered', author: A, task: true })
+  store.note(decided, { text: 'go ahead', role: 'human', author: 'owner' })
+  const open = store.create({ title: 'still open', author: A, task: true })
+  assert.equal(store.get(decided.id)!.state, 'decided')
+  const b = bench(t, store, { view: 'all' })
+  await b.until(has(b, /already answered/))
+
+  await b.press('g', ...`${decided.id}`.split(''), '\r')
+  await b.until(has(b, /already answered/))
+  await b.press('A')
+  await b.until(() => store.get(decided.id)!.state === 'completed')
+
+  await b.press('g', ...`${open.id}`.split(''), '\r')
+  await b.until(has(b, /still open/))
+  await b.press('A')
+  await b.until(has(b, /reason/))
+  assert.equal(store.get(open.id)!.state, 'not_started', 'archiving unfinished work asks first; nothing changes yet')
+  await b.press('merged into something else', '\r')
+  await b.until(() => store.get(open.id)!.state === 'closed')
+})
+
 test('note headlines are just who and how long ago', () => {
   // The User/Agent tags and the relative time are English regardless of UI language; pin it here.
   setLang('en')

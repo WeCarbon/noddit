@@ -564,6 +564,23 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     reload()
   }
 
+  /** 归档 (`a`): decided (you answered, an AI hasn't picked it up) archives right away, same
+   *  as the old "seen"; anything still open asks why first, same as the old "close". */
+  const archive = () => {
+    if (!current) return
+    if (isTerminal(current.state)) return say(t('bench.toast.alreadyPendingChange', { ref: refOf(current), status: statusLabel(current.state) }))
+    if (current.state === 'decided') {
+      try {
+        store.dismiss(current)
+        say(t('bench.toast.dismissed', { ref: refOf(current), id: current.id }))
+      } catch (e) {
+        say((e as Error).message)
+      }
+      return reload()
+    }
+    return startText('close')
+  }
+
   const commitGoto = () => {
     const raw = draft.trim()
     setMode('browse')
@@ -1212,20 +1229,8 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       return openAttachment(idx + 1)
     }
     if (input === 'n' || input === 'N') return startText('note')
-    if (input === 'x' || input === 'X') {
-      if (isTerminal(current.state)) return say(t('bench.toast.alreadyPendingChange', { ref: refOf(current), status: statusLabel(current.state) }))
-      return startText('close')
-    }
     if (input === 'T') return startText('retitle', current.title)
-    if (input === 'a' || input === 'A') {
-      try {
-        store.dismiss(current)
-        say(t('bench.toast.dismissed', { ref: refOf(current), id: current.id }))
-      } catch (e) {
-        say((e as Error).message)
-      }
-      return reload()
-    }
+    if (input === 'a' || input === 'A') return archive()
     if (input === '!') {
       const on = current.urgency !== 'high'
       try {

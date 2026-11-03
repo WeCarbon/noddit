@@ -8,7 +8,7 @@ import { Viewer, itemsAround, type ViewItem } from './viewer.tsx'
 import { BodyEditor } from './editor.tsx'
 import { ViewEditor, ViewIcon } from './views.tsx'
 import {
-  ArrowRight, Ban, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, Eye, FileText,
+  Archive, ArrowRight, CaseUpper, CheckCheck, ChevronsDownUp, ChevronsUpDown, CircleCheck, Copy, CornerLeftUp, ExternalLink, FileText,
   FolderSearch, Inbox, Keyboard, ListChecks, Lock, Maximize2, MessageSquareReply, Paperclip, PenLine, Play, Plus, RotateCcw,
   Bot, Hourglass, RefreshCcw, Repeat, Settings as SettingsIcon, SlidersHorizontal, Star, User, SquareTerminal, Timer, TimerOff, Unlink, X, type LucideIcon,
 } from 'lucide-preact'
@@ -445,6 +445,14 @@ export function Bench(props: {
   const startClose = () => {
     if (node && !node.terminal) setComposer({ kind: 'close' })
   }
+  /** One action for both: work an AI already finished (decided — you answered, it's just waiting
+   *  to be picked up) archives right away, same as "seen"; anything still open asks why first,
+   *  same as "close". */
+  const archive = () => {
+    if (!node || node.terminal) return
+    if (node.status === 'decided') return seen()
+    return startClose()
+  }
   const [deferFor, setDeferFor] = useState<Node | null>(null)
   /** 延迟到…: waiting on `on` (purple), or — no one named — a plain deferral (grey); `date` null = indefinitely. */
   const delayNode = (n: Node, on: string | null, date: string | null, passive: boolean) => {
@@ -644,7 +652,7 @@ export function Bench(props: {
   const isMac = /Mac/.test(navigator.platform)
   const revealLabel = isMac ? s('ctxRevealMac') : s('ctxRevealWin')
   const latest = useRef<Record<string, (...a: never[]) => unknown>>({})
-  latest.current = { startAnswer, seen, startClose, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, reassign, setDeferFor, delayEvery } as never
+  latest.current = { startAnswer, archive, toggleDefer, markStart, markDone, goParent, setComposer, toggleImportant, reassign, setDeferFor, delayEvery } as never
 
   const nodeMenu = (n: Node | undefined, r: Row): MenuItem[] => {
     const L = () => latest.current as unknown as {
@@ -653,8 +661,7 @@ export function Bench(props: {
       reassign: () => void
       setDeferFor: (n: Node) => void
       delayEvery: (n: Node) => void
-      seen: () => void
-      startClose: () => void
+      archive: () => void
       toggleDefer: () => void
       markStart: () => void
       markDone: () => void
@@ -700,8 +707,7 @@ export function Bench(props: {
         ],
       })
       items.push({ label: n.assignee === 'human' ? s('assignAi') : s('assignMe'), icon: n.assignee === 'human' ? I(Bot) : I(User), run: () => L().reassign() })
-      items.push({ label: s('seen'), icon: I(Eye), shortcut: 'A', run: () => L().seen() })
-      items.push({ label: s('ctxCloseMenu'), icon: I(Ban), shortcut: 'X', danger: true, run: () => L().startClose() })
+      items.push({ label: s('ctxArchive'), icon: I(Archive), shortcut: 'A', run: () => L().archive() })
     }
     items.push({ kind: 'separator' })
     if (n?.parent != null) items.push({ label: s('ctxGoParent'), icon: I(CornerLeftUp), shortcut: '←', run: () => L().goParent() })
@@ -984,13 +990,10 @@ export function Bench(props: {
           return detailRef.current?.scrollBy({ top: 80, behavior: 'smooth' })
         case 'k':
           return detailRef.current?.scrollBy({ top: -80, behavior: 'smooth' })
-        case 'X':
-        case 'x':
-          e.preventDefault()
-          return startClose()
         case 'A':
         case 'a':
-          return seen()
+          e.preventDefault()
+          return archive()
         case 'd':
           return toggleDefer()
         case 'g':
@@ -1204,8 +1207,7 @@ export function Bench(props: {
             onReply={() => setComposer({ kind: 'reply' })}
             onFree={() => setComposer({ kind: 'free' })}
             onDefer={toggleDefer}
-            onClose={startClose}
-            onSeen={seen}
+            onArchive={archive}
             onJump={jump}
             listening={(() => {
               const pr = bench.projects.find((x) => x.project === node.project)
@@ -1482,8 +1484,7 @@ function Detail(p: {
   onReply: () => void
   onFree: () => void
   onDefer: () => void
-  onClose: () => void
-  onSeen: () => void
+  onArchive: () => void
   onJump: (key: string) => void
   listening: { on: boolean; who: string | null } | null
   onImage: (i: number) => void
@@ -1676,16 +1677,10 @@ function Detail(p: {
             )}
             <span class="grow" />
             {!n.terminal && (
-              <>
-                <button class="quiet" onClick={p.onSeen} title={`${s('seen')} — ${s('seenHint')}`}>
-                  <Eye size={14} strokeWidth={1.75} />
-                  <span class="ql">{s('seenShort')}</span> <kbd>A</kbd>
-                </button>
-                <button class="quiet danger" onClick={p.onClose} title={s('closeNode')}>
-                  <Ban size={14} strokeWidth={1.75} />
-                  <span class="ql">{s('closeNode')}</span> <kbd>X</kbd>
-                </button>
-              </>
+              <button class="quiet" onClick={p.onArchive} title={s('archiveHint')}>
+                <Archive size={14} strokeWidth={1.75} />
+                <span class="ql">{s('ctxArchive')}</span> <kbd>A</kbd>
+              </button>
             )}
           </div>
         )}
@@ -1926,8 +1921,7 @@ function Help({ onClose }: { onClose: () => void }) {
     ['N', s('keyReply')],
     ['D', s('keyDefer')],
     ['⌥↑ ⌥↓', s('keyReorder')],
-    ['A', s('keySeen')],
-    ['X', s('keyCloseNode')],
+    ['A', s('keyArchive')],
     ['G', s('keyGoto')],
     ['W', s('keyNext')],
     ['H', s('keyRecent')],
