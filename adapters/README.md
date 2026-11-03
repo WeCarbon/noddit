@@ -91,3 +91,71 @@ nod source events --since <ISO>     # wait 退出时会打印一个 since 游标
 - **适配器挂了要看得出来。** 心跳是免费的（sync/push 自动带），别写一个
   「静默失败就不心跳」的循环——catch 住异常、打一行 stderr、照常进入下一轮
   sleep，让 `nod source list` 的 stale 检测能抓到「进程直接死了」。
+
+## 只在有会话开着时同步：交给 nod monitor 跑
+
+适配器如果能「同步一次就退出」（比如 `--once`），就不用自己在后台循环了：把这条单次
+命令登记成来源的同步命令，主控会话的 `nod monitor`（plugin 每个会话自动起的那个）
+活着时按间隔跑它，会话结束它也就不跑了。
+
+```sh
+nod source register github-issues \
+    --sync-cmd "python3 adapters/github_sync.py --name github-issues --once" --every 10m
+```
+
+- 同一个来源同一时间只跑一份：上一次还没跑完，到点也不会再起一个，本机上几个主控
+  monitor 也只有一个在跑。
+- 命令退出码非 0 时，monitor 打一行 `DECS-ERROR`（带 stderr 最后一行），接着盯，
+  下一轮照常跑；`nod source list` 会显示上次失败的原因。
+- 只有主控的 monitor 跑；`--mine`（lane）和 `--updates`（窗口重画）的 monitor 不跑，
+  `--no-sync` 关掉。monitor 因为空闲下线（`DECS-IDLE`）后，重新挂上才会接着跑。
+- **命令只存在本机**（`~/.decs/source-sync.json`，按项目路径），不写进 `decisions/`。
+  `decisions/` 可能被提交、被别人克隆，克隆一个仓库不能让谁的 monitor 去执行命令——
+  在这台机器上用 `--sync-cmd` 登记一次，就是「我信任这条命令」的那一步。换一台机器要
+  重新登记。`--no-sync-cmd` 删掉，`--every` 单独给就是只改间隔。
+
+## Azure DevOps 工作项：`azure_devops_sync.py`
+
+`adapters/azure_devops_sync.py` 是现成可用的适配器：按条件查 Azure DevOps 工作项，
+同步成一个 nod 来源。每条只有 id、标题、url、state（可选 `from`），不读正文——
+请求里根本不要 `System.Description`。
+
+```sh
+python3 adapters/azure_devops_sync.py --org contoso --project web \
+    --type Issue --area web --tag feedback --name ado-feedback --once
+```
+
+| 参数 | 作用 |
+|---|---|
+| `--org` / `--project` | 组织和项目（必填） |
+| `--type` | 工作项类型，如 `Issue`、`Bug` |
+| `--area` | 区域路径，这个路径下面的都算，如 `web` 或 `web\Checkout` |
+| `--tag` | 必须带的标签，可以写多次 |
+| `--from-tag` | 哪些标签当成条目的 `from`，可用通配符，如 `--from-tag 'region-*'` |
+| `--name` | nod 来源名（默认 `ado`）；第一次跑会自动 `nod source register` |
+| `--azure-config-dir` | 用哪个 az 登录（就是 `AZURE_CONFIG_DIR`） |
+| `--once` | 同步一次就退出，失败时退出码非 0；不加就每 `--interval` 秒轮询一次 |
+
+认证用调用方自己的 az CLI 登录（`az account get-access-token`，资源是 Azure DevOps），
+nod 不存 token，也不需要 PAT。一台机器上有几个 Azure 身份时，用 `--azure-config-dir`
+指到对的那个 config 目录。
+
+几个容易踩的点，适配器已经处理了：
+
+- 响应开头带 UTF-8 BOM，按 `utf-8-sig` 解码。
+- **登错租户时 Azure DevOps 回的是一整页 HTML**（常见标题「Identity has not been
+  materialized」，有时是 HTTP 403，有时是 200），看着像「没登录」。适配器把它报成明确的
+  错误、退出码非 0，并且**这一轮什么都不同步**——不会当成「0 条」把已有条目都标成消失。
+  遇到了先看 `az account show` 里登的是谁，别急着重新登录。
+- 一次最多读 200 条（`workitemsbatch` 的上限），多了分批。
+- 输出按 id 排序，同样的数据重跑结果一字不差，nod 不会误报变化。
+
+交给 nod monitor 在会话开着时跑：
+
+```sh
+nod source register ado-feedback --every 10m --sync-cmd \
+    "python3 adapters/azure_devops_sync.py --org contoso --project web --type Issue \
+     --area web --tag feedback --name ado-feedback --azure-config-dir ~/.azure-contoso --once"
+```
+
+脚本路径按你项目里放的位置写；用 npm 装的 nod，适配器在包里的 `adapters/` 下面。
