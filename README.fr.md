@@ -125,7 +125,7 @@ direct sur tous les projets que vous avez enregistrés. Six onglets :
 
 | onglet | affiche |
 |---|---|
-| **Disponible** | ce qui peut avancer maintenant : en cours, en attente de quelqu’un, prêt à démarrer, qui vous attend, répondu |
+| **Disponible** | ce qui peut avancer maintenant : en cours, en attente de quelqu’un, prêt à démarrer ou encore bloqué derrière un autre nœud, qui vous attend, répondu |
 | **Actif** | ce qui se passe : seulement en cours et à décider |
 | **Travail humain** | ce qui vous attend : les décisions à prendre, et vos propres tâches — ce qui bloque un agent en premier |
 | **En attente** | bloqué à l’extérieur — un·e collègue, un·e client·e, un service — l’attente la plus longue en premier |
@@ -240,12 +240,48 @@ le leviez.
 **Agir sur plusieurs à la fois.** `Space` marque des lignes sur le tableau ;
 avec une ou plusieurs marquées, les mêmes touches à un seul nœud —
 reporter, démarrer, réassigner, marquer important, archiver — agissent sur
-toutes. L’app de bureau fait la même chose avec `⌘`-clic, `⇧`-clic ou un
-cadre glissé, et reflète aussi les modifications du titre/de la
-description sur place, le zoom et le panoramique d’une image, et les
-aperçus intégrés de Markdown/HTML — voir [Développement](#développement)
-ci-dessous pour où les deux surfaces sont suivies l’une par rapport à
-l’autre.
+toutes. L’app de bureau fait la même chose avec `⌘`-clic, `⇧`-clic, ou un
+cadre glissé depuis un espace vide ou depuis n’importe quelle ligne qui
+n’est pas elle-même déplaçable, et reflète aussi les modifications du
+titre/de la description sur place, le zoom et le panoramique d’une image,
+et les aperçus intégrés de Markdown/HTML — voir
+[Développement](#développement) ci-dessous pour où les deux surfaces sont
+suivies l’une par rapport à l’autre.
+
+**Chaque réponse garde tout son historique.** Un nœud avec une option sans
+réponse est toujours **à décider** — même s’il est déjà en cours ou pas
+encore démarré — et une réponse qui ne choisit aucune option renvoie
+simplement ce tour à l’agent au lieu de le clore ; le nœud redevient
+**en cours** et la question est posée à nouveau. Chaque réponse que vous
+donnez est son propre bloc, intitulé *Décidé* ; choisir le crayon pour
+changer une réponse déjà verrouillée ajoute un nouveau bloc intitulé
+*Réponse modifiée* juste après, sans jamais réécrire le précédent.
+
+**Les références dans le texte renvoient à leur nœud.** Écrivez une
+référence comme `G91` ou `W305` n’importe où — un titre, un corps, une
+note, un résumé ou une option — et l’app de bureau en fait un lien qui
+mène directement à ce nœud, même entre projets. Le tableau du terminal n’a
+pas de pointeur pour cliquer ; tapez la même référence à `g` ou `:` à la
+place.
+
+**Un compteur quotidien de Nods.** ⚡, au-dessus de Vues dans la barre
+latérale de l’app et dans l’en-tête du tableau de terminal, compte chaque
+action du responsable — une réponse, une décision tranchée, un nœud que
+vous avez déposé vous-même ; les écritures d’une IA elle-même ne comptent
+jamais — sur tous les projets enregistrés, archivés compris. Il affiche
+aujourd’hui, hier et la moyenne sur 7 jours (arrondie vers le bas à un
+nombre entier), et bouge à l’instant même où vous agissez plutôt que
+d’attendre le prochain rafraîchissement. Le bouton calendrier à côté
+(`c` sur le tableau de terminal) ouvre le calendrier des Nods, une carte de
+chaleur façon GitHub de toute la dernière année.
+
+**Deux sons de notification, synthétisés en direct.** Les réglages ont deux
+courts carillons — *Mise à jour d’une IA* et *Décision nécessaire* —
+construits à partir d’une recette Web Audio, sans fichier audio à livrer
+ni à licencier. Chacun a son propre interrupteur, une variante A/B et un
+bouton d’écoute, plus un curseur de volume partagé ; au plus un carillon
+joue sur une fenêtre de cinq secondes, et celui d’une décision gagne
+toujours sur celui d’une mise à jour dans cette fenêtre.
 
 ## Installation
 
@@ -405,6 +441,7 @@ Les identifiants s’écrivent `305`, `W305` (lettre du projet), `web:305`
 | `i` · `o` | choisir et voir des images · ouvrir une pièce jointe |
 | `j` `k` `Ctrl-F` `Ctrl-B` | faire défiler le panneau de détail |
 | `Z` · `?` · `q` | corps condensé · toutes les touches · quitter |
+| `c` | calendrier des Nods — une carte de chaleur de la dernière année derrière ⚡ |
 | `,` | réglages (langue, texte de droite à gauche, souris, …) |
 
 La souris marche aussi : cliquez un onglet, un nœud, une option ou une
@@ -494,7 +531,11 @@ marchent toujours).
 
 **Ça marche avec les git worktrees ?**
 Oui. `nod` résout toujours vers le `decisions/` du clone principal, donc
-les voies dans des worktrees partagent un seul dépôt de données.
+les voies dans des worktrees partagent un seul dépôt de données. Chaque
+voie devrait tout de même exécuter `nod` depuis son propre worktree ;
+quand l’une est forcée de partager le cwd d’une autre voie, réglez
+`NODDIT_WORKTREE=<chemin de son propre worktree>` pour que leurs
+identités ne se mélangent pas.
 
 **Plusieurs dépôts à la fois ?**
 `nod init` enregistre chaque projet ; `nod bench` sans argument ouvre

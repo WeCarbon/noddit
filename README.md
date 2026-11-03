@@ -114,7 +114,7 @@ project you've registered. Six tabs:
 
 | tab | shows |
 |---|---|
-| **Available** | what can move now: running, waiting on someone, ready to start, needs you, answered |
+| **Available** | what can move now: running, waiting on someone, ready to start or still blocked behind another node, needs you, answered |
 | **Active** | what's happening: running and needs-decision only |
 | **Human work** | what waits on you: decisions to make, and your own to-dos — whatever blocks an AI first |
 | **Waiting** | held up outside — a colleague, a customer, a service — longest wait first |
@@ -211,10 +211,41 @@ until you lift it.
 
 **Act on several at once.** `Space` marks rows on the bench; with any marked,
 the same single-node keys — defer, start, reassign, important, archive — act
-on all of them. The desktop app does the same with `⌘`-click, `⇧`-click or a
-dragged box, and mirrors in-place title/description edits, image zoom and
-pan, and inline Markdown/HTML previews — see [Development](#development)
-below for where the two surfaces are tracked against each other.
+on all of them. The desktop app does the same with `⌘`-click, `⇧`-click, or a
+box dragged from empty space or from any row that isn't itself draggable, and
+mirrors in-place title/description edits, image zoom and pan, and inline
+Markdown/HTML previews — see [Development](#development) below for where the
+two surfaces are tracked against each other.
+
+**Every answer keeps its own history.** A node with any unanswered option is
+always **needs decision** — even one that's already running or not started —
+and a reply that doesn't pick one hands that round back to the agent instead
+of settling it; the node returns to **in progress** and gets asked again.
+Each answer you give is its own block, labelled *Decided*; picking the pencil
+to change an already-locked answer adds a new block labelled *Answer changed*
+right after it, never rewriting the one before.
+
+**Refs in prose link to their node.** Write a ref like `G91` or `W305`
+anywhere — a title, body, note, summary or option — and the desktop app turns
+it into a link that jumps straight to that node, across projects too. The
+terminal board has no pointer to click with; type the same ref at `g` or `:`
+instead.
+
+**A daily Nod counter.** ⚡, above Views in the app's sidebar and in the
+terminal board's header, counts every owner action — a reply, a decision
+answered, a node you filed yourself; an AI's own writes never count — across
+every registered project, archived ones included. It shows today, yesterday
+and the 7-day average (floored to a whole number), and moves the instant you
+act rather than waiting for the next refresh. The calendar button beside it
+(`c` on the terminal board) opens the Nod calendar, a GitHub-style heatmap of
+the whole last year.
+
+**Two notice sounds, synthesized live.** Settings gets two short chimes —
+*AI update* and *Needs a decision* — built from a Web Audio recipe, no audio
+file to ship or license. Each has its own on/off switch, an A/B variant and a
+preview button, plus one shared volume slider; at most one chime plays in any
+five-second span, and a decision's chime always wins over an update's in
+that span.
 
 ## Install
 
@@ -371,6 +402,7 @@ Ids are `305`, `W305` (project letter), `web:305` (project name), or legacy
 | `i` · `o` | pick and view images · open an attachment |
 | `j` `k` `Ctrl-F` `Ctrl-B` | scroll the detail pane |
 | `Z` · `?` · `q` | condensed body · all keys · quit |
+| `c` | Nod calendar — a heatmap of the last year behind ⚡ |
 | `,` | settings (language, right-to-left text, mouse, …) |
 
 The mouse works too: click a tab, a node, an option or an attachment; the wheel
@@ -447,7 +479,10 @@ Elsewhere, set `NODDIT_ROLE=agent` and `NODDIT_SESSION` (`DECS_ROLE` / `DECS_SES
 
 **Does it work with git worktrees?**
 Yes. `nod` always resolves to the main checkout's `decisions/`, so lanes in
-worktrees share one store.
+worktrees share one store. Each lane should still run `nod` from its own
+worktree; when one is forced to share another lane's cwd instead, set
+`NODDIT_WORKTREE=<its own worktree's path>` so their identities don't
+collide.
 
 **Several repos at once?**
 `nod init` registers each project; `nod bench` with no arguments opens all of
