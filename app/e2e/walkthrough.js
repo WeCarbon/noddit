@@ -382,7 +382,7 @@
     type(title, 'Renew the domain')
     $$('.new-node .qchip').find((b) => b.textContent.includes('Milestone')).click()
     const due = await until('milestone date field', () => $('.new-node .datefield input'))
-    type(due, 'next week')
+    type(due, 'in 7 days')
     await until('the date read', () => /in 7 days/.test($('.new-node .date-read:not(.bad)')?.textContent ?? ''))
     await shot('new-node')
     ;(await until('add enabled', () => ($('.new-node .primary')?.disabled === false ? $('.new-node .primary') : null))).click()
