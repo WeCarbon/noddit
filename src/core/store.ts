@@ -1098,6 +1098,25 @@ export class Store {
     return back
   }
 
+  /**
+   * 「人开始后转给 AI」: the owner hands their own to-do to an AI. Like a reply it is a request —
+   * a note signed by the owner, queued, so the monitor of whoever runs the node (or the lead's) hears it.
+   */
+  handToAi(d: Decision, opts: { by: string; text?: string }): Decision {
+    if (isTerminal(d.state)) throw new Error(t('core.store.alreadyFinishedNoHand', { ref: refOf(d) }))
+    const text = [NOTE_TEXT.handedToAi, opts.text?.trim() ?? ''].filter(Boolean).join('\n\n')
+    const written = this.mutate(d, (d) => ({
+      next: {
+        ...d,
+        assignee: undefined,
+        state: d.state === 'needs_decision' ? d.state : 'decided',
+        body: appendSection(d.body, noteHeading(NOTE_KIND.reply, 'human', opts.by, nowStamp()), text),
+      },
+    }))
+    enqueue(this.layoutOf(written), written.id)
+    return { ...written, queued: true }
+  }
+
   /** Who does it: `human` (the owner's to-do) or undefined (an AI). */
   assign(d: Decision, assignee: string | undefined): Decision {
     if ((d.assignee ?? undefined) === assignee) return d

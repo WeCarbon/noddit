@@ -80,7 +80,7 @@ test('nod assign: an agent hands the owner a task, but taking one back for an AI
   const back = decsResult(root, ['assign', '1', 'ai'])
   assert.notEqual(back.code, 0)
   assert.match(back.stderr, /only when the owner says so/)
-  assert.match(decs(root, ['assign', '1', 'ai'], owner), /for an AI now/)
+  assert.match(decs(root, ['assign', '1', 'ai'], owner), /handed to an AI/)
   assert.equal(json(decs(root, ['get', '1', '--json'])).assignee, 'ai')
 })
 

@@ -122,7 +122,8 @@
     "notYourNote": "{{ref}}: الملاحظة {{n}} كتبها غيرك — ‎--force لتعديلها رغم ذلك",
     "attachmentNotFound": "لا يوجد في {{ref}} مرفق اسمه {{name}}",
     "unholdNotWaiting": "{{ref}} ليس في الانتظار",
-    "noEvery": "{{ref}} بلا R — عيّنه بـ nod edit {{ref}} --every 3d"
+    "noEvery": "{{ref}} بلا R — عيّنه بـ nod edit {{ref}} --every 3d",
+    "alreadyFinishedNoHand": "{{ref}} منتهٍ أصلًا؛ لا شيء يُسلَّم"
   },
   "duration": {
     "notADuration": "\"{{value}}\" ليست مدة — مثل 90s أو 30m أو 1h أو 2d"

@@ -110,7 +110,8 @@
     "notYourNote": "{{ref}}: note {{n}} was written by someone else — --force to edit it anyway",
     "attachmentNotFound": "{{ref}} has no attachment called {{name}}",
     "unholdNotWaiting": "{{ref}} isn't waiting",
-    "noEvery": "{{ref}} has no R — set one with nod edit {{ref}} --every 3d"
+    "noEvery": "{{ref}} has no R — set one with nod edit {{ref}} --every 3d",
+    "alreadyFinishedNoHand": "{{ref}} is already finished; nothing to hand over"
   },
   "duration": {
     "notADuration": "\"{{value}}\" is not a duration — e.g. 90s, 30m, 1h, 2d"

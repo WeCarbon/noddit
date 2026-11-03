@@ -1,7 +1,7 @@
 import { assigneeArg, isHumanTask } from '../../core/assignee.ts'
 import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
-import { bool, type Args } from '../args.ts'
+import { bool, one, type Args } from '../args.ts'
 import { requireDecision, resolveStore, shellRole } from '../context.ts'
 import { t } from '../../i18n/index.ts'
 
@@ -21,9 +21,13 @@ export function run(args: Args): number {
   const assignee = assigneeArg(who)
   const store = resolveStore(args, { allowRegistry: true })
   const d = requireDecision(store, ref, args)
-  if (!assignee && isHumanTask(d) && shellRole() === 'agent' && !bool(args, 'force')) throw new Error(t('cli.assign.agentTakesHuman', { ref: refOf(d) }))
-  const next = store.assign(d, assignee)
+  const role = bool(args, 'human') ? 'human' : bool(args, 'agent') ? 'agent' : shellRole()
+  if (!assignee && isHumanTask(d) && role === 'agent' && !bool(args, 'force')) throw new Error(t('cli.assign.agentTakesHuman', { ref: refOf(d) }))
+  // The owner handing their own to-do to an AI is a request, heard by the AI's monitor.
+  const handOff = !assignee && isHumanTask(d) && role === 'human'
+  const note = one(args, 'note')
+  const next = handOff ? store.handToAi(d, { by: one(args, 'by') ?? 'owner', text: note }) : store.assign(d, assignee)
   if (bool(args, 'json')) console.log(JSON.stringify(toJSON(next)))
-  else console.log(t(assignee ? 'cli.assign.toHuman' : 'cli.assign.toAi', { ref: refOf(next) }))
+  else console.log(t(handOff ? 'cli.assign.handedToAi' : assignee ? 'cli.assign.toHuman' : 'cli.assign.toAi', { ref: refOf(next) }))
   return 0
 }

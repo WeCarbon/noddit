@@ -113,7 +113,8 @@
     "notYourNote": "{{ref}} : la note {{n}} a été écrite par quelqu’un d’autre — --force pour la modifier quand même",
     "attachmentNotFound": "{{ref}} n’a pas de pièce jointe nommée {{name}}",
     "unholdNotWaiting": "{{ref}} n’est pas en attente",
-    "noEvery": "{{ref}} n’a pas de R — définissez-le avec nod edit {{ref}} --every 3d"
+    "noEvery": "{{ref}} n’a pas de R — définissez-le avec nod edit {{ref}} --every 3d",
+    "alreadyFinishedNoHand": "{{ref}} est déjà terminé ; rien à confier"
   },
   "duration": {
     "notADuration": "« {{value}} » n’est pas une durée — ex. 90s, 30m, 1h, 2d"

@@ -89,6 +89,7 @@ export const NOTE_TEXT = {
   deferred: '后面再做。解除延迟之前先别动它。',
   undeferred: '可以接着做了。',
   deferredUntil: (day: string) => `后面再做，${day} 再拿出来。到那天之前先别动它。`,
+  handedToAi: '交给 AI 了：负责人这边开了头，接着做下去。',
   ownerSaid: (words: string) => `负责人原话：「${words}」`,
   backFromDeferral: (day: string) => `延迟到 ${day}，到期了，可以接着做了。`,
   seen: '看过了，不用处理。',

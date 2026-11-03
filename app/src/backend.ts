@@ -563,7 +563,7 @@ export async function addNode(root: string, n: NewNode): Promise<{ id: number; r
 }
 
 /** Defer until a day (the node comes back on its own then), or indefinitely with `null`. */
-export const assign = (root: string, id: number, who: 'me' | 'ai') => ok(['assign', String(id), who, '--dir', root])
+export const assign = (root: string, id: number, who: 'me' | 'ai') => ok(['assign', String(id), who, ...human, '--dir', root])
 
 /** The first megabyte of an attachment as text, for the in-app viewer. */
 export async function readPreview(path: string): Promise<{ text: string; truncated: boolean; size: number }> {
