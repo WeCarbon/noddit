@@ -112,7 +112,10 @@
     "unholdNotWaiting": "{{ref}} isn't waiting",
     "noEvery": "{{ref}} has no R — set one with nod edit {{ref}} --every 3d",
     "alreadyFinishedNoHand": "{{ref}} is already finished; nothing to hand over",
-    "waitOnTooLong": "--on is who or what it waits on, in a few words — this is {{cols}} columns, the limit is {{max}}. Put the details in a note: nod note {{id}} \"…\""
+    "waitOnTooLong": "--on is who or what it waits on, in a few words — this is {{cols}} columns, the limit is {{max}}. Put the details in a note: nod note {{id}} \"…\"",
+    "summaryNeeded": "this reply needs a one-line summary: --summary \"…\" (≤60 CJK characters / ≤120 Latin ones)",
+    "summaryTooLong": "the summary itself is over the limit: ≤60 CJK characters / ≤120 Latin ones",
+    "summaryBadChars": "a summary can't contain a line break or \"-->\" — keep it to one plain line"
   },
   "duration": {
     "notADuration": "\"{{value}}\" is not a duration — e.g. 90s, 30m, 1h, 2d"

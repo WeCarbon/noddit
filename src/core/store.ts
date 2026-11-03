@@ -13,6 +13,7 @@ import { dequeue, enqueue, readQueue } from './queue.ts'
 import { HEADING, NOTE_KIND, NOTE_TEXT, isAnswerKind, optionsHeading } from './format.ts'
 import { OPTIONS_HEADING_RE, optionsRoundOf, parseDecision, parseNoteHeading, parseNotes, parseOptions, sectionAttachments } from './parse.ts'
 import { WAIT_ON_MAX_COLS, deferralOver, findRef, isDeferred, isStartable, isTerminal, isWaitDue, statusLabel } from './status.ts'
+import { checkSummary } from './summary.ts'
 import { isHumanTask } from './assignee.ts'
 import { everyUntil, untilDay } from './fuzzy-date.ts'
 import { stringWidth } from '../tui/width.ts'
@@ -717,12 +718,17 @@ export class Store {
    */
   note(
     d: Decision,
-    n: { text: string; role: NoteRole; author: string; kind?: string; attach?: AttachOpts & { sources: string[] } },
+    n: { text: string; role: NoteRole; author: string; kind?: string; summary?: string; attach?: AttachOpts & { sources: string[] } },
   ): Decision {
     if (n.role === 'human' && this.recentSameHumanNote(d, n.text)) return d
+    // N203/N205: `summary`, if given, is already checked by the caller (`nod note`'s
+    // CLI command) before it gets here — this is a shared primitive other writers use
+    // too (`nod run`'s own failure note is routinely over the budget and has no
+    // `--summary` of its own), so it never rejects a write on this account itself.
+    const summary = n.summary
     const kind = n.kind ?? (n.role === 'human' ? NOTE_KIND.reply : NOTE_KIND.addendum)
     const heading = noteHeading(kind, n.role, n.author, nowStamp())
-    if (!n.attach?.sources.length) return this.append(d, heading, n.text, n.author, n.role)
+    if (!n.attach?.sources.length) return this.append(d, heading, n.text, n.author, n.role, summary)
 
     const { sources, ...opts } = n.attach
     if (opts.approveOn && !opts.approvalContent) throw new Error(t('core.store.approveOnNeedsApprovalContent'))
@@ -737,7 +743,7 @@ export class Store {
         next: {
           ...d,
           approvals,
-          body: appendSection(d.body, heading, block ? `${n.text.trim()}\n\n${block}` : n.text),
+          body: appendSection(d.body, heading, block ? `${n.text.trim()}\n\n${block}` : n.text, summary),
           state: human ? 'decided' : d.state,
           reopenedAt: human && d.archived ? nowStamp(new Date(), { ms: true }) : d.reopenedAt,
         },
@@ -764,12 +770,12 @@ export class Store {
    * the node to 待 AI 取走 (even from 待决策) and un-archives it; an agent's
    * own note does neither. `role` falls back to what the heading says, then to `by`.
    */
-  append(d: Decision, heading: string, text: string, by = 'owner', role?: NoteRole): Decision {
+  append(d: Decision, heading: string, text: string, by = 'owner', role?: NoteRole, summary?: string): Decision {
     const human = (role ?? parseNoteHeading(`## ${heading}`)?.role ?? roleOf(by)) === 'human'
     const written = this.mutate(d, (d) => ({
       next: {
         ...d,
-        body: appendSection(d.body, heading, text),
+        body: appendSection(d.body, heading, text, summary),
         // A human reply means it's the AI's turn; `decs ask` is how the AI asks again.
         state: human ? 'decided' : d.state,
         reopenedAt: human && d.archived ? nowStamp(new Date(), { ms: true }) : d.reopenedAt,
@@ -1214,6 +1220,8 @@ export class Store {
       author: string
       /** This round's own `--question`s, if any. */
       questions?: DecisionQuestion[]
+      /** N203/N205: `text`'s own one-line summary, when `text` is long enough to need one. */
+      summary?: string
     },
   ): Decision {
     const questions = q.questions ?? []
@@ -1222,6 +1230,11 @@ export class Store {
     // contain `## 选项`; that block is adopted (or must match -o exactly).
     const text = q.text?.trim() ? q.text : undefined
     const inText = text ? parseOptions(text) : []
+    // N203/N205: only the plain explanatory text needs its own summary — `nod ask`
+    // is always the AI's own words, never 'human'. A `text` that already carries its
+    // whole `## 选项` block is a full document (e.g. piped from stdin), not a reply
+    // being condensed, so it is exempt the same way a long `nod add` body is.
+    const summary = text && !inText.length ? checkSummary(text, q.summary, 'agent') : undefined
     if (text && text.split('\n').filter((l) => OPTIONS_HEADING_RE.test(l)).length > 1)
       throw new Error(t('core.store.multipleOptionsBlocks'))
     if (questions.length && (q.options.length || inText.length)) throw new Error(t('core.store.questionsAndOptionsMixed'))
@@ -1244,9 +1257,9 @@ export class Store {
         // Renumbered to this round, so it outranks every earlier block.
         const heading = `## ${optionsHeading(round)}`
         const own = text.split('\n').map((l) => (OPTIONS_HEADING_RE.test(l) ? heading : l)).join('\n')
-        body = appendSection(body, noteHeading(NOTE_KIND.newQuestion, 'agent', q.author, at), own)
+        body = appendSection(body, noteHeading(NOTE_KIND.newQuestion, 'agent', q.author, at), own, summary)
       } else {
-        if (text) body = appendSection(body, noteHeading(NOTE_KIND.newQuestion, 'agent', q.author, at), text)
+        if (text) body = appendSection(body, noteHeading(NOTE_KIND.newQuestion, 'agent', q.author, at), text, summary)
         body = `${body.replace(/\s+$/, '')}\n\n${renderOptionsBlock(options, round).trim()}\n`
       }
       if (questions.length) body = `${body.replace(/\s+$/, '')}\n\n${renderQuestionsBlock(questions, round).trim()}\n`

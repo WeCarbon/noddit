@@ -226,7 +226,7 @@ function nodeJson(d: Item, items: Item[], now: number, backlinks: Item[]): Recor
     body_attachments: d.bodyAttachments.map((a) => withPath(d, a)),
     // The description as written (markdown), for a window that edits it (nod edit --body).
     description: descriptionOf(d.body),
-    notes: d.notes.map((n) => ({ kind: n.kind, role: n.role, author: n.author, at: n.at, text: n.text, attachments: n.attachments.map((a) => withPath(d, a)) })),
+    notes: d.notes.map((n) => ({ kind: n.kind, role: n.role, author: n.author, at: n.at, text: n.text, summary: n.summary ?? null, attachments: n.attachments.map((a) => withPath(d, a)) })),
     terminal: isTerminal(d.state),
     backlinks: backlinks.map((b) => keyOf(b)),
   }

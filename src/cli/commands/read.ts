@@ -4,6 +4,7 @@ import { refOf } from '../../core/ref.ts'
 import { requireDecision, resolveAuthor, resolveStore } from '../context.ts'
 import { bold, dim, green, toJSON } from '../../core/render.ts'
 import { renderAnswerLines } from '../../core/questions.ts'
+import { checkSummary } from '../../core/summary.ts'
 import type { Decision } from '../../core/types.ts'
 import { t } from '../../i18n/index.ts'
 
@@ -69,10 +70,16 @@ export function run(args: Args): number {
     throw new Error(t('cli.read.cantDoneUnanswered', { refs: unanswered.map((d) => refOf(d)).join(' ') }))
   }
   const ack = one(args, 'ack')
+  // Checked before anything is collected (N203/N205): --ack already always
+  // writes its note through `store.note`, which enforces this — but that
+  // write comes *after* `store.deliver` below, which already dequeued the
+  // item by then. Failing here first keeps a bad --ack from leaving a node
+  // delivered with no note to show for it.
+  const summary = ack ? checkSummary(ack, one(args, 'summary'), 'agent') : one(args, 'summary')
   const delivered = picked.map((d) => {
     const got = store.deliver(d)
     const filed = done && !got.archived ? store.archive(got) : got
-    const noted = ack ? store.note(filed, { text: ack, role: 'agent', author: resolveAuthor(args), kind: NOTE_KIND.received }) : filed
+    const noted = ack ? store.note(filed, { text: ack, role: 'agent', author: resolveAuthor(args), kind: NOTE_KIND.received, summary }) : filed
     return { ...noted, options: d.options, body: noted.body, notes: noted.notes }
   })
 

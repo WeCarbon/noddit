@@ -250,11 +250,21 @@ function writerMarker(): string {
   return id ? `<!-- nod:by=${id} -->` : ''
 }
 
-/** Appends a `## <heading>` section without touching a byte of what came before. */
-export function appendSection(body: string, heading: string, text: string): string {
+/** `<!-- nod:summary=… -->` (N203/N205) — same invisible-marker shape as
+ *  `writerMarker`, one line above it so both strip independently off the tail. */
+function summaryMarker(summary: string): string {
+  return `<!-- nod:summary=${summary} -->`
+}
+
+/** Appends a `## <heading>` section without touching a byte of what came before.
+ *  `summary` (N203/N205) is the note's own one-line summary, already checked by
+ *  `core/summary.ts`'s `checkSummary` — stored as an invisible trailing marker. */
+export function appendSection(body: string, heading: string, text: string, summary?: string): string {
   const base = body.replace(/\s+$/, '')
   const marker = writerMarker()
-  const content = marker ? `${text.trim()}\n${marker}` : text.trim()
+  let content = text.trim()
+  if (summary) content += `\n${summaryMarker(summary)}`
+  if (marker) content += `\n${marker}`
   return `${base}\n\n## ${heading}\n\n${content}\n`
 }
 

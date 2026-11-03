@@ -38,7 +38,7 @@ export async function run(args: Args, verb = ''): Promise<number> {
     const { options, default: def } = optionsAndDefault(args)
     const questions = questionsFromArgs(args)
     const text = one(args, 'text') ?? ((await readStdin()).trim() || undefined)
-    let next = store.ask(d, { options, default: def, text, author: resolveAuthor(args), questions })
+    let next = store.ask(d, { options, default: def, text, author: resolveAuthor(args), questions, summary: one(args, 'summary') })
     // --attach: the draft goes with the question that presents it (its own section when there is text).
     const sources = many(args, 'attach')
     if (sources.length) {

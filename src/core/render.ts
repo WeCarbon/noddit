@@ -262,7 +262,7 @@ export function toJSON(d: Decision): Record<string, unknown> {
     // or the bench's own numbered picker wanting "everything" reads this.
     // To show them where they belong, read `body_attachments` for the body
     // and each note's own `attachments` below — never this flat list.
-    notes: d.notes.map((n) => ({ kind: n.kind, role: n.role, author: n.author, at: n.at, text: n.text, attachments: n.attachments.map(attachmentJSON) })),
+    notes: d.notes.map((n) => ({ kind: n.kind, role: n.role, author: n.author, at: n.at, text: n.text, summary: n.summary ?? null, attachments: n.attachments.map(attachmentJSON) })),
     queued: Boolean(d.queued),
     archived_at: d.archivedAt ?? null,
     reopened_at: d.reopenedAt ?? null,

@@ -2,6 +2,7 @@ import { bool, many, one, type Args } from '../args.ts'
 import { noteKindKey } from '../../core/format.ts'
 import { refOf } from '../../core/ref.ts'
 import { hasSessionNode, looksLikeRef, readStdin, requireDecision, resolveAuthor, resolveStore, sessionNode, shellRole } from '../context.ts'
+import { checkSummary } from '../../core/summary.ts'
 import type { NoteRole } from '../../core/types.ts'
 import { t } from '../../i18n/index.ts'
 
@@ -56,6 +57,10 @@ export async function run(args: Args): Promise<number> {
     console.log(t('cli.note.alreadyRecorded', { ref: refOf(d), by: same.author }))
     return 0
   }
+  // N203/N205: checked here, not inside Store.note — that's a shared primitive
+  // other writers use too (nod run's own failure note has no --summary of its own
+  // and is routinely over the budget), so only this command's own writes enforce it.
+  const summary = checkSummary(text, one(args, 'summary'), role)
   const sources = many(args, 'attach')
   const groups = many(args, 'label')
   const captions = many(args, 'caption')
@@ -66,6 +71,7 @@ export async function run(args: Args): Promise<number> {
     role,
     author,
     kind: one(args, 'heading'),
+    summary,
     attach: sources.length
       ? {
           sources,

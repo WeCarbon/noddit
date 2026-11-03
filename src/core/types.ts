@@ -113,6 +113,10 @@ export interface DecisionNote {
    *  made this section left one — see `core/identity.ts`. Absent on
    *  anything written before the marker existed, or with no identity set. */
   writer?: string
+  /** The invisible `<!-- nod:summary=… -->` marker (N203/N205): a one-line
+   *  summary of `text`, shown as a title wherever there isn't room for the
+   *  whole reply. Absent on an older note, or a short one that never needed one. */
+  summary?: string
   /** This note's own `## 附件` block — attached with `nod note --attach` or
    *  `nod attach --to` pointed here. Empty when this note has none. */
   attachments: Attachment[]

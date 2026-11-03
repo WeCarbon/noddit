@@ -266,6 +266,9 @@ export function parseNoteHeading(line: string): NoteHeading | null {
 /** `<!-- nod:by=<identity> -->` on its own trailing line — see `serialize.ts`'s `appendSection`. */
 const WRITER_MARKER_RE = /\n?<!--[ \t]*nod:by=([^\n]*?)[ \t]*-->[ \t]*$/
 
+/** `<!-- nod:summary=… -->` (N203/N205), one line above the writer marker if both are present. */
+const SUMMARY_MARKER_RE = /\n?<!--[ \t]*nod:summary=([^\n]*?)[ \t]*-->[ \t]*$/
+
 /** Every appended section, in body order. */
 export function parseNotes(body: string): DecisionNote[] {
   const lines = body.split('\n')
@@ -281,6 +284,9 @@ export function parseNotes(body: string): DecisionNote[] {
     const m = WRITER_MARKER_RE.exec(text)
     const writer = m?.[1]
     if (m) text = text.slice(0, m.index).trim()
+    const sm = SUMMARY_MARKER_RE.exec(text)
+    const summary = sm?.[1]
+    if (sm) text = text.slice(0, sm.index).trim()
     out.push({
       kind: h.kind,
       role: h.role,
@@ -289,6 +295,7 @@ export function parseNotes(body: string): DecisionNote[] {
       text,
       heading: lines[i].replace(/^##[ \t]+/, ''),
       ...(writer ? { writer } : {}),
+      ...(summary ? { summary } : {}),
       attachments: sections.notes[noteIndex] ?? [],
     })
     noteIndex++

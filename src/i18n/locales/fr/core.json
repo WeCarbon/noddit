@@ -115,7 +115,10 @@
     "unholdNotWaiting": "{{ref}} n’est pas en attente",
     "noEvery": "{{ref}} n’a pas de R — définissez-le avec nod edit {{ref}} --every 3d",
     "alreadyFinishedNoHand": "{{ref}} est déjà terminé ; rien à confier",
-    "waitOnTooLong": "--on dit qui ou quoi on attend, en quelques mots — ici {{cols}} colonnes, la limite est {{max}}. Mettez les détails dans une note : nod note {{id}} \"…\""
+    "waitOnTooLong": "--on dit qui ou quoi on attend, en quelques mots — ici {{cols}} colonnes, la limite est {{max}}. Mettez les détails dans une note : nod note {{id}} \"…\"",
+    "summaryNeeded": "cette réponse a besoin d’un résumé d’une ligne : --summary « … » (≤60 caractères chinois / ≤120 latins)",
+    "summaryTooLong": "le résumé lui-même dépasse la limite : ≤60 caractères chinois / ≤120 latins",
+    "summaryBadChars": "un résumé ne peut pas contenir de retour à la ligne ni « --> » — gardez une seule ligne simple"
   },
   "duration": {
     "notADuration": "« {{value}} » n’est pas une durée — ex. 90s, 30m, 1h, 2d"
