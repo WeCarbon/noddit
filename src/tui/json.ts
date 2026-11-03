@@ -5,7 +5,7 @@ import { QUESTIONS_HEADING_RE } from '../core/questions.ts'
 import { toJSON } from '../core/render.ts'
 import { descriptionOf } from '../core/edit.ts'
 import { readProjectConfig } from '../core/project.ts'
-import { dependentsOf } from '../core/sequence.ts'
+import { dependentsOf, findCycles } from '../core/sequence.ts'
 import { isHumanTask } from '../core/assignee.ts'
 import { builtinView, filterText, isPristine, loadViews, type ViewDef } from '../core/view-defs.ts'
 import { estimateTotal } from '../core/estimate.ts'
@@ -296,6 +296,9 @@ export function benchJson(store: Store, opts: { project?: string; now?: number; 
   const links = backlinkIndex(store, items)
   const nodes = Object.fromEntries(items.filter((d) => !d.archived).map((d) => [keyOf(d), nodeJson(d, items, now, links.get(keyOf(d)) ?? [])]))
   const sessions = projectSessions(store, now)
+  const byKey = new Map(items.map((i) => [keyOf(i), i]))
+  // `after` forming a loop (summary.ts:cyclesLine reports the same list in the TUI's strip).
+  const cycles = findCycles(items).map((cycle) => cycle.map((c) => ({ key: `${c.project}#${c.id}`, ref: c.ref, id: c.id, project: c.project, title: byKey.get(`${c.project}#${c.id}`)?.title ?? '' })))
   return {
     now: new Date(now).toISOString(),
     lang: lang(),
@@ -318,6 +321,7 @@ export function benchJson(store: Store, opts: { project?: string; now?: number; 
     project_views: projectViews,
     // Deferred `--until` a day that has come: brought back by this read (or one just before it).
     back_from_deferral: (opts.back ?? []).map((d) => ({ key: keyOf(d), ref: refOf(d), title: d.title, text: t('bench.toast.backFromDeferral', { refs: refOf(d) }) })),
+    cycles,
     nodes,
   }
 }

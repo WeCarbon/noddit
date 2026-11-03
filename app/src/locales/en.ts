@@ -103,6 +103,8 @@ export const en = {
   noticeDueHour: 'Due within the hour',
   noticeUncollected: 'Your answer hasn’t been picked up',
   newAbove: '{{count}} new above',
+  cycleWarning: 'Dependency cycle:',
+  cycleMore: ' and {{count}} more',
   previousRound: 'Previous round',
   previousRounds: 'Previous rounds ({{count}})',
   roundN: 'Round {{n}}',

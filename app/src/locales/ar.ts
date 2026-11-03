@@ -104,6 +104,8 @@ export const ar: Strings = {
   noticeDueHour: 'يستحق خلال ساعة',
   noticeUncollected: 'لم يستلم أحد إجابتك بعد',
   newAbove: '{{count}} جديدة في الأعلى',
+  cycleWarning: 'حلقة تبعية:',
+  cycleMore: ' و {{count}} أخرى',
   previousRound: 'الجولة السابقة',
   previousRounds: 'الجولات السابقة ({{count}})',
   roundN: 'الجولة {{n}}',

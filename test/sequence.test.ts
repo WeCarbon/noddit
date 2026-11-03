@@ -6,6 +6,7 @@ import { initLayout } from '../src/core/paths.ts'
 import { Store } from '../src/core/store.ts'
 import { buildSchedule, dependentsOf, findCycles } from '../src/core/sequence.ts'
 import { buildOverview } from '../src/core/overview.ts'
+import { benchJson } from '../src/tui/json.ts'
 import {
   isPossiblyObsolete,
   isStale,
@@ -217,4 +218,20 @@ test('decs check reports an after-cycle as an error', (t) => {
   const result = decsResult(root, ['check'], { DECS_LANG: 'en' })
   assert.equal(result.code, 1)
   assert.match(result.stdout, /dependency cycle/)
+})
+
+test('bench --json carries the same after-cycle findCycles reports, for a window with no terminal to read it from', (t) => {
+  const { root, store } = scratchStore(t)
+  decs(root, ['add', 'A', '--task'])
+  decs(root, ['add', 'B', '--task', '--after', '1'])
+  const file = store.get(1)!.file
+  const text = readFileSync(file, 'utf8')
+  writeFileSync(file, text.replace('status: not_started', 'status: not_started\nafter:\n  - "2"'))
+
+  const out = benchJson(store) as { cycles: { key: string; ref: string; id: number; project: string; title: string }[][] }
+  assert.equal(out.cycles.length, 1)
+  assert.deepEqual([...new Set(out.cycles[0].map((c) => c.ref))].sort(), ['X1', 'X2'])
+  const a = out.cycles[0].find((c) => c.ref === 'X1')!
+  assert.equal(a.key, `${store.get(1)!.project}#1`)
+  assert.equal(a.title, 'A')
 })

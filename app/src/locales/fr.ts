@@ -105,6 +105,8 @@ export const fr: Strings = {
   noticeDueHour: 'Échéance dans l’heure',
   noticeUncollected: 'Votre réponse n’a pas encore été prise',
   newAbove: '{{count}} nouveau(x) au-dessus',
+  cycleWarning: 'Cycle de dépendance :',
+  cycleMore: ' et {{count}} de plus',
   previousRound: 'Tour précédent',
   previousRounds: 'Tours précédents ({{count}})',
   roundN: 'Tour {{n}}',

@@ -26,6 +26,7 @@ import { Settings } from './settings.tsx'
 import { useDialogFocus } from './focus.ts'
 import { useLiveMotion } from './motion.ts'
 import { NoticeStack, noticeWhat, useNoticeQueue, type Notice } from './notices.tsx'
+import { CycleBanner } from './cycles.tsx'
 import { noticeTitle, plainReply } from './plain-reply.ts'
 import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, heldAt, keepHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, type Held, type PendingOp } from './optimistic.ts'
@@ -1162,6 +1163,7 @@ export function Bench(props: {
           <h1>{view.label}</h1>
           {view.count !== null && <span class="head-count">{view.count}</span>}
         </header>
+        <CycleBanner cycles={bench.cycles ?? []} onJump={jump} />
         {motion.above > 0 && (
           <button class="new-above" onClick={motion.toTop}>
             ↑ {s('newAbove', { count: motion.above })}

@@ -105,6 +105,8 @@ export const zhHant: Strings = {
   noticeDueHour: '一小時內到期',
   noticeUncollected: '你的回答還沒人取',
   newAbove: '上面有 {{count}} 條新的',
+  cycleWarning: '依賴成環：',
+  cycleMore: ' 等 {{count}} 處',
   previousRound: '上一輪的答案',
   previousRounds: '之前幾輪的答案（{{count}}）',
   roundN: '第 {{n}} 輪',

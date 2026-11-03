@@ -254,6 +254,15 @@ export interface Project {
   stale_count?: number
 }
 
+/** One node in an `after` loop — `nod check` reports the same list as an error. */
+export interface CycleNode {
+  key: string
+  ref: string
+  id: number
+  project: string
+  title: string
+}
+
 export interface Bench {
   now: string
   lang: string
@@ -266,6 +275,8 @@ export interface Bench {
   project_views?: { project: string; count: number; empty: string; rows: Row[] }[]
   /** Deferrals this read ended: each says so once. */
   back_from_deferral?: { key: string; ref: string; title: string; text: string }[]
+  /** `after` forming a loop: every node in each chain is permanently unstartable. */
+  cycles?: CycleNode[][]
 }
 
 /**
