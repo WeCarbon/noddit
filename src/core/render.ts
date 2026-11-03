@@ -224,6 +224,7 @@ export function toJSON(d: Decision): Record<string, unknown> {
     kind: d.kind,
     urgency: d.urgency ?? 'normal',
     due: d.due ?? null,
+    remind_at: d.remindAt ?? null,
     milestone: Boolean(d.milestone),
     important: d.urgency === 'high',
     if_no_answer: d.ifNoAnswer ?? null,

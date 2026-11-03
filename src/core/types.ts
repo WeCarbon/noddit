@@ -204,6 +204,9 @@ export interface Decision {
   due?: string
   /** A key date the owner marked: `due` is the date, counted down on the bench. */
   milestone?: boolean
+  /** 提醒: when an AI should tell the owner something (`nod add --remind` / `nod edit
+   *  --remind`) — never the owner's own to-do. ISO. See core/remind.ts. */
+  remindAt?: string
   /** What the proposer will do if nobody answers — the 「你不回的话」 line, as data. */
   ifNoAnswer?: string
   /** Whether that default action can be undone. */
@@ -300,6 +303,7 @@ export interface NewDecision {
   tags?: string[]
   urgency?: Urgency
   due?: string
+  remindAt?: string
   ifNoAnswer?: string
   reversible?: boolean
   /** Only `fyi` is stored; decision vs acceptance follows from the options. */

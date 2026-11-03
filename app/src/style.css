@@ -3167,7 +3167,8 @@ figcaption {
 }
 
 .notice.k-decision .n-gem,
-.notice.k-milestone .n-gem {
+.notice.k-milestone .n-gem,
+.notice.k-remind .n-gem {
   background: var(--yellow);
 }
 

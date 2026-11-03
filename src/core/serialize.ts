@@ -9,7 +9,7 @@ import type { Attachment, Decision, DecisionOption, NoteRole, AttachmentApproval
 const KEY_ORDER = [
   'id', 'title', 'author', 'status', 'close_reason', 'waiting_on', 'waiting_until', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'created', 'updated_at',
   'after', 'progress', 'progress_msg', 'est', 'every', 'when', 'stale_after', 'steps', 'owner_agent', 'intake', 'claimed_by', 'claimed_at',
-  'kind', 'urgency', 'due', 'milestone', 'default', 'question_defaults', 'if_no_answer', 'reversible',
+  'kind', 'urgency', 'due', 'remind_at', 'milestone', 'default', 'question_defaults', 'if_no_answer', 'reversible',
   'order', 'tags', 'session', 'supersedes', 'superseded_by', 'answer', 'approvals',
   'archived_at', 'reopened_at',
 ]
@@ -50,6 +50,7 @@ export function frontMatterOf(d: Decision): Record<string, unknown> {
   if (d.kind === 'fyi') fm.kind = 'fyi'
   if (d.urgency && d.urgency !== 'normal') fm.urgency = d.urgency
   if (d.due) fm.due = d.due
+  if (d.remindAt) fm.remind_at = d.remindAt
   if (d.milestone) fm.milestone = true
   if (d.ifNoAnswer) fm.if_no_answer = d.ifNoAnswer
   if (d.reversible !== undefined) fm.reversible = d.reversible

@@ -73,6 +73,8 @@
     "doing": "在做",
     "due": "{{when}}到期",
     "overdue": "逾期 {{span}}",
+    "remind": "{{when}}提醒",
+    "remindNow": "現在提醒",
     "byAi": "AI 延後的",
     "estHuman": "人 {{span}}",
     "estAi": "AI {{span}}"

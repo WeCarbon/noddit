@@ -434,7 +434,7 @@ export function legacyStatus(state: ItemStatus, answered: boolean): DecisionStat
 /** Every front matter key this version reads; anything else is kept verbatim in `extra`. */
 const KNOWN_KEYS = new Set([
   'id', 'title', 'author', 'status', 'created', 'updated_at', 'default', 'order', 'pin', 'pinned_at',
-  'urgency', 'due', 'milestone', 'if_no_answer', 'reversible', 'kind', 'session', 'superseded_by', 'supersedes',
+  'urgency', 'due', 'remind_at', 'milestone', 'if_no_answer', 'reversible', 'kind', 'session', 'superseded_by', 'supersedes',
   'close_reason', 'waiting_on', 'waiting_until', 'deferred_at', 'deferred_by', 'deferred_until', 'assignee', 'answer', 'answered_by', 'answered_at', 'archived_at', 'reopened_at', 'tags',
   'question_defaults', 'progress', 'progress_msg', 'after', 'est', 'every', 'when', 'stale_after', 'steps', 'owner_agent',
   'approvals', 'intake', 'claimed_by', 'claimed_at',
@@ -515,6 +515,7 @@ export function parseDecision(
     order: orderOf(data),
     urgency: data.urgency === 'high' || data.urgency === 'low' ? data.urgency : undefined,
     due: str(data.due),
+    remindAt: str(data.remind_at),
     milestone: data.milestone === true || undefined,
     ifNoAnswer: str(data.if_no_answer),
     reversible: typeof data.reversible === 'boolean' ? data.reversible : undefined,

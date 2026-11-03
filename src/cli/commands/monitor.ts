@@ -441,6 +441,23 @@ export async function run(args: Args): Promise<number> {
     }
   }
 
+  /**
+   * A reminder's clock (`nod add --remind` / `nod edit --remind`) has come: one NODDIT-REMIND
+   * line for the node's own agent, with its next step — the owner's own notification is the
+   * desktop app's job (`nod show due --json`-style polling in watch.rs), not this one's.
+   */
+  const reportDueReminders = () => {
+    store.fireDueReminders()
+    for (const d of store.all()) {
+      if ((author && !ownedBy(d, author)) || theirs(d.project)) continue
+      const note = d.notes.findLast((n) => n.author === DEFERRAL_CLOCK && n.kind === NOTE_KIND.reminded)
+      if (!note || Date.parse(note.at) < Date.parse(cursor) - 60_000) continue
+      emit(`r|${d.project}|${d.id}|${note.at}`, note.at, `NODDIT-REMIND ${t('cli.monitor.remind', { ref: refOfNode(d), title: d.title })}`, {
+        event: 'remind', ref: refOfNode(d), id: d.id, project: d.project, title: d.title, at: note.at,
+      })
+    }
+  }
+
   /** A waiting node's check-back day has come: one NODDIT-CHECK-BACK line for its agent. */
   const reportCheckBacks = () => {
     store.remindDueWaits()
@@ -532,6 +549,11 @@ export async function run(args: Args): Promise<number> {
     }
     try {
       reportCheckBacks()
+    } catch (err) {
+      process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
+    }
+    try {
+      reportDueReminders()
     } catch (err) {
       process.stdout.write(`DECS-ERROR ${flat((err as Error).message)}\n`)
     }

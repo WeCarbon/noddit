@@ -5,11 +5,15 @@
  * English: today / tomorrow / yesterday; mon … sunday (the nearest one, today
  *   included); next / last <weekday>; 3d / 2w / in 3 days / 3 days later /
  *   3 days ago; N weeks / months; next / last / this week / month / quarter /
- *   year; 14 / 14th (this month); 2026-11-15; 11/15[/2026]; nov 15 / 15 nov
- *   [2026]; nov [2026]; q3 [2026]; 2026.
+ *   year; 14 / 14th (this month); 2026-11-15; 11-15 / 11/15[/2026]; nov 15 /
+ *   15 nov [2026]; nov [2026]; q3 [2026]; 2026.
  * Chinese: 今天 / 明天 / 后天 / 大后天 / 昨天 / 前天; 周一…周日 / 星期一…星期天
  *   (the nearest one); 下周三 / 上周五 / 这周二; N 天后 / N 天前 / N 周后 /
  *   N 个月后; 下周 / 上周 / 下个月 / 月初 / 月底 / 明年; 11月15日 / 11.15 / 15号.
+ *
+ * `parseWhen` additionally keeps a time of day riding on any of the above
+ * (`fri 2pm`, `11-07 09:00`, `明天9点`, `上午9点`, `9点30`) — `parseFuzzyDate`
+ * itself only ever reads a day.
  */
 
 const WEEKDAYS: Record<string, number> = {
@@ -153,6 +157,11 @@ function english(s: string, now: Date): string | null {
     const y = m[3] ? Number(m[3].length === 2 ? `20${m[3]}` : m[3]) : upcomingYear(now, mo)
     return mo < 0 || mo > 11 ? null : valid(y, mo, Number(m[2]))
   }
+  // `11-07`: month-day, no year — same reading as `11/07`.
+  if ((m = /^(\d{1,2})-(\d{1,2})$/.exec(s))) {
+    const mo = Number(m[1]) - 1
+    return mo < 0 || mo > 11 ? null : valid(upcomingYear(now, mo), mo, Number(m[2]))
+  }
   if ((m = new RegExp(`^(${MO})\\.? (\\d{1,2})${ORD}(?:,? (\\d{4}))?$`).exec(s))) {
     const mo = MONTHS[m[1]]
     return valid(m[3] ? Number(m[3]) : upcomingYear(now, mo), mo, Number(m[2]))
@@ -201,12 +210,64 @@ export function daysFromToday(key: string, now: Date = new Date()): number {
   return Math.round((startOfDay(key).getTime() - today.getTime()) / 86_400_000)
 }
 
-/** A full ISO date-time (`2026-11-15T09:00`) is taken as given; anything else goes through `parseFuzzyDate`. */
+/**
+ * A time of day on its own: `09:00` / `9:00`, `9am` / `9:30pm`, or Chinese `9点` / `9点30(分)` /
+ * `上午9点` / `下午3点`. Always needs a marker (`:`, `点`, `am`/`pm`) — a bare number stays a plain
+ * day-of-month digit, never a time.
+ */
+function parseTimeToken(tok: string): { h: number; m: number } | null {
+  let m: RegExpExecArray | null
+  if ((m = /^([01]?\d|2[0-3])[:：]([0-5]\d)$/.exec(tok))) return { h: Number(m[1]), m: Number(m[2]) }
+  if ((m = /^(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)$/i.exec(tok))) {
+    const h = Number(m[1]) % 12
+    return { h: m[3].toLowerCase() === 'pm' ? h + 12 : h, m: m[2] ? Number(m[2]) : 0 }
+  }
+  if ((m = /^(上午|下午|早上|晚上)?([01]?\d|2[0-3])点([0-5]?\d)?分?$/.exec(tok))) {
+    const h = Number(m[2])
+    if (h > 23) return null
+    const pm = m[1] === '下午' || m[1] === '晚上'
+    return { h: pm && h < 12 ? h + 12 : h, m: m[3] ? Number(m[3]) : 0 }
+  }
+  return null
+}
+
+/**
+ * Peels a trailing time of day off `raw`: by the last space when there is one (`fri 2pm`,
+ * `11-07 09:00`, `明天 9点`), else a glued Chinese suffix (`明天9点30`, which is never written
+ * with a space) — what is left still reads through `parseFuzzyDate` as the day.
+ */
+function splitTimeOfDay(raw: string): { datePart: string; time: { h: number; m: number } } | null {
+  const sp = raw.lastIndexOf(' ')
+  if (sp > 0) {
+    const time = parseTimeToken(raw.slice(sp + 1).trim())
+    if (time) return { datePart: raw.slice(0, sp).trim(), time }
+  }
+  const glued = /^(.+?)((?:上午|下午|早上|晚上)?(?:[01]?\d|2[0-3])(?:点[0-5]?\d?分?|[：:][0-5]\d))$/.exec(raw)
+  if (glued) {
+    const time = parseTimeToken(glued[2])
+    if (time) return { datePart: glued[1], time }
+  }
+  return null
+}
+
+/**
+ * A full ISO date-time (`2026-11-15T09:00`) is taken as given; a loose day with a time of
+ * day on it (`fri 2pm`, `11-07 09:00`, `明天9点`) keeps that time; a bare loose day
+ * (`parseFuzzyDate`) means its start.
+ */
 export function parseWhen(input: string, now: Date = new Date()): { day: string; at: Date; timed: boolean } | null {
   const raw = input.trim()
   if (/^\d{4}-\d{2}-\d{2}[T ]\d{1,2}:\d{2}/.test(raw)) {
     const at = new Date(raw.replace(' ', 'T'))
     return Number.isNaN(at.getTime()) ? null : { day: dayKey(at), at, timed: true }
+  }
+  const split = splitTimeOfDay(raw)
+  if (split) {
+    const day = parseFuzzyDate(split.datePart, now)
+    if (day) {
+      const base = startOfDay(day)
+      return { day, at: new Date(base.getFullYear(), base.getMonth(), base.getDate(), split.time.h, split.time.m), timed: true }
+    }
   }
   const day = parseFuzzyDate(raw, now)
   return day ? { day, at: startOfDay(day), timed: false } : null

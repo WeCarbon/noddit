@@ -109,6 +109,19 @@ impl Milestone {
     }
 }
 
+/// A live node with a reminder (`nod show remind` — `nod add --remind` / `nod edit --remind`).
+/// Fires once, at its own moment — not the day/hour-before staging a due date gets. `nod
+/// monitor` tells the node's own agent (`NODDIT-REMIND`) independently of this.
+#[derive(Clone, Serialize)]
+pub struct Reminder {
+    key: String,
+    #[serde(rename = "ref")]
+    reference: String,
+    title: String,
+    /// Milliseconds since the epoch.
+    remind_at: i64,
+}
+
 /// Words the notifications use, in the window's language (it knows it; this side does not).
 #[derive(Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -122,6 +135,8 @@ pub struct Phrases {
     /// "Due in a day" / "Due in an hour", for a due date that is not a milestone.
     due_day: String,
     due_hour: String,
+    /// "Reminder" — a `nod add --remind` firing right now.
+    remind: String,
     agent_replied: String,
     open: String,
     settings: String,
@@ -138,7 +153,8 @@ pub struct Watch {
     phrases: Mutex<Phrases>,
     waiting: Mutex<Vec<Waiting>>,
     milestones: Mutex<Vec<Milestone>>,
-    /// `key|day` / `key|hour`: reminders already shown in this run.
+    reminders: Mutex<Vec<Reminder>>,
+    /// `key|day` / `key|hour` / `key|remind`: reminders already shown in this run.
     reminded: Mutex<HashSet<String>>,
     clock_started: AtomicBool,
     /// Keys already waiting when last read; `None` until the first read, which notifies nothing.
@@ -182,6 +198,22 @@ fn parse_milestones(json: &str) -> Vec<Milestone> {
                 title: d["title"].as_str().unwrap_or_default().to_string(),
                 due,
                 milestone: d["milestone"] == true,
+            })
+        })
+        .collect()
+}
+
+fn parse_reminders(json: &str) -> Vec<Reminder> {
+    let Ok(Value::Array(items)) = serde_json::from_str::<Value>(json) else { return vec![] };
+    items
+        .iter()
+        .filter_map(|d| {
+            let remind_at = chrono_ms(d["remind_at"].as_str()?)?;
+            Some(Reminder {
+                key: format!("{}#{}", d["project"].as_str().unwrap_or_default(), d["id"]),
+                reference: d["ref"].as_str().unwrap_or_default().to_string(),
+                title: d["title"].as_str().unwrap_or_default().to_string(),
+                remind_at,
             })
         })
         .collect()
@@ -274,6 +306,39 @@ fn remind(app: &AppHandle, milestones: &[Milestone]) {
     }
 }
 
+/// Reminders whose own moment has come: one notification each, right then — not staged a
+/// day/hour ahead like a due date, since a reminder has nothing earlier worth saying.
+fn remind_owner(app: &AppHandle, reminders: &[Reminder]) {
+    let now = now_ms();
+    let due: Vec<Reminder> = {
+        let watch = app.state::<Watch>();
+        let mut reminded = watch.reminded.lock().unwrap();
+        reminders
+            .iter()
+            .filter(|r| r.remind_at <= now)
+            .filter_map(|r| reminded.insert(format!("{}|remind", r.key)).then(|| r.clone()))
+            .collect()
+    };
+    let style = settings(app).notify;
+    if due.is_empty() || style == "off" {
+        return;
+    }
+    if style == "banner" {
+        for r in due {
+            notice(app, serde_json::json!({ "kind": "remind", "key": r.key, "ref": r.reference, "title": r.title }));
+        }
+        return;
+    }
+    if background() {
+        return;
+    }
+    let phrases = app.state::<Watch>().phrases.lock().unwrap().clone();
+    let head = phrase(&phrases.remind, "Reminder");
+    for r in due {
+        let _ = app.notification().builder().title(format!("⏰ {} · {head}", r.reference)).body(&r.title).show();
+    }
+}
+
 /// A refresh every minute, so a milestone's reminder comes on time even when nothing changes.
 fn start_clock(app: &AppHandle) {
     if app.state::<Watch>().clock_started.swap(true, Ordering::SeqCst) {
@@ -358,9 +423,18 @@ pub fn refresh(app: &AppHandle) {
                 },
                 Err(_) => vec![],
             };
+            let reminders = match decs_command(&env, &["show".into(), "remind".into(), "--json".into()], None) {
+                Ok(mut cmd) => match cmd.output().await {
+                    Ok(o) if o.status.success() => parse_reminders(&String::from_utf8_lossy(&o.stdout)),
+                    _ => vec![],
+                },
+                Err(_) => vec![],
+            };
             *app.state::<Watch>().milestones.lock().unwrap() = flagged.clone();
+            *app.state::<Watch>().reminders.lock().unwrap() = reminders.clone();
             apply(&app, parse_waiting(&String::from_utf8_lossy(&out.stdout)));
             remind(&app, &flagged);
+            remind_owner(&app, &reminders);
         }
     });
 }

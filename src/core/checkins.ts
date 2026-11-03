@@ -17,6 +17,7 @@ import { ensureGitignoreLines } from './gitignore.ts'
 import { withFileLock, writeFileAtomic } from './lock.ts'
 import type { Layout } from './paths.ts'
 import { isHumanTask, isMilestone } from './assignee.ts'
+import { remindsLater } from './remind.ts'
 import { checkinThresholdMs } from './staleness.ts'
 import { isDeferred, isStartable } from './status.ts'
 import type { Decision } from './types.ts'
@@ -145,20 +146,23 @@ export function askIfDue(
  */
 export function staleNagDue(
   l: Layout,
-  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt' | 'deferredUntil' | 'assignee' | 'milestone'>,
+  d: Pick<Decision, 'id' | 'state' | 'updatedAt' | 'created' | 'staleAfter' | 'activeAt' | 'deferredAt' | 'deferredUntil' | 'assignee' | 'milestone' | 'remindAt'>,
   now = Date.now(),
 ): CheckinStatus | undefined {
-  if (d.state !== 'not_started' || isDeferred(d) || isHumanTask(d) || isMilestone(d)) return undefined
+  if (d.state !== 'not_started' || isDeferred(d) || isHumanTask(d) || isMilestone(d) || remindsLater(d, now)) return undefined
   const lastWrite = Date.parse(d.activeAt || d.updatedAt || d.created || '')
   return dueAndRecord(l, d.id, lastWrite, checkinThresholdMs(d.staleAfter), now)
 }
 
 /** Not-started, not deferred, free to start and not the owner's own to-do — the owner's
  *  "stale task": neither waiting on a decision nor being worked on. A node queued behind
- *  an unfinished `--after` is waiting its turn, not stale. Oldest first, so the nag (and
- *  `stale_count` in the bench/JSON) surfaces what's sat longest. */
-export function staleTasksOf<T extends Decision>(items: T[]): T[] {
+ *  an unfinished `--after` is waiting its turn, not stale; neither is a reminder before its
+ *  own clock (`remind_at`, `nod add --remind` / `nod edit --remind`) — not idle, just
+ *  waiting on its own schedule. Oldest first, so the nag (and `stale_count` in the
+ *  bench/JSON) surfaces what's sat longest. */
+export function staleTasksOf<T extends Decision>(items: T[], now = Date.now()): T[] {
   return items
     .filter((d) => d.state === 'not_started' && !isDeferred(d) && !isHumanTask(d) && !isMilestone(d) && isStartable(d, items))
+    .filter((d) => !remindsLater(d, now))
     .sort((a, b) => Date.parse(a.created) - Date.parse(b.created))
 }

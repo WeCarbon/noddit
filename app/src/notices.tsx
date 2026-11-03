@@ -4,7 +4,7 @@ import { s, type StringKey } from './strings.ts'
 
 /** Something an AI (or the clock) did that the owner should notice. */
 export interface Notice {
-  kind: 'replied' | 'decision' | 'claimed' | 'checkBack' | 'milestone' | 'uncollected'
+  kind: 'replied' | 'decision' | 'claimed' | 'checkBack' | 'milestone' | 'remind' | 'uncollected'
   key: string
   ref: string
   title: string
@@ -31,6 +31,7 @@ const WHAT: Record<Notice['kind'], StringKey> = {
   claimed: 'noticeClaimed',
   checkBack: 'noticeCheckBack',
   milestone: 'noticeMilestoneDay',
+  remind: 'noticeRemind',
   uncollected: 'noticeUncollected',
 }
 

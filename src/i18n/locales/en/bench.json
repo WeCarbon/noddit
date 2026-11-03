@@ -73,6 +73,8 @@
     "doing": "In progress",
     "due": "Due {{when}}",
     "overdue": "Overdue {{span}}",
+    "remind": "Remind {{when}}",
+    "remindNow": "Remind now",
     "byAi": "by an AI",
     "estHuman": "you {{span}}",
     "estAi": "AI {{span}}"

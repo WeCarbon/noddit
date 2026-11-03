@@ -73,6 +73,8 @@
     "doing": "قيد التنفيذ",
     "due": "يستحق {{when}}",
     "overdue": "متأخر {{span}}",
+    "remind": "تذكير {{when}}",
+    "remindNow": "تذكير الآن",
     "byAi": "أجّله وكيل",
     "estHuman": "أنت {{span}}",
     "estAi": "AI {{span}}"

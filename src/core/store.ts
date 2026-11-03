@@ -536,6 +536,7 @@ export class Store {
       kind: input.kind ?? (options.length ? 'decision' : 'task'),
       urgency: input.urgency && input.urgency !== 'normal' ? input.urgency : undefined,
       due: input.due,
+      remindAt: input.remindAt,
       ifNoAnswer: input.ifNoAnswer?.trim() || undefined,
       reversible: input.reversible,
       session: input.session,
@@ -1020,10 +1021,10 @@ export class Store {
     return this.delay(d, { by: opts.by, role: opts.role, until: nowStamp(everyUntil(every)), ownerSaid: opts.ownerSaid })
   }
 
-  /** Front-matter fields set after the fact (`nod edit --every / --due / --est`); null clears one. Not a request: nothing is queued. */
-  setFields(d: Decision, f: { every?: string | null; due?: string | null; est?: string | null }): Decision {
-    const pick = <K extends 'every' | 'due' | 'est'>(k: K): string | undefined => (f[k] === undefined ? d[k] : (f[k] ?? undefined))
-    return this.mutate(d, (d) => ({ next: { ...d, every: pick('every'), due: pick('due'), est: pick('est'), milestone: pick('due') ? d.milestone : undefined } }))
+  /** Front-matter fields set after the fact (`nod edit --every / --due / --est / --remind`); null clears one. Not a request: nothing is queued. */
+  setFields(d: Decision, f: { every?: string | null; due?: string | null; est?: string | null; remindAt?: string | null }): Decision {
+    const pick = <K extends 'every' | 'due' | 'est' | 'remindAt'>(k: K): string | undefined => (f[k] === undefined ? d[k] : (f[k] ?? undefined))
+    return this.mutate(d, (d) => ({ next: { ...d, every: pick('every'), due: pick('due'), est: pick('est'), remindAt: pick('remindAt'), milestone: pick('due') ? d.milestone : undefined } }))
   }
 
   /** Lifts any 延迟: a plain deferral comes back as it was; a wait goes back to 待开始. */
@@ -1104,6 +1105,35 @@ export class Store {
       if (done) back.push(next)
     }
     return back
+  }
+
+  /** A `nod` reminder note already went out for the `remind_at` currently on record —
+   *  editing it to a later time starts over (same idea as `waitReminded`). */
+  private reminderFired(d: Decision): boolean {
+    if (!d.remindAt) return false
+    const note = d.notes.findLast((n) => n.author === DEFERRAL_CLOCK && n.kind === NOTE_KIND.reminded)
+    return Boolean(note) && Date.parse(note!.at) >= Date.parse(d.remindAt)
+  }
+
+  /**
+   * Reminders (`nod add --remind` / `nod edit --remind`) whose clock has come: one note
+   * signed `nod` — "time to tell the owner" (the monitor turns it into NODDIT-REMIND for
+   * the node's own agent, and the app's own notification) — the first time anything looks
+   * after that moment. Once per `remind_at`: moving it later starts over.
+   */
+  fireDueReminders(now = Date.now()): Decision[] {
+    const out: Decision[] = []
+    for (const d of this.all()) {
+      if (!d.remindAt || isTerminal(d.state) || Date.parse(d.remindAt) > now || this.reminderFired(d)) continue
+      let done = false
+      const next = this.mutate(d, (d) => {
+        if (!d.remindAt || isTerminal(d.state) || Date.parse(d.remindAt) > now || this.reminderFired(d)) return { next: d }
+        done = true
+        return { next: { ...d, body: appendSection(d.body, noteHeading(NOTE_KIND.reminded, 'agent', DEFERRAL_CLOCK, nowStamp()), NOTE_TEXT.reminded(d.title)) } }
+      })
+      if (done) out.push(next)
+    }
+    return out
   }
 
   /**

@@ -230,6 +230,7 @@ whenLanguageSet(() =>
     milestone: s('milestone'),
     dueDay: s('phraseDueDay'),
     dueHour: s('phraseDueHour'),
+    remind: s('phraseRemind'),
     agentReplied: s('phraseAgentReplied'),
     open: s('trayOpen'),
     settings: s('traySettings'),

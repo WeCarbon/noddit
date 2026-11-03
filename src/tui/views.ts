@@ -461,6 +461,20 @@ export function milestoneCountdown(_d: Item, _now = Date.now()): Segment | null 
   return null
 }
 
+/** 「Remind tomorrow」 on a live node with a reminder (`nod add --remind` / `nod edit
+ *  --remind`) still ahead of it — shown the same way as a due date. Nothing once `nod
+ *  monitor` has already told its agent (a 已提醒 note on record — core/store.ts's
+ *  `fireDueReminders`), since the AI's own next step takes it from there. */
+export function remindMark(d: Item, now = Date.now()): Segment | null {
+  if (!d.remindAt || isTerminal(d.state) || d.notes.some((n) => n.kind === NOTE_KIND.reminded)) return null
+  const left = Date.parse(d.remindAt) - now
+  if (!Number.isFinite(left)) return null
+  if (left < 0) return { text: t('bench.badge.remindNow'), color: 'red', bold: true }
+  const day = untilDay(d.remindAt)
+  const soon = left < 86_400_000
+  return { text: t('bench.badge.remind', { when: day ? dayFromToday(day, new Date(now)) : '' }), color: soon ? 'red' : 'yellow', bold: soon }
+}
+
 /** 待决: per project, AI-stuck nodes first, then early-answerable ones.
  *  Answered nodes have left this view; they're in 可用. */
 export function ownerRows(items: Item[]): Row[] {
@@ -953,7 +967,7 @@ function refsShort(refs: string[], max = 2): string {
 export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
   const sep: Segment = { text: ' · ', dim: true }
   const lead = (forms: Segment[][], seg: Segment | null) => (seg ? [...forms.map((f) => [seg, sep, ...f]), [seg]] : forms)
-  const countdown = row?.touch ? null : (milestoneCountdown(d, now) ?? dueMark(d, now))
+  const countdown = row?.touch ? null : (milestoneCountdown(d, now) ?? dueMark(d, now) ?? remindMark(d, now))
   const est = row?.touch ? null : estimateMark(d, items)
   return lead(lead(stateSuffix(d, items, now, row), est), countdown)
 }

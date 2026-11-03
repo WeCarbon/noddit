@@ -3,15 +3,15 @@ import { readStdin, requireDecision, resolveAuthor, resolveStore, shellRole } fr
 import { refOf } from '../../core/ref.ts'
 import { toJSON } from '../../core/render.ts'
 import { t } from '../../i18n/index.ts'
-import { dueOf, everyArg } from './send.ts'
+import { dueOf, everyArg, remindOf } from './send.ts'
 import { estWho } from '../../core/estimate.ts'
 
 const help = () => t('cli.help.edit')
 
-const FIELDS = ['every', 'due', 'est'] as const
+const FIELDS = ['every', 'due', 'est', 'remind'] as const
 const CLEAR = new Set(['off', 'none', 'no', '-', ''])
 
-/** `nod edit <id> --est 2h --every 3d --due fri` (`off` clears one): the node's own fields, not its text. */
+/** `nod edit <id> --est 2h --every 3d --due fri --remind "11-07 09:00"` (`off` clears one): the node's own fields, not its text. */
 function editFields(args: Args, ref: string): number {
   const raw = (k: (typeof FIELDS)[number]) => {
     const v = one(args, k)
@@ -20,19 +20,26 @@ function editFields(args: Args, ref: string): number {
   const every = raw('every')
   const due = raw('due')
   const est = raw('est')
+  const remind = raw('remind')
   const store = resolveStore(args, { allowRegistry: true })
   const d = requireDecision(store, ref, args)
-  const next = store.setFields(d, { every: every === null ? null : everyArg(every), due: due === null ? null : dueOf(due), est: est === null ? null : est?.trim() })
+  const next = store.setFields(d, {
+    every: every === null ? null : everyArg(every),
+    due: due === null ? null : dueOf(due),
+    est: est === null ? null : est?.trim(),
+    remindAt: remind === null ? null : remindOf(remind),
+  })
   if (bool(args, 'json')) console.log(JSON.stringify({ ...toJSON(next), changed: next !== d }))
   else console.log(t('cli.edit.fields', { ref: refOf(next), what: fieldsText(next) }))
   return 0
 }
 
-function fieldsText(d: { every?: string; due?: string; est?: string; assignee?: string }): string {
+function fieldsText(d: { every?: string; due?: string; est?: string; assignee?: string; remindAt?: string }): string {
   return [
     d.est ? t(estWho(d) === 'human' ? 'cli.edit.estHuman' : 'cli.edit.estAi', { est: d.est }) : t('cli.edit.noEst'),
     d.every ? t('cli.edit.every', { every: d.every }) : t('cli.edit.noEvery'),
     d.due ? t('cli.edit.due', { due: d.due.slice(0, 16).replace('T', ' ') }) : t('cli.edit.noDue'),
+    d.remindAt ? t('cli.edit.remind', { remind: d.remindAt.slice(0, 16).replace('T', ' ') }) : t('cli.edit.noRemind'),
   ].join(' · ')
 }
 

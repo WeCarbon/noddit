@@ -51,6 +51,7 @@ test('next/last/this week, month, quarter, year start on their first day (weeks 
 
 test('calendar dates: ISO, month/day, day month, month day — a month already over means next year', () => {
   assert.equal(p('2026-11-15'), '2026-11-15')
+  assert.equal(p('11-07'), '2026-11-07')
   assert.equal(p('11/15'), '2026-11-15')
   assert.equal(p('11/15/27'), '2027-11-15')
   assert.equal(p('15 nov'), '2026-11-15')
@@ -112,6 +113,28 @@ test('a full date-time is taken as given; a day means its start', () => {
   assert.equal(parseWhen('nope', MON), null)
   assert.equal(untilDay(new Date(2026, 10, 6).toISOString()), '2026-11-06')
   assert.equal(daysFromToday('2026-11-06', MON), 4)
+})
+
+test('a time of day rides on a loose day too: fri 2pm, 11-07 09:00, 明天9点, 明天 下午3点', () => {
+  const a = parseWhen('fri 2pm', MON)!
+  assert.equal(a.timed, true)
+  assert.deepEqual([a.day, a.at.getHours(), a.at.getMinutes()], ['2026-11-06', 14, 0])
+  const b = parseWhen('11-07 09:00', MON)!
+  assert.equal(b.timed, true)
+  assert.deepEqual([b.day, b.at.getHours(), b.at.getMinutes()], ['2026-11-07', 9, 0])
+  const c = parseWhen('tomorrow 9:30pm', MON)!
+  assert.deepEqual([c.day, c.at.getHours(), c.at.getMinutes()], ['2026-11-03', 21, 30])
+  const d = parseWhen('明天9点', MON)!
+  assert.equal(d.timed, true)
+  assert.deepEqual([d.day, d.at.getHours(), d.at.getMinutes()], ['2026-11-03', 9, 0])
+  const e = parseWhen('明天 下午3点', MON)!
+  assert.deepEqual([e.day, e.at.getHours(), e.at.getMinutes()], ['2026-11-03', 15, 0])
+  const f = parseWhen('后天上午9点30', MON)!
+  assert.deepEqual([f.day, f.at.getHours(), f.at.getMinutes()], ['2026-11-04', 9, 30])
+  // No marker (`:`, `点`, am/pm): a bare number stays a day-of-month digit, never a time.
+  assert.equal(parseWhen('15', MON)!.timed, false)
+  // A time alone, with no date in front of it, reads as nothing — there is no day to attach it to.
+  assert.equal(parseWhen('下午3点', MON), null)
 })
 
 test('suggestions: the parsed day first, then the matching ready-made picks, no day twice', () => {

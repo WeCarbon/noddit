@@ -7,7 +7,7 @@ import { briefTitle } from '../../core/intake.ts'
 import { isListening } from '../../core/listeners.ts'
 import { assigneeArg, HUMAN } from '../../core/assignee.ts'
 import { milestoneDue } from './flag.ts'
-import { parseEvery } from '../../core/fuzzy-date.ts'
+import { parseEvery, parseWhen } from '../../core/fuzzy-date.ts'
 import { mentionsRemind } from '../../core/remind.ts'
 import { nodditEnv, setNodditEnv } from '../../core/env.ts'
 import { URGENCIES } from '../../core/order.ts'
@@ -60,7 +60,10 @@ export async function run(args: Args): Promise<number> {
   const milestone = bool(args, 'milestone')
   if (milestone && assignee) throw new Error(t('cli.send.milestoneNotAssignee'))
   if (milestone && (bool(args, 'brief') || cliOptions.length || questions.length || bool(args, 'fyi'))) throw new Error(t('cli.send.milestoneIsTask'))
-  const brief = !assignee && !milestone && isBrief(args, { options: cliOptions.length > 0, questions: questions.length > 0, meta, body: piped.body })
+  const remindRaw = one(args, 'remind') ?? (meta.remind !== undefined ? String(meta.remind) : undefined)
+  if (remindRaw !== undefined && assignee) throw new Error(t('cli.send.remindNotAssignee'))
+  if (remindRaw !== undefined && (bool(args, 'brief') || cliOptions.length || questions.length || bool(args, 'fyi'))) throw new Error(t('cli.send.remindIsTask'))
+  const brief = !assignee && !milestone && remindRaw === undefined && isBrief(args, { options: cliOptions.length > 0, questions: questions.length > 0, meta, body: piped.body })
 
   const title = brief && words ? briefTitle(words) : words || piped.title
   if (!title) throw new Error(`${t('cli.send.titleRequired')}\n\n${help()}`)
@@ -78,10 +81,11 @@ export async function run(args: Args): Promise<number> {
     milestone: milestone || undefined,
     assignee,
     due: dueOf(one(args, 'due') ?? (meta.due !== undefined ? String(meta.due) : undefined)),
+    remindAt: remindOf(remindRaw),
     ifNoAnswer: one(args, 'if-no-answer') ?? (meta.if_no_answer !== undefined ? String(meta.if_no_answer) : undefined),
     reversible: yesNo(one(args, 'reversible') ?? (meta.reversible !== undefined ? String(meta.reversible) : undefined), 'reversible'),
     kind: bool(args, 'fyi') || meta.kind === 'fyi' ? 'fyi' : undefined,
-    task: brief || Boolean(assignee) || milestone || bool(args, 'task'),
+    task: brief || Boolean(assignee) || milestone || Boolean(remindRaw) || bool(args, 'task'),
     intake: brief || undefined,
     parent: one(args, 'parent'),
     after: many(args, 'after').flatMap((s) => s.split(/[,\s]+/)).filter(Boolean),
@@ -202,6 +206,15 @@ export function everyArg(raw: string | undefined): string | undefined {
 /** `--due`: an ISO time, a loose day (fri, 15 nov — the end of it), or a span from now (`4h`) — stored as ISO either way. */
 export function dueOf(raw: string | undefined): string | undefined {
   return raw ? milestoneDue(raw) : undefined
+}
+
+/** `--remind`: a loose day/time (`fri 2pm`, `11-07 09:00`, `明天9点` — kept as given; a bare
+ *  day means its start) — stored as an ISO stamp either way. */
+export function remindOf(raw: string | undefined): string | undefined {
+  if (!raw) return undefined
+  const when = parseWhen(raw)
+  if (!when) throw new Error(t('cli.send.badRemind', { value: raw }))
+  return nowStamp(when.at)
 }
 
 /** Runs `$NODDIT_NOTIFY_CMD` (or the older `$DECS_NOTIFY_CMD`) if set — no built-in channel, since pinging by default gets muted. */

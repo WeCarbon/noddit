@@ -41,6 +41,7 @@ export const NOTE_KIND = {
   claimed: '接活',
   heartbeat: '心跳',
   received: '已收到',
+  reminded: '已提醒',
 } as const
 
 export type NoteKindKey = keyof typeof NOTE_KIND
@@ -98,6 +99,7 @@ export const NOTE_TEXT = {
   supersededBy: (ref: string, title: string) => `被 ${ref} 取代：${title}`,
   declinedTextOnly: '只写了文字，没选选项',
   claimed: '接了。展开、拆成子节点后请负责人确认，确认前不开工。',
+  reminded: (what: string) => `到点了，告诉负责人：${what}`,
   attachedHere: '附件见下。',
   editedDescription: '改了描述。',
   editedNote: (note: { kind: string; author: string; at: string; text: string }) => {

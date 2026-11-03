@@ -20,6 +20,7 @@ const SCOPES: Record<string, ListFilter> = {
   deferred: { status: 'all', archived: false },
   flagged: { status: 'all', archived: false },
   due: { status: 'all', archived: false },
+  remind: { status: 'all', archived: false },
 }
 
 const statusWordCache = new Map<Lang, Record<string, ItemStatus>>()
@@ -76,6 +77,8 @@ export function run(args: Args): number {
     .filter((d) => (scope === 'flagged' ? isFlagged(d) && !hidden(d) : true))
     // Anything with a due date, still live and not put off — what the app reminds the owner of.
     .filter((d) => (scope === 'due' ? Boolean(d.due) && !isTerminal(d.state) && !hidden(d) : true))
+    // A live reminder (`nod add --remind`) — what the app's own notification polls for.
+    .filter((d) => (scope === 'remind' ? Boolean(d.remindAt) && !isTerminal(d.state) && !hidden(d) : true))
 
   if (bool(args, 'json')) {
     console.log(JSON.stringify(list.map(toJSON)))
