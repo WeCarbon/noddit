@@ -636,7 +636,15 @@ export function Bench(props: {
   const markStart = () =>
     node &&
     optimistic(
-      both(patchNode(node.key, (n) => ({ ...n, status: 'in_progress' })), patchRows(node.key, (r) => ({ ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '◐', color: 'cyan', dim: false } }))),
+      both(
+        patchNode(node.key, (n) => ({ ...n, status: 'in_progress' })),
+        // The owner's own to-do started is ⬖ in yellow (as the CLI draws it), an AI's is ◐ in cyan; the badge waits for the reload.
+        patchRows(node.key, (r) =>
+          r.human_task
+            ? { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '⬖', color: 'yellow', dim: false }, badge: [], badge_short: [] }
+            : { ...r, state: 'in_progress', glyph: r.glyph && { ...r.glyph, text: '◐', color: 'cyan', dim: false } },
+        ),
+      ),
       () => api.start(rootOf(node), node.id),
       s('started'),
     )
@@ -695,7 +703,7 @@ export function Bench(props: {
     if (n && !n.terminal) {
       items.push({ kind: 'separator' })
       if (n.status === 'not_started') items.push({ label: s('ctxStart'), icon: I(Play), run: () => L().markStart() })
-      if (n.status === 'in_progress' || n.status === 'waiting') items.push({ label: s('ctxDone'), icon: I(CircleCheck), run: () => L().markDone() })
+      if (n.status !== 'needs_decision') items.push({ label: s('ctxDone'), icon: I(CircleCheck), run: () => L().markDone() })
       const delayed = Boolean(n.deferred_at) || n.status === 'waiting'
       items.push({
         label: s('defer'),

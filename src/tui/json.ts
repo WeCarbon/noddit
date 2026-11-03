@@ -185,6 +185,13 @@ const withPath = (d: Item, a: Item['attachments'][number]) => ({
   label: a.label, target: a.target, path: targetPath(d.file, a.target), image: a.image, group: a.group ?? null, caption: a.caption ?? null,
 })
 
+/** How `d`'s list row looks — glyph, badge, state, who — for a window that reloads one node without the whole bench. */
+function rowLook(d: Item, items: Item[], now: number): Record<string, unknown> {
+  const view = 'all'
+  const { key: _k, kind: _kind, depth: _d, fold: _f, scope: _s, has_kids: _h, collapsed: _c, context: _x, mark: _m, ...look } = rowJson(view, { key: keyOf(d), kind: 'node', node: d, depth: 0 }, items, now, null)
+  return look
+}
+
 function nodeJson(d: Item, items: Item[], now: number, backlinks: Item[]): Record<string, unknown> {
   const { body: _body, ...fields } = toJSON(d)
   const live = withoutLiveChoices(d.body)
@@ -237,7 +244,7 @@ function nodeJson(d: Item, items: Item[], now: number, backlinks: Item[]): Recor
 export function nodeDetailJson(store: Store, d: Item, now = Date.now()): Record<string, unknown> {
   const items = store.all()
   const self = items.find((i) => keyOf(i) === keyOf(d)) ?? d
-  return nodeJson(self, items, now, store.backlinks(self, items))
+  return { ...nodeJson(self, items, now, store.backlinks(self, items)), row: rowLook(self, items, now) }
 }
 
 /**

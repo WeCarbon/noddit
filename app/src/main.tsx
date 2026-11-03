@@ -5,7 +5,7 @@ import { Bench, type Prefs } from './bench.tsx'
 import { ResizeEdges } from './resize.tsx'
 import { Onboarding, envReady } from './onboarding.tsx'
 import { Banner } from './banner.tsx'
-import { newer, nextStamp, patchNode, readBench, type PendingOp, type Read } from './optimistic.ts'
+import { both, newer, nextStamp, patchNode, patchRows, readBench, type PendingOp, type Read } from './optimistic.ts'
 import { s, setLanguage, whenLanguageSet } from './strings.ts'
 import type { Bench as BenchData, MonitorUpdated, ShellEnv } from './types.ts'
 import './style.css'
@@ -28,6 +28,8 @@ type Phase = { kind: 'boot' } | { kind: 'onboarding'; startAt?: 'welcome' | 'che
 function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }) {
   const [prefs, setPrefsState] = useState<Prefs>(prefs0)
   const [read, setRead] = useState<Read | null>(snapshot && { bench: snapshot, startedAt: 0 })
+  const shownBench = useRef(read?.bench)
+  shownBench.current = read?.bench
   const bench = read?.bench ?? null
   // A monitor "updated" event names exactly which nodes changed; these hold
   // the ones reloaded one at a time off that (N258), on top of `bench` until
@@ -131,7 +133,11 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
           .loadNode(root, c.id)
           .then((node) => {
             const id = ++patchId.current
-            setPatches((ps) => [...ps, { id, patch: patchNode(c.key, () => node), doneAt: nextStamp() }])
+            const { row, ...fresh } = node
+            setPatches((ps) => [...ps, { id, patch: both(patchNode(c.key, () => fresh), patchRows(c.key, (r) => ({ ...r, ...row }))), doneAt: nextStamp() }])
+            // A node that changed state, owner or delay may belong in other lists now: only the full reload knows which.
+            const before = shownBench.current?.nodes[c.key]
+            if (!before || before.status !== fresh.status || before.assignee !== fresh.assignee || before.deferred_at !== fresh.deferred_at) scheduleRefresh()
           })
           .catch(() => scheduleRefresh())
       }

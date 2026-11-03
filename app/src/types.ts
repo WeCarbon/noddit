@@ -120,6 +120,8 @@ export interface Attachment {
 }
 
 export interface Node {
+  /** Only from a one-node reload (`bench --json --node`): how its list row looks now. */
+  row?: Partial<Row>
   key: string
   id: number
   ref: string
