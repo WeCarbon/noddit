@@ -1367,7 +1367,7 @@ export class Store {
     const body = how.note !== undefined ? replaceNoteText(d.body, how.note, how.text) : replaceDescription(d.body, how.text)
     if (body === null || body === d.body) return d
     const edited = this.mutate(d, (d) => ({ next: { ...d, body } }))
-    const what = how.note !== undefined ? NOTE_TEXT.editedNote(how.note) : NOTE_TEXT.editedDescription
+    const what = how.note !== undefined ? NOTE_TEXT.editedNote({ ...d.notes[how.note - 1], text: how.text }) : NOTE_TEXT.editedDescription
     return this.append(edited, noteHeading(NOTE_KIND.addendum, how.role, how.by, nowStamp()), what, how.by, how.role)
   }
 

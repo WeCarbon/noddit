@@ -100,7 +100,12 @@ export const NOTE_TEXT = {
   claimed: '接了。展开、拆成子节点后请负责人确认，确认前不开工。',
   attachedHere: '附件见下。',
   editedDescription: '改了描述。',
-  editedNote: (n: number) => `改了第 ${n} 条。`,
+  editedNote: (note: { kind: string; author: string; at: string; text: string }) => {
+    const when = note.at.slice(5, 16).replace('T', ' ')
+    const plain = note.text.replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ').trim()
+    const start = [...plain].slice(0, 20).join('')
+    return `改了 ${note.author} ${when} 的那条${note.kind}：「${start}${[...plain].length > 20 ? '…' : ''}」。`
+  },
   retitled: (from: string) => `改了标题，原来是「${from}」。`,
 } as const
 
