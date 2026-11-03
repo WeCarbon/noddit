@@ -1,4 +1,4 @@
-import { useEffect } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import type { NodsDay } from './types.ts'
 import { s } from './strings.ts'
 import { historyWeeks, monthLabels, nodsLevel } from './nod-calendar-data.ts'
@@ -13,6 +13,11 @@ const weekdayLabel = (n: number) => new Intl.DateTimeFormat(docLang(), { weekday
 /** GitHub's own convention: every other row carries a label, to cut clutter. */
 const WEEKDAY_ROWS = [0, 1, 2, 3, 4, 5, 6]
 const LABELLED_ROWS = new Set([1, 3, 5])
+const WEEKDAY_COL = 16
+const GAP = 3
+
+/** The cell size that fits `weeks` columns, plus the weekday column, into `width`. */
+export const cellSize = (width: number, weeks: number) => Math.max(4, Math.floor((width - WEEKDAY_COL - weeks * GAP) / weeks))
 
 /**
  * The calendar button next to ⚡ opens this: a GitHub-style heatmap of the
@@ -29,6 +34,15 @@ export function NodCalendar({ history, onClose }: { history: NodsDay[]; onClose:
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
   const weeks = historyWeeks(history)
+  const chart = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const el = chart.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const max = Math.max(1, ...history.map((d) => d.count))
   const months = monthLabels(weeks, monthShort)
   const today = history.at(-1)?.date
@@ -36,7 +50,7 @@ export function NodCalendar({ history, onClose }: { history: NodsDay[]; onClose:
     <div class="overlay" onClick={onClose}>
       <div class="nod-cal" onClick={(e) => e.stopPropagation()}>
         <h3>{s('nodsCalendarTitle')}</h3>
-        <div class="nod-cal-chart" style={{ '--weeks': weeks.length }}>
+        <div ref={chart} class="nod-cal-chart" style={{ '--weeks': weeks.length, '--cell': `${cellSize(width, weeks.length)}px` }}>
           <span />
           {WEEKDAY_ROWS.map((n) => (
             <span key={`d${n}`} class="nod-cal-weekday">
@@ -55,7 +69,7 @@ export function NodCalendar({ history, onClose }: { history: NodsDay[]; onClose:
                   title={s('nodsCalendarHover', { date: day.date, count: String(day.count) })}
                 />
               ) : (
-                <span key={`${wi}-${di}`} class="nod-cal-cell empty" />
+                <span key={`${wi}-${di}`} class="nod-cal-cell nod-cal-blank" />
               ),
             ),
           ])}
