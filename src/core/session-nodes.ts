@@ -102,20 +102,37 @@ function worktreeOf(cwd: string): string | undefined {
 }
 
 /**
+ * N296: a lane runs `nod` with `cwd` in the *main* checkout, not its own
+ * worktree — `decisions/` is gitignored and only ever checked out there, so
+ * every lane (and the lead) has to reach it the same way. That makes
+ * `worktreeOf(cwd)` return the same main-checkout path for all of them,
+ * undoing N280's whole point. `NODDIT_WORKTREE`/`DECS_WORKTREE` lets a lane
+ * say which worktree it actually is, once, regardless of where it then has
+ * to point `cwd` to run `nod` at all — a plain string, so it costs nothing
+ * on any OS and needs no git call. Unset, this is a no-op: cwd's own
+ * worktree still wins, same as before.
+ */
+function worktreeScope(env: NodeJS.ProcessEnv, cwd: string): string | undefined {
+  return nodditEnv('WORKTREE', env) || worktreeOf(cwd)
+}
+
+/**
  * Which session is asking: the pinned identity, else the harness's own
- * session id, else its process — then, when cwd is inside one, the
- * worktree it's in. That last part (N280) is what keeps a lead and a
- * sub-agent it spawned apart: a sub-agent in the same agent process shares
- * everything else (`CLAUDE_CODE_SESSION_ID` is set once per top-level
- * harness process, not reassigned per agent inside it), but a lane working
- * its own worktree still has a cwd of its own. A sub-agent with no
- * worktree of its own (sharing its lead's cwd too) still collides —
- * nothing left to tell them apart — same as before this existed. Undefined
- * outside any agent session — the owner's terminal has no "current node".
+ * session id, else its process — then, when cwd is inside one (or
+ * `NODDIT_WORKTREE` says otherwise), the worktree it's in. That last part
+ * (N280, N296) is what keeps a lead and a sub-agent it spawned apart: a
+ * sub-agent in the same agent process shares everything else
+ * (`CLAUDE_CODE_SESSION_ID` is set once per top-level harness process, not
+ * reassigned per agent inside it), but a lane working its own worktree
+ * still has a worktree of its own. A sub-agent with no worktree of its own
+ * (sharing its lead's cwd too, with no `NODDIT_WORKTREE` either) still
+ * collides — nothing left to tell them apart — same as before this
+ * existed. Undefined outside any agent session — the owner's terminal has
+ * no "current node".
  */
 export function sessionKey(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): string | undefined {
   const scoped = (key: string) => {
-    const scope = worktreeOf(cwd)
+    const scope = worktreeScope(env, cwd)
     return scope ? `${key}@${scope}` : key
   }
   const identity = currentIdentity(env)

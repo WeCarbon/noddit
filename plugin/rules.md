@@ -17,6 +17,13 @@ how? `nod <command> --help`; for the details, load the nod skill.
 - **Only nod commands write `decisions/`** — never an editor, `sed`, a
   redirect or moved files. A command can't do what you need? Record a node
   saying what's missing; don't work around it.
+- **Run `nod` from your own worktree, not a shared checkout.** It already
+  finds `decisions/` through the main checkout on its own — no `cd` needed.
+  If something still makes you share a cwd with another agent, set
+  `NODDIT_WORKTREE=<your own worktree's absolute path>` on every call: nod
+  tells sessions apart partly by cwd, and a shared one otherwise means a
+  shared current node and a signed author that can flip to whoever else
+  last ran `nod` from there.
 - **Need the owner to decide: `nod ask <id> -o 1="…" -o 2="…"`.** Every
   option says what choosing it costs — time, who does it, what is given
   up, risk, whether it can be undone — and which one you recommend and
