@@ -2,6 +2,7 @@ import { render } from 'preact'
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import * as api from './backend.ts'
 import { Bench, type Prefs } from './bench.tsx'
+import { coalesce } from './coalesce.ts'
 import { ResizeEdges } from './resize.tsx'
 import { Onboarding, envReady } from './onboarding.tsx'
 import { Banner } from './banner.tsx'
@@ -52,8 +53,18 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
   const [phase, setPhase] = useState<Phase>(snapshot && prefs0.onboarded ? { kind: 'bench' } : { kind: 'boot' })
   const [adding, setAdding] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const inflight = useRef<Promise<void> | null>(null)
-  const again = useRef(false)
+  const doRefresh = useRef<(() => Promise<void>) | null>(null)
+  if (!doRefresh.current)
+    doRefresh.current = coalesce(async () => {
+      try {
+        const next = await readBench(api.loadBench)
+        setLanguage(next.bench.lang, next.bench.rtl)
+        setRead((shown) => newer(shown, next))
+        void api.snapshotSave(JSON.stringify(next.bench))
+      } catch {
+        /* keep what is on screen; the next event retries */
+      }
+    })
 
   const setPrefs = useCallback((p: Partial<Prefs>) => {
     setPrefsState((prev) => {
@@ -64,27 +75,12 @@ function App({ prefs0, snapshot }: { prefs0: Prefs; snapshot: BenchData | null }
   }, [])
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (inflight.current) {
-      again.current = true
-      return inflight.current
-    }
     setRefreshing(true)
-    inflight.current = (async () => {
-      do {
-        again.current = false
-        try {
-          const next = await readBench(api.loadBench)
-          setLanguage(next.bench.lang, next.bench.rtl)
-          setRead((shown) => newer(shown, next))
-          void api.snapshotSave(JSON.stringify(next.bench))
-        } catch {
-          /* keep what is on screen; the next event retries */
-        }
-      } while (again.current)
-    })()
-    await inflight.current
-    inflight.current = null
-    setRefreshing(false)
+    try {
+      await doRefresh.current!()
+    } finally {
+      setRefreshing(false)
+    }
   }, [])
 
   const refreshTimer = useRef(0)
