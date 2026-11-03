@@ -55,6 +55,7 @@ import { loadViews } from '../core/view-defs.ts'
 import { readPreview, TEXT_PREVIEW } from './preview.ts'
 import { DEFERRED_FOLD_KEY, foldFor, foldKey, foldSets, groupFoldKey, loadFolds, saveFold, type FoldMap } from './folds.ts'
 import { cycleOption, initialPicks, metaLines, optionForKey, picksSummary, questionLines, statusSegments } from './detail.ts'
+import { OTHER_KEY, type DecisionQuestion } from '../core/questions.ts'
 
 /** The box bench reserves for the big-image view: full screen minus the
  *  caption row and a 1-col margin. Must match what `imageLayout` lays out,
@@ -89,9 +90,9 @@ export function repaintRows(frame: Line[], from: number, to: number): string {
 const MIN_PANEL_COLS = 12
 
 type Line = Segment[]
-export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'close' | 'goto' | 'settings' | 'brief' | 'session'
+export type Mode = 'browse' | 'move' | 'confirm' | 'note' | 'attach' | 'help' | 'image' | 'text' | 'questions' | 'qnote' | 'qother' | 'close' | 'goto' | 'settings' | 'brief' | 'session'
 /** Modes where keystrokes go into the prompt-line draft. */
-const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'close', 'goto', 'brief']
+const TEXT_MODES: Mode[] = ['confirm', 'note', 'qnote', 'qother', 'close', 'goto', 'brief']
 
 interface Props {
   store: Store
@@ -491,6 +492,41 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
     setMode('questions')
   }
 
+  /** Picks a real option for a sub-question — dropping any 「其他」 text left
+   *  over from before, the same collapse the app side does on an option click. */
+  const pickQuestionOption = (q: DecisionQuestion, opt: string) => {
+    const wasOther = qPicks[q.key] === OTHER_KEY
+    setQPicks((p) => ({ ...p, [q.key]: opt }))
+    if (wasOther)
+      setQNotes((n) => {
+        const next = { ...n }
+        delete next[q.key]
+        return next
+      })
+  }
+
+  /** Typed text makes this question's pick 「其他」; an empty box falls back to
+   *  its default instead of leaving a text-less 「其他」 behind. */
+  const commitQOther = () => {
+    const q = current?.questions?.[qIndex]
+    const text = draft.trim()
+    if (q) {
+      if (text) {
+        setQPicks((p) => ({ ...p, [q.key]: OTHER_KEY }))
+        setQNotes((n) => ({ ...n, [q.key]: text }))
+      } else {
+        setQPicks((p) => (p[q.key] === OTHER_KEY ? { ...p, [q.key]: q.default ?? q.options[0]?.key ?? '' } : p))
+        setQNotes((n) => {
+          const next = { ...n }
+          delete next[q.key]
+          return next
+        })
+      }
+    }
+    setDraft('')
+    setMode('questions')
+  }
+
   /** Files the draft as a brief; with nobody listening in that project, offers to open a session. */
   const commitBrief = () => {
     const at = briefAt
@@ -856,7 +892,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       if (key.escape) {
         setDraft('')
         setBriefAt(null)
-        if (mode === 'qnote') return setMode('questions')
+        if (mode === 'qnote' || mode === 'qother') return setMode('questions')
         if (mode === 'confirm' && current?.questions?.length && pendingKey === '2') return setMode('questions')
         setMode('browse')
         setPendingKey(null)
@@ -866,6 +902,7 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
         if (mode === 'confirm') return commitAnswer()
         if (mode === 'note') return commitNote()
         if (mode === 'qnote') return commitQNote()
+        if (mode === 'qother') return commitQOther()
         if (mode === 'close') return commitClose()
         if (mode === 'brief') return commitBrief()
         return commitGoto()
@@ -900,14 +937,15 @@ export function App({ store, view: initialView, openDeferred, project }: Props) 
       }
       if (key.upArrow) return setQIndex((i) => Math.max(0, i - 1))
       if (key.downArrow || key.tab) return setQIndex((i) => Math.min(qs.length - 1, i + 1))
-      if (key.leftArrow || key.rightArrow) return setQPicks((p) => ({ ...p, [q.key]: cycleOption(q, p[q.key], key.leftArrow ? -1 : 1) }))
+      if (key.leftArrow || key.rightArrow) return pickQuestionOption(q, cycleOption(q, qPicks[q.key], key.leftArrow ? -1 : 1))
       if (key.return) return startText('confirm')
       const chosen = optionForKey(q, input)
       if (chosen) {
-        setQPicks((p) => ({ ...p, [q.key]: chosen }))
+        pickQuestionOption(q, chosen)
         return setQIndex((i) => Math.min(qs.length - 1, i + 1))
       }
       if (input === 'n' || input === 'N') return startText('qnote', qNotes[q.key] ?? '')
+      if (input === 'o' || input === 'O') return startText('qother', qPicks[q.key] === OTHER_KEY ? (qNotes[q.key] ?? '') : '')
       return
     }
 
@@ -1876,7 +1914,7 @@ function renderDetail(s: FrameInput, g: Geometry, d: Decision, width: number, ro
 /** 逐条回复 replaces the body with the sub-question picker. */
 function isPicking(s: FrameInput, d: Decision): boolean {
   const qs = d.questions ?? []
-  return qs.length > 0 && (s.mode === 'questions' || s.mode === 'qnote' || (s.mode === 'confirm' && s.pendingKey === '2'))
+  return qs.length > 0 && (s.mode === 'questions' || s.mode === 'qnote' || s.mode === 'qother' || (s.mode === 'confirm' && s.pendingKey === '2'))
 }
 
 /** The detail pane's scrollable body and where each `🖼️` placeholder
@@ -1930,6 +1968,10 @@ function promptPrefix(s: FrameInput): Line | null {
     const q = d.questions?.[s.qIndex ?? 0]
     return [{ text: t('bench.prompt.qnote', { key: q?.key ?? '' }), color: 'magenta', bold: true }]
   }
+  if (s.mode === 'qother') {
+    const q = d.questions?.[s.qIndex ?? 0]
+    return [{ text: t('bench.prompt.qother', { key: q?.key ?? '' }), color: 'magenta', bold: true }]
+  }
   if (s.mode === 'close') return [{ text: t('bench.prompt.close', { ref: refOf(d) }), color: 'red', bold: true }]
   return null
 }
@@ -1968,6 +2010,7 @@ const PLACEHOLDER: Partial<Record<Mode, () => string>> = {
   confirm: () => t('bench.placeholder.optional'),
   note: () => t('bench.placeholder.typeHere'),
   qnote: () => t('bench.placeholder.typeHere'),
+  qother: () => t('bench.placeholder.typeHere'),
   close: () => t('bench.placeholder.closeReason'),
   goto: () => t('bench.placeholder.goto'),
   brief: () => t('bench.placeholder.brief'),

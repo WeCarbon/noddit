@@ -7,7 +7,7 @@ import { minutesSince } from '../core/staleness.ts'
 import { dependenciesOf, isDeferred, isTerminal, statusLabel, waitingOnOwner } from '../core/status.ts'
 import { parseSteps } from '../core/steps.ts'
 import { type Decision as Item } from '../core/types.ts'
-import type { DecisionQuestion } from '../core/questions.ts'
+import { OTHER_KEY, type DecisionQuestion } from '../core/questions.ts'
 import { t } from '../i18n/index.ts'
 import type { Segment } from './model.ts'
 import { GLYPH, ago, agoSpan, bar, glyphOf, keyOf, progressOf, unmetDeps, waitingSince } from './views.ts'
@@ -171,10 +171,15 @@ export function optionForKey(q: DecisionQuestion, input: string): string | undef
   return q.options.find((o) => o.key.toLowerCase() === input.toLowerCase())?.key
 }
 
-/** `Q1=B Q2=1(默认)`, for the confirm line. */
+/** `Q1=B Q2=1(默认) Q3=*`, for the confirm line. An 「其他」 pick shows as the
+ *  bare `*` token — the typed text is on the line above, not worth repeating here. */
 export function picksSummary(qs: DecisionQuestion[], picks: Record<string, string>, notes: Record<string, string> = {}): string {
   return qs
-    .map((q) => `${q.key}=${picks[q.key]}${picks[q.key] === q.default ? '' : '*'}${notes[q.key] ? '✎' : ''}`)
+    .map((q) => {
+      const v = picks[q.key]
+      if (v === OTHER_KEY) return `${q.key}=${OTHER_KEY}`
+      return `${q.key}=${v}${v === q.default ? '' : '*'}${notes[q.key] ? '✎' : ''}`
+    })
     .join(' ')
 }
 
@@ -200,13 +205,16 @@ export function questionLines(
       { text: q.key, bold: true, color: 'cyan' },
       { text: ` ${q.label}`, bold: focused },
     ])
+    const other = picks[q.key] === OTHER_KEY
     const optSegs: Segment[] = [{ text: '     ' }]
     for (const o of q.options) {
-      const chosen = picks[q.key] === o.key
+      const chosen = !other && picks[q.key] === o.key
       const label = `${o.key} ${o.label}${o.key === q.default ? t('bench.detail.defaultMark') : ''}`
       optSegs.push({ text: chosen ? `[${label}]` : ` ${label} `, inverse: chosen && focused, bold: chosen, color: chosen ? 'green' : undefined, dim: !chosen })
       optSegs.push({ text: ' ' })
     }
+    const otherLabel = t('bench.detail.otherOption')
+    optSegs.push({ text: other ? `[${otherLabel}]` : ` ${otherLabel} `, inverse: other && focused, bold: other, color: other ? 'green' : undefined, dim: !other })
     // Long option lists wrap on option boundaries.
     let cur: Line = []
     let used = 0
@@ -221,7 +229,10 @@ export function questionLines(
       used += sw
     }
     if (cur.length) lines.push(cur)
-    if (notes[q.key]) for (const l of wrapToWidth(t('bench.detail.noteChange', { text: notes[q.key] }), width - 6)) lines.push([{ text: `     ${l}`, color: 'magenta' }])
+    if (notes[q.key]) {
+      const line = other ? t('bench.detail.otherAnswer', { text: notes[q.key] }) : t('bench.detail.noteChange', { text: notes[q.key] })
+      for (const l of wrapToWidth(line, width - 6)) lines.push([{ text: `     ${l}`, color: 'magenta' }])
+    }
   })
   return { lines, focusRow }
 }

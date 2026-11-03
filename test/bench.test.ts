@@ -8,6 +8,7 @@ import { setLang } from '../src/i18n/index.ts'
 
 import { askIfDue } from '../src/core/checkins.ts'
 import { initLayout } from '../src/core/paths.ts'
+import { OTHER_KEY } from '../src/core/questions.ts'
 import { Store } from '../src/core/store.ts'
 import { buildOverview } from '../src/core/overview.ts'
 import type { SourceSummary } from '../src/core/sources.ts'
@@ -34,6 +35,7 @@ import {
 } from '../src/tui/views.ts'
 import { stringWidth } from '../src/tui/width.ts'
 import { RESET } from '../src/tui/zoom.ts'
+import { bench, has, KEY } from './tui-harness.ts'
 
 const text = (segs: { text: string }[]) => segs.map((s) => s.text).join('')
 const frameText = (frame: { text: string }[][]) => frame.map(text).join('\n')
@@ -388,6 +390,73 @@ test('the frame swaps the body for the picker while answering, and the prompt sh
   assert.match(picker, /▶ Q1/)
   const confirm = frameText(buildFrame(input(store, { list, index, mode: 'confirm', pendingKey: '2', qPicks: { Q1: 'B', Q2: '1' } })))
   assert.match(confirm, /Submit X\d+: Q1=B\* Q2=1/)
+})
+
+// N186: a sub-question answered free-text ("other") instead of picking an option.
+
+test('picksSummary and questionLines show an 「其他」 pick as itself, not a second asterisk tacked onto the sentinel', (t) => {
+  const store = tmpStore(t)
+  const s = session(store)
+  const form = store.get(s.form.id)!
+
+  assert.equal(
+    picksSummary(form.questions!, { Q1: OTHER_KEY, Q2: '1' }, { Q1: 'wait for Dave to confirm the copy' }),
+    `Q1=${OTHER_KEY} Q2=1`,
+  )
+
+  const { lines } = questionLines(form.questions!, 0, { Q1: OTHER_KEY, Q2: '1' }, { Q1: 'wait for Dave to confirm the copy' }, 60)
+  const drawn = lines.map(text)
+  assert.ok(drawn.some((l) => l.includes('[Other]')), 'the chip is bracketed like a chosen option')
+  assert.ok(!drawn.some((l) => l.includes('[A just rewrite it]') || l.includes('[B ask first]')), 'no option looks chosen')
+  assert.ok(drawn.some((l) => l.includes('other: wait for Dave to confirm the copy')), 'the typed text shows, not "change:"')
+})
+
+test('App: o opens a free-text box for the focused sub-question; typed text (with a comma) picks 「其他」, an option key collapses it back', async (t) => {
+  const store = tmpStore(t)
+  // Just this one node, so it is already the cursor — no navigating needed.
+  const form = store.create({
+    title: 'Carol rewrites the onboarding copy',
+    author: A,
+    questions: [
+      { key: 'Q1', label: 'how to word the heading', body: '', options: [{ key: 'A', label: 'just rewrite it', body: '' }, { key: 'B', label: 'ask first', body: '' }], default: 'A' },
+      { key: 'Q2', label: 'home-screen load speed', body: '', options: [{ key: '1', label: 'pass', body: '' }, { key: '2', label: 'fail', body: '' }], default: '1' },
+    ],
+  })
+  const b = bench(t, store, { view: 'all' })
+  await b.until(has(b, /全部按默认（Q1=A Q2=1）/))
+  await b.press('2')
+  await b.until(has(b, /Step through/))
+  await b.until(has(b, /▶ Q1/))
+
+  await b.press('o')
+  await b.until(has(b, /other answer/))
+  await b.press('wait, let’s check with Dave first, 先别发')
+  await b.press('\r')
+  await b.until(has(b, /\[Other\]/))
+  assert.match(b.frame().join('\n'), /other: wait, let’s check with Dave first, 先别发/)
+
+  // An option key collapses 「其他」 back to a normal pick — and, like any pick, moves on to Q2.
+  await b.press('b')
+  await b.until(() => !/\[Other\]/.test(b.frame().join('\n')))
+  assert.match(b.frame().join('\n'), /\[B ask first\]/)
+
+  // Back to Q1 — reopening "其他" there and committing it for real carries through to the written answer.
+  await b.press(KEY.up)
+  await b.until(has(b, /▶ Q1/))
+  await b.press('o')
+  await b.until(has(b, /other answer/))
+  await b.press('needs another pass，不急')
+  await b.press('\r')
+  await b.until(has(b, /\[Other\]/))
+  await b.press('\r') // questions → confirm
+  await b.until(has(b, /Submit/))
+  await b.press('\r') // confirm → commit
+
+  await b.until(() => store.get(form.id)!.answer?.answers?.Q1 === OTHER_KEY)
+  const answered = store.get(form.id)!
+  assert.deepEqual(answered.answer?.answers, { Q1: OTHER_KEY, Q2: '1' })
+  assert.deepEqual(answered.answer?.answerNotes, { Q1: 'needs another pass，不急' })
+  assert.match(answered.body, /- Q1 = \* —— 其他：needs another pass，不急/)
 })
 
 // ---------------------------------------------------------------------------
