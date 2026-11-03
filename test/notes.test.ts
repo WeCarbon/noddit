@@ -433,6 +433,41 @@ test('a bare decs monitor re-armed after a gap picks up what happened in between
   t.after(() => rmSync(root, { recursive: true, force: true }))
 })
 
+test('decs monitor notices a file changed on disk (not through decs) well before the next --interval tick (N257)', async (t) => {
+  const root = scratch()
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  decs(root, ['init', '--no-register'])
+  decs(root, ['add', 'edited from outside', '--task'])
+  const activeDir = join(root, 'decisions', 'active')
+  const file = join(activeDir, readdirSync(activeDir).find((f) => /^1-/.test(f))!)
+
+  const { spawn } = await import('node:child_process')
+  // A long interval: if the update still shows up quickly, it can only be the
+  // file-system watch — the poll fallback alone would not fire for 10s.
+  const child = spawn(process.execPath, [BIN, 'monitor', '--updates', '--json', '--interval', '10000', '--no-sources', '--idle-exit', '0'], {
+    cwd: root,
+    env: { ...process.env, NO_COLOR: '1', DECS_AUTHOR: 'lead · x', CLAUDECODE: '1', DECS_HOME: join(root, 'home') },
+  })
+  let out = ''
+  let err = ''
+  child.stdout.on('data', (b) => (out += b))
+  child.stderr.on('data', (b) => (err += b))
+  t.after(() => killAndWait(child))
+  await waitFor(() => err.includes('nod monitor: watching'), 'the monitor to start')
+  await new Promise((r) => setTimeout(r, 300))
+  assert.equal(out, '', 'nothing on start: the first pass only takes stock')
+
+  // A plain edit with no `decs` process involved — an editor saving the file,
+  // another tool, a sync client.
+  const text = readFileSync(file, 'utf8').replace(/^title: .*$/m, 'title: edited from outside, now')
+  writeFileSync(file, text)
+
+  await waitFor(() => out.includes('"updated"'), 'the updated line', 2_000)
+  const line = JSON.parse(out.trim().split('\n')[0])
+  assert.deepEqual(line.refs, ['X1'])
+  assert.ok(Array.isArray(line.changed) && line.changed.some((c: { ref: string }) => c.ref === 'X1'), 'the structured `changed` entry the app patches a node from')
+})
+
 test('decs monitor goes offline by itself after --idle-exit with no events, saying so', async (t) => {
   const root = scratch()
   t.after(() => rmSync(root, { recursive: true, force: true }))
