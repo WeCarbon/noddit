@@ -115,7 +115,7 @@ export function Bench(props: {
   // below what a moment ago already showed, reset once a new day's own count catches up
   // or begins) covers both, the same way `ops` above covers everything else about a node.
   const [nodsBump, setNodsBump] = useState<NodsBump | null>(null)
-  const bumpNod = () => setNodsBump((b) => bumpNodsToday(b, props.bench.nods))
+  const bumpNod = () => setNodsBump((b) => (props.bench.nods ? bumpNodsToday(b, props.bench.nods) : b))
   const bench = useMemo(() => {
     const applied = applyOps(props.bench, [...ops, ...(props.patches ?? [])], readAt)
     return applied.nods ? { ...applied, nods: displayNods(applied.nods, nodsBump) } : applied
@@ -320,6 +320,7 @@ export function Bench(props: {
   }
   const cursorKey = current?.kind === 'node' ? current.key : null
   const rowClick = (r: Row, e?: MouseEvent) => {
+    if (boxedJustNow.current) return void (boxedJustNow.current = false)
     if (!isSelectable(r)) return
     if (r.kind === 'node' && e && (e.metaKey || e.ctrlKey)) {
       const next = toggle(selection, order, r.key, cursorKey)
@@ -332,11 +333,14 @@ export function Bench(props: {
     setSelection(NONE)
     deselect()
   }
-  /** Dragging a box from empty list space picks every row it touches (⌘ adds to what is picked). */
+  /** Dragging a box from empty list space, or from a row that can't be dragged itself, picks every row it touches (⌘ adds to what is picked). */
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const boxedJustNow = useRef(false)
   const startBox = (e: MouseEvent) => {
-    if (e.target !== e.currentTarget || e.button !== 0) return
+    if (e.button !== 0) return
+    const t = e.target as HTMLElement
+    const onRow = t.closest<HTMLElement>('.row')
+    if (t !== e.currentTarget && (!onRow || onRow.draggable || t.closest('button, a, input, textarea, select, .caret'))) return
     const x0 = e.clientX
     const y0 = e.clientY
     const add = e.metaKey || e.ctrlKey
@@ -462,9 +466,9 @@ export function Bench(props: {
     write: () => api.assign(rootOf(n), n.id, on ? 'milestone' : 'ai'),
   })
   const startItem = (n: Node): BatchItem => {
-    bumpNod()
     return {
       ref: n.ref,
+      nod: true,
       patch: both(
         patchNode(n.key, (x) => ({ ...x, status: 'in_progress' })),
         // The owner's own to-do started is ⬖ in yellow (as the CLI draws it), an AI's is ◐ in cyan; the badge waits for the reload.
@@ -479,10 +483,9 @@ export function Bench(props: {
   }
   /** 归档 without asking why: decided work is marked seen, anything still open is closed as obsolete. */
   const archiveItem = (n: Node): BatchItem => {
-    bumpNod()
     return n.status === 'decided'
-      ? { ref: n.ref, patch: finished(n.key, 'completed'), write: () => api.seen(rootOf(n), n.id) }
-      : { ref: n.ref, patch: finished(n.key, 'closed'), write: () => api.close(rootOf(n), n.id, 'obsolete') }
+      ? { ref: n.ref, nod: true, patch: finished(n.key, 'completed'), write: () => api.seen(rootOf(n), n.id) }
+      : { ref: n.ref, nod: true, patch: finished(n.key, 'closed'), write: () => api.close(rootOf(n), n.id, 'obsolete') }
   }
   /** 延迟到…: waiting on `on` (purple), or — no one named — a plain deferral (grey); `date` null = indefinitely. */
   const delayItem = (n: Node, on: string | null, date: string | null, passive: boolean): BatchItem & { active: boolean } => {
@@ -534,6 +537,7 @@ export function Bench(props: {
   const batch = (items: BatchItem[], done: string, hold = false) => {
     if (!items.length) return
     if (hold) holdPicked()
+    for (const it of items) if (it.nod) bumpNod()
     const first = opSeq.current + 1
     opSeq.current += items.length
     setError(null)
@@ -829,6 +833,7 @@ export function Bench(props: {
   const markStart = () => {
     if (!node) return
     const it = startItem(node)
+    bumpNod()
     optimistic(it.patch, it.write, s('started'))
   }
   const markDone = () => {

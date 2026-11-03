@@ -132,6 +132,8 @@ export interface BatchItem {
   ref: string
   patch: (b: Bench) => Bench
   write: () => Promise<unknown>
+  /** Running it is a Nod (the ⚡ counter goes up by one). */
+  nod?: boolean
 }
 
 /**
