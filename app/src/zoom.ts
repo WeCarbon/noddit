@@ -26,12 +26,16 @@ export function zoomTo(z: ZoomState, scale: number, relX: number, relY: number):
 }
 
 /**
- * `z` pulled back so the image — `fitW`×`fitH` at scale 1 — never drifts past a `viewW`×`viewH`
- * viewport by more than half its own overflow. No pan at `ZOOM_MIN`.
+ * `z` pulled back so the image — `fitW`×`fitH` at scale 1, centred in a `viewW`×`viewH`
+ * viewport — can be panned edge to edge but no further. With the origin at the image's
+ * top-left, an offset of 0 is not centred: centred is `-fit * (scale - 1) / 2`.
  */
 export function clampPan(z: ZoomState, fitW: number, fitH: number, viewW: number, viewH: number): ZoomState {
   if (z.scale <= ZOOM_MIN) return FIT
-  const maxX = Math.max(0, (fitW * z.scale - viewW) / 2)
-  const maxY = Math.max(0, (fitH * z.scale - viewH) / 2)
-  return { ...z, x: Math.min(maxX, Math.max(-maxX, z.x)), y: Math.min(maxY, Math.max(-maxY, z.y)) }
+  const axis = (at: number, fit: number, view: number) => {
+    const centred = (-fit * (z.scale - 1)) / 2
+    const slack = Math.max(0, (fit * z.scale - view) / 2)
+    return Math.min(centred + slack, Math.max(centred - slack, at))
+  }
+  return { ...z, x: axis(z.x, fitW, viewW), y: axis(z.y, fitH, viewH) }
 }
