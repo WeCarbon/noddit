@@ -28,7 +28,7 @@ import { DraftFiles, filesOf } from './draftfiles.tsx'
 import { applyOps, both, dropRows, heldAt, keepHeld, moveRow, nextStamp, patchNode, patchRows, pendingOver, type Held, type PendingOp } from './optimistic.ts'
 import { Divider, clampPanes, paneColumns, type PaneWidths } from './panes.tsx'
 import { s } from './strings.ts'
-import type { Attachment, Bench as BenchData, Node, PreviousRound, Project, Row, View, ViewName } from './types.ts'
+import { OTHER_KEY, type Attachment, type Bench as BenchData, type Node, type PreviousRound, type Project, type Row, type View, type ViewName } from './types.ts'
 
 export interface Prefs {
   view: ViewName
@@ -1147,7 +1147,7 @@ export function Bench(props: {
             onSaveEdit={(target, md) => saveEdit(node, target, md)}
             onCancelEdit={() => setEditing(null)}
             onFiles={(target, files) => void api.attachFiles(rootOf(node), node.id, files, target).then(() => (showToast(s('attachedFiles', { count: files.length })), refresh()), (e: Error) => setError(e.message))}
-            onQuestions={(picks) => act(() => api.answerQuestions(rootOf(node), node.id, picks), s('sent'))}
+            onQuestions={(picks, otherText) => optimistic(answered(node.key), () => api.answerQuestions(rootOf(node), node.id, picks, otherText), s('sent'))}
           />
         ) : current?.kind === 'fold' ? (
           <div class="placeholder">
@@ -1425,7 +1425,7 @@ function Detail(p: {
   onSaveEdit: (target: 'body' | number, markdown: string) => void
   onCancelEdit: () => void
   onFiles: (target: 'body' | number, files: File[]) => void
-  onQuestions: (picks: Record<string, string>) => void
+  onQuestions: (picks: Record<string, string>, otherText: Record<string, string>) => void
 }) {
   const n = p.node
   // Each message's files sit under it when the CLI says which message they belong to; older CLIs: one list at the end.
@@ -1702,7 +1702,7 @@ function PreviousRounds({ rounds }: { rounds: PreviousRound[] }) {
               <ul class="prev-subs">
                 {r.questions.map((q) => {
                   const pick = r.sub_answers?.[q.key]
-                  const label = q.options.find((o) => o.key === pick)?.label ?? pick
+                  const label = pick === OTHER_KEY ? s('otherAnswered') : (q.options.find((o) => o.key === pick)?.label ?? pick)
                   return pick ? (
                     <li key={q.key}>
                       <span class="d">{q.label}</span> {label}
@@ -1718,30 +1718,69 @@ function PreviousRounds({ rounds }: { rounds: PreviousRound[] }) {
   )
 }
 
-function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubmit: (picks: Record<string, string>) => void }) {
-  const initial = Object.fromEntries(node.questions.map((q) => [q.key, node.answers?.[q.key] ?? q.default ?? q.options[0]?.key ?? '']))
-  const [picks, setPicks] = useState<Record<string, string>>(initial)
+function Questions({ node, busy, onSubmit }: { node: Node; busy: boolean; onSubmit: (picks: Record<string, string>, otherText: Record<string, string>) => void }) {
+  // `optionPick` is the option each question would answer with if it isn't
+  // (or stops being) "other"; `otherOpen`/`otherDraft` track the free-text
+  // box independently, so clearing the text falls back to the last option
+  // picked rather than submitting an empty "other".
+  const optionFor = (q: Node['questions'][number]) => (node.answers?.[q.key] && node.answers[q.key] !== OTHER_KEY ? node.answers[q.key] : (q.default ?? q.options[0]?.key ?? ''))
+  const [optionPick, setOptionPick] = useState<Record<string, string>>(() => Object.fromEntries(node.questions.map((q) => [q.key, optionFor(q)])))
+  const [otherDraft, setOtherDraft] = useState<Record<string, string>>(() => Object.fromEntries(node.questions.filter((q) => node.answers?.[q.key] === OTHER_KEY).map((q) => [q.key, node.answer_notes?.[q.key] ?? ''])))
+  const [otherOpen, setOtherOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(node.questions.filter((q) => node.answers?.[q.key] === OTHER_KEY).map((q) => [q.key, true])))
+  const isOther = (key: string) => Boolean(otherOpen[key] && otherDraft[key]?.trim())
+  const pickOption = (key: string, opt: string) => {
+    setOptionPick({ ...optionPick, [key]: opt })
+    setOtherOpen({ ...otherOpen, [key]: false })
+  }
+  const openOther = (key: string) => setOtherOpen({ ...otherOpen, [key]: true })
+  const typeOther = (key: string, text: string) => setOtherDraft({ ...otherDraft, [key]: text })
+  const submit = () => {
+    const picks: Record<string, string> = {}
+    const otherText: Record<string, string> = {}
+    for (const q of node.questions) {
+      if (isOther(q.key)) {
+        picks[q.key] = OTHER_KEY
+        otherText[q.key] = otherDraft[q.key].trim()
+      } else picks[q.key] = optionPick[q.key]
+    }
+    onSubmit(picks, otherText)
+  }
   return (
     <section class="decide">
       <div class="section-title">{s('questions')}</div>
-      {node.questions.map((q) => (
-        <div key={q.key} class="question">
-          <div class="q-label">
-            <span class="key">{q.key}</span> {q.label}
-          </div>
-          <div class="chips">
-            {q.options.map((o) => (
-              <button key={o.key} class={`pick ${picks[q.key] === o.key ? 'on' : ''}`} onClick={() => setPicks({ ...picks, [q.key]: o.key })} title={o.body}>
-                <span class="pk">{o.key}</span> {o.label}
-                {q.default === o.key && <span class="d"> · {s('defaultOption')}</span>}
+      {node.questions.map((q) => {
+        const other = isOther(q.key)
+        return (
+          <div key={q.key} class="question">
+            <div class="q-label">
+              <span class="key">{q.key}</span> {q.label}
+            </div>
+            <div class="chips">
+              {q.options.map((o) => (
+                <button key={o.key} class={`pick ${!other && optionPick[q.key] === o.key ? 'on' : ''}`} onClick={() => pickOption(q.key, o.key)} title={o.body}>
+                  <span class="pk">{o.key}</span> {o.label}
+                  {q.default === o.key && <span class="d"> · {s('defaultOption')}</span>}
+                </button>
+              ))}
+              <button class={`pick other ${other ? 'on' : ''}`} onClick={() => openOther(q.key)}>
+                {s('otherOption')}
               </button>
-            ))}
+            </div>
+            {otherOpen[q.key] && (
+              <input
+                class="other-input"
+                autoFocus
+                value={otherDraft[q.key] ?? ''}
+                placeholder={s('otherPlaceholder')}
+                onInput={(e) => typeOther(q.key, (e.target as HTMLInputElement).value)}
+              />
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
       {!node.terminal && (
         <div class="q-actions">
-          <button class="primary" disabled={busy} onClick={() => onSubmit(picks)}>
+          <button class="primary" disabled={busy} onClick={submit}>
             {s('submitAnswers')}
           </button>
         </div>

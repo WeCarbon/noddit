@@ -72,6 +72,10 @@ export interface Question {
   options: Option[]
 }
 
+/** A sub-question answer of this value means free text instead of an option — see
+ *  `OTHER_KEY` in `src/core/questions.ts`, which this must keep matching. */
+export const OTHER_KEY = '*'
+
 /** An earlier `nod ask` round of a node, with what it was answered — history, not live state. */
 export interface PreviousRound {
   round: number
@@ -130,6 +134,8 @@ export interface Node {
   previous_rounds?: PreviousRound[]
   answer: { choice?: string; note?: string; by: string; at: string } | null
   answers: Record<string, string> | null
+  /** A sub-question answered `OTHER_KEY`: the free text that was typed, keyed the same way as `answers`. */
+  answer_notes: Record<string, string> | null
   deferred_at: string | null
   parent: number | null
   children: number[]

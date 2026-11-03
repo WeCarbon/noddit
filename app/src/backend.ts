@@ -1,4 +1,4 @@
-import type { Bench, Node, Project, RunOutput, ShellEnv } from './types.ts'
+import { OTHER_KEY, type Bench, type Node, type Project, type RunOutput, type ShellEnv } from './types.ts'
 
 /**
  * Everything the window knows comes from the `decs` CLI: reads are
@@ -70,8 +70,18 @@ export const answer = async (root: string, id: number, choice: string, note?: st
   await attachToAnswer(root, id, files)
 }
 
-export const answerQuestions = (root: string, id: number, picks: Record<string, string>, note?: string) =>
-  ok(['push', String(id), ...Object.entries(picks).map(([q, k]) => `${q}=${k}`), ...(note ? ['--note', note] : []), ...human, '--dir', root])
+/** `otherText[q]` is the typed answer for any question picked `OTHER_KEY` — carried in the same
+ *  token (`Qx=*:<text>`) push already reads, so the CLI never sees a bare, text-less `*`. */
+export const answerQuestions = (root: string, id: number, picks: Record<string, string>, otherText: Record<string, string> = {}, note?: string) =>
+  ok([
+    'push',
+    String(id),
+    ...Object.entries(picks).map(([q, k]) => (k === OTHER_KEY ? `${q}=${OTHER_KEY}:${otherText[q] ?? ''}` : `${q}=${k}`)),
+    ...(note ? ['--note', note] : []),
+    ...human,
+    '--dir',
+    root,
+  ])
 
 export const answerDefaults = (root: string, id: number) => ok(['push', String(id), '--defaults', ...human, '--dir', root])
 
