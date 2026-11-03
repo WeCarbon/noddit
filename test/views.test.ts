@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { initLayout } from '../src/core/paths.ts'
 import { Store } from '../src/core/store.ts'
 import { groupFoldKey, loadFolds } from '../src/tui/folds.ts'
-import { GLYPH, HUMAN_GLYPH, VIEWS, doneGroupKey, flagMark, glyphOf, glyphText, homeView, importantTone, inView, nodeRowSegments, rowsFor, viewCount, type Row, type View } from '../src/tui/views.ts'
+import { GLYPH, HUMAN_DOING_GLYPH, HUMAN_GLYPH, VIEWS, doneGroupKey, flagMark, glyphOf, glyphText, homeView, importantTone, inView, nodeRowSegments, rowsFor, viewCount, type Row, type View } from '../src/tui/views.ts'
 import { statusSegments } from '../src/tui/detail.ts'
 import { helpText } from '../src/tui/app.ts'
 import { stringWidth } from '../src/tui/width.ts'
@@ -296,6 +296,7 @@ test('the detail status line and the help use the same glyphs', (t) => {
   const help = helpText().join('\n')
   for (const glyph of Object.values(GLYPH)) assert.ok(help.includes(glyph), `help shows ${glyph}`)
   assert.ok(help.includes(HUMAN_GLYPH), 'help shows the human-work diamond')
+  assert.ok(help.includes(HUMAN_DOING_GLYPH), 'help shows the started human-work diamond')
   assert.match(help, /green = answered, awaiting an AI \(you answered, an AI hasn't picked it up\)/)
   assert.doesNotMatch(help, /[▶⇢]/, 'the old glyphs are gone')
 })
@@ -303,10 +304,25 @@ test('the detail status line and the help use the same glyphs', (t) => {
 test('◐ is one column, like ◆ and ○, in our width helper and in the one ink lays out with', async () => {
   // all three are East Asian Ambiguous: one column unless a terminal draws ambiguous glyphs wide, breaking ◆/○ the same way
   const widest = (await import('widest-line')).default
-  for (const glyph of Object.values(GLYPH)) {
+  for (const glyph of [...Object.values(GLYPH), HUMAN_GLYPH, HUMAN_DOING_GLYPH]) {
     assert.equal(stringWidth(glyph), 1, `${glyph} in width.ts`)
     assert.equal(widest(glyph), 1, `${glyph} in ink`)
   }
+})
+
+test('a human task\'s glyph fills in as it goes: hollow ◇ not started, left-half ⬖ once in progress', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'decs-human-glyph-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = new Store([initLayout(root)])
+  const A = 'lane · test'
+  const todo = store.create({ title: 'your to-do', author: A, task: true, assignee: 'human' })
+  const items = store.all()
+  assert.equal(glyphText(todo, items), HUMAN_GLYPH, 'not started yet: hollow diamond')
+  assert.deepEqual(glyphOf(todo, items), { text: HUMAN_GLYPH, color: 'yellow' })
+  const doing = store.start(todo)
+  const items2 = store.all()
+  assert.equal(glyphText(doing, items2), HUMAN_DOING_GLYPH, 'started: left-half-filled diamond')
+  assert.deepEqual(glyphOf(doing, items2), { text: HUMAN_DOING_GLYPH, color: 'yellow' })
 })
 
 test('a row with ◐ is exactly as wide as the pane, like every other state', (t) => {

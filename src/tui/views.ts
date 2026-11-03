@@ -27,7 +27,7 @@ import { fit, padToWidth, stringWidth } from './width.ts'
  *   tree; a superset of 人类工作.
  * - 人类工作 (key `decide`): everything waiting on a person — what the owner must
  *   rule on and the human-assigned tasks that can be done now — AI-blocking first,
- *   then ★/⚑, then the rest.
+ *   then ★, then the rest.
  * - 等待: held up outside, longest first, plus a 「延迟 N」 fold row.
  * - 实时: what the owner answered, replied to, filed or deferred, latest first —
  *   finished and archived nodes included.
@@ -866,19 +866,32 @@ export function decidedShape(d: Item): string {
 /** 派活 the owner filed that no AI has picked up yet — its own shape, whatever the state says. */
 export const BRIEF_GLYPH = '✎'
 
-/** 人类工作, not a decision: a hollow yellow diamond, instead of its state's own shape. */
+/** 人类工作, not started: a hollow yellow diamond, instead of its state's own shape. */
 export const HUMAN_GLYPH = '◇'
+
+/** 人类工作, started (in_progress): a yellow diamond with its left half filled —
+ *  between HUMAN_GLYPH (not started) and a decision's solid ◆ (blocking an AI). */
+export const HUMAN_DOING_GLYPH = '⬖'
 
 /** The glyph text for `d`, whatever its state. */
 export const glyphText = (d: Item, items: Item[]) =>
-  isUnclaimedBrief(d) ? BRIEF_GLYPH : isOpenHumanTask(d, items) ? HUMAN_GLYPH : d.state === 'decided' ? decidedShape(d) : GLYPH[d.state]
+  isUnclaimedBrief(d)
+    ? BRIEF_GLYPH
+    : isOpenHumanTask(d, items)
+      ? d.state === 'in_progress'
+        ? HUMAN_DOING_GLYPH
+        : HUMAN_GLYPH
+      : d.state === 'decided'
+        ? decidedShape(d)
+        : GLYPH[d.state]
 
 /**
  * ◆ is yellow, bold while an AI is stuck on it, dim if answerable early.
- * ◇ (hollow, also yellow) is the owner's own open to-do — a human task, not
- * a decision; see `isOpenHumanTask`. Green is 已答待取 (owner answered, AI
- * hasn't picked up), keeping its task shape. ◐ goes red once a check-in has
- * gone unanswered 3 times (core/checkins.ts).
+ * ◇ (hollow, also yellow) is the owner's own open to-do, not yet started — a
+ * human task, not a decision; see `isOpenHumanTask`. ⬖ (left half filled,
+ * also yellow) is that same to-do once started (in_progress). Green is
+ * 已答待取 (owner answered, AI hasn't picked up), keeping its task shape. ◐
+ * goes red once a check-in has gone unanswered 3 times (core/checkins.ts).
  */
 export function glyphOf(d: Item, items: Item[], now = Date.now()): Glyph {
   const text = glyphText(d, items)
@@ -1118,7 +1131,8 @@ function nodeRowParts(row: Row, items: Item[], width: number, now: number, opts:
 
 /**
  * Order of 人类工作: what holds an AI up first (a question it is stuck on, or the
- * owner's to-do that other work is `after`), then what the owner flagged ★/⚑,
+ * owner's to-do that other work is `after`), then what the owner flagged ★
+ * (important or, since N250, a milestone — still sorts first, just unmarked),
  * then the rest (to-dos, questions answerable early); bench order within each.
  */
 export function ownerQueue(items: Item[]): Item[] {
