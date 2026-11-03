@@ -69,7 +69,9 @@
     "checkBackDue": "حان وقتها",
     "checkOn": "اسأل {{who}}",
     "waitingOnUntil": "بانتظار {{who}} · المتابعة {{date}}",
-    "backOn": "المتابعة {{date}}"
+    "backOn": "المتابعة {{date}}",
+    "todo": "مهمتك",
+    "doing": "قيد التنفيذ"
   },
   "detail": {
     "aiStuck": "الوكيل متعطل",

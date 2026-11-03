@@ -69,7 +69,9 @@
     "checkBackDue": "À relancer",
     "checkOn": "{{who}}",
     "waitingOnUntil": "Attend {{who}} · revoir {{date}}",
-    "backOn": "Revoir {{date}}"
+    "backOn": "Revoir {{date}}",
+    "todo": "À faire",
+    "doing": "En cours"
   },
   "detail": {
     "aiStuck": "IA bloquée",

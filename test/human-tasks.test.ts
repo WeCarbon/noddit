@@ -118,7 +118,7 @@ test('Human work lists decisions and the owner\'s startable to-dos; AI-blocking 
   const rows = rowsFor('decide', items)
   assert.match(rows[0].text ?? '', /Human work 5/)
   const todoRow = rows.find((r) => r.node?.id === todo.id)!
-  assert.match(text(nodeRowSegments(todoRow, items, 80, Date.now())), /For you/)
+  assert.match(text(nodeRowSegments(todoRow, items, 80, Date.now())), /To do/)
   const decisionRow = rows.find((r) => r.node?.id === stuck.id)!
   assert.match(text(nodeRowSegments(decisionRow, items, 80, Date.now())), /Decide/, 'a question still says Decide')
 })
@@ -243,7 +243,7 @@ test('bench: ⇥ in the p prompt files a to-do for the owner instead of a brief'
   await b.press('\t')
   await b.until(has(b, /New to-do for you/))
   await b.press('Call the vendor', '\r')
-  await b.until(has(b, /Call the vendor +For you/))
+  await b.until(has(b, /Call the vendor +To do/))
   const d = store.all().find((x) => x.title === 'Call the vendor')!
   assert.equal(d.assignee, 'human')
   assert.equal(d.intake, undefined)

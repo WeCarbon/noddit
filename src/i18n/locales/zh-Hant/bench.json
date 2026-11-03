@@ -69,7 +69,9 @@
     "checkBackDue": "到期",
     "checkOn": "問問 {{who}}",
     "waitingOnUntil": "等 {{who}} · {{date}} 回來看",
-    "backOn": "{{date}} 回來看"
+    "backOn": "{{date}} 回來看",
+    "todo": "待辦",
+    "doing": "在做"
   },
   "detail": {
     "aiStuck": "AI 卡住",

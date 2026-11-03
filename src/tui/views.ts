@@ -893,14 +893,8 @@ function refsShort(refs: string[], max = 2): string {
 export function suffixOf(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
   const sep: Segment = { text: ' · ', dim: true }
   const lead = (forms: Segment[][], seg: Segment | null) => (seg ? [...forms.map((f) => [seg, sep, ...f]), [seg]] : forms)
-  const you = row?.touch ? null : forYouMark(d)
   const countdown = row?.touch ? null : milestoneCountdown(d, now)
-  return lead(lead(stateSuffix(d, items, now, row), you), countdown)
-}
-
-/** 「你来做」 on the owner's own live to-do. */
-export function forYouMark(d: Item): Segment | null {
-  return isHumanTask(d) && !isTerminal(d.state) ? { text: t('bench.badge.forYou'), color: 'blue', bold: true } : null
+  return lead(stateSuffix(d, items, now, row), countdown)
 }
 
 function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][] {
@@ -933,6 +927,11 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
   }
   switch (d.state) {
     case 'in_progress': {
+      // A human task's own badge, yellow like 待决: no age, no progress bar — it never gets a check-in.
+      if (isHumanTask(d)) {
+        forms.push([...fold, { text: t('bench.badge.doing'), color: 'yellow' }])
+        break
+      }
       const when = ago(minutesSince(d, now))
       const pct = progressOf(d)
       const alert = d.checkin?.unanswered
@@ -982,6 +981,9 @@ function stateSuffix(d: Item, items: Item[], now: number, row?: Row): Segment[][
       if (deps.length) {
         forms.push([...fold, { text: t('bench.badge.waitingOn', { refs: refsShort(deps) }), dim: true }])
         forms.push([{ text: t('bench.badge.waitingOn', { refs: refsShort(deps, 1) }), dim: true }])
+      } else if (isHumanTask(d)) {
+        // Startable and yours: the yellow 待做, same place and colour as 待决.
+        forms.push([...fold, { text: t('bench.badge.todo'), color: 'yellow' }])
       } else forms.push([...fold, { text: t('bench.badge.ready'), dim: true }])
       break
     }

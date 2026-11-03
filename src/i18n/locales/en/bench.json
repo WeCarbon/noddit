@@ -69,7 +69,9 @@
     "checkBackDue": "Check back",
     "checkOn": "on {{who}}",
     "waitingOnUntil": "Waiting on {{who}} · back {{date}}",
-    "backOn": "Back {{date}}"
+    "backOn": "Back {{date}}",
+    "todo": "To do",
+    "doing": "In progress"
   },
   "detail": {
     "aiStuck": "AI stuck",
