@@ -105,15 +105,16 @@ decisions/
 ## 你能得到什么
 
 **给人用的——看板。** `nod bench` 是一个覆盖你注册过的所有项目的实时终端 UI。
-五个标签：
+六个标签：
 
 | 标签 | 看到什么 |
 |---|---|
 | **可用** | 现在能动的：在跑、在等人、可以开始、要你决定、已经答了 |
 | **活动** | 正在发生的：只有在跑的和待决策的 |
-| **待决** | 只看要你决定的问题，按项目分，先列卡住智能体的那些 |
-| **全部** | 全部节点，完成的折进一行 `✓ 已完成 N` |
+| **人类工作** | 等你处理的：要你决定的问题，加上你自己的待办——卡住智能体的那些排最前 |
 | **等待** | 卡在外部的：同事、客户、某个服务，等得最久的排最前 |
+| **实时** | 任何人改动过的全部节点，最新的排最前，完成的也算 |
+| **全部** | 全部节点，完成的折进一行 `✓ 已完成 N` |
 
 左边是带进度条和"多久没动"标记的节点树（超过 30 分钟不更新变灰，超过一小时变红）。
 右边是选中节点的详情：状态、紧急程度、*"你不回的话会怎样"*、父节点、依赖、正文、
@@ -133,9 +134,32 @@ nod ask W15 -o 1="Short & playful" 2="Plain & direct" --default 2 <<'EOF'
 EOF
 ```
 
+**人类工作，和 AI 的活并排放着。** `nod add <title> --for me` 给你自己派一件
+待办，不是给 AI 的——没有智能体会启动它、来问它的进展，或者把它当成一条待
+展开的派活。`nod assign <id> me|ai` 可以之后把一个节点在两者间挪动。看板的
+**人类工作**标签把两种都列出来：等你决定的问题，加上你自己的待办，卡住
+AI 的排最前。
+
+**里程碑。** `nod add <title> --milestone`（或者 `nod assign <id>
+milestone`）把一个节点标成一个目标，下面挂着子目标和具体的活——这是一个
+阶段，不是一件任务。它从不自己启动或完成；看板上显示成 `⚑`，带着子节点的
+完成/总数，也不需要 `--due`，不过你仍然可以给它一个。
+
+**到期日、预估、重复周期。** 在 `nod add` 或 `nod edit` 上加 `--due <date>`
+给任何节点定一个截止日期——过期了就在看板和 app 里变红。`--est 2h` 记下这
+份活花谁的时间：你自己的待办算你的时间，其余算 AI 的；父节点会把子树里两边
+各自加总。`--every 3d` 给一个节点自己的周期，这样 `nod defer --every`（或者
+看板上的 `D`）就会把它延迟到今天加上这个周期，不用每次都手打日期。
+
+**提醒是 AI 的活，不是你的。** `nod add --remind "fri 2pm"`（或者 `nod edit
+--remind`）在那个时刻给 AI 排一件普通任务——它从不跟选项、派活或 `--for`
+混在一起。到点了，`nod monitor` 会告诉那个节点自己的智能体一次，带着下一步
+该做什么（先告诉负责人，再 `nod done`）；桌面 app 也会提醒你。
+
 **不用轮询的通知。** `nod monitor` 每行打印一件智能体要处理的事——负责人的答复、
 一条回复、外部来源来的新条目、五分钟没人取走的答案——并且记得每个会话看到
-哪里了。Claude Code 插件会在整个会话期间自动起一个（`nod monitor --here`，
+哪里了。它靠文件系统事件叫醒自己，不是定时器，所以不用等下一轮轮询。
+Claude Code 插件会在整个会话期间自动起一个（`nod monitor --here`，
 只盯当前项目）；连续两小时没事件会自己下线，打一行 `DECS-IDLE`。子智能体，或者
 `DECS-IDLE` 之后的会话，用 Claude Code 的 Monitor 工具自己挂一个：
 
@@ -143,12 +167,19 @@ EOF
 Monitor({ command: "nod monitor --mine", description: "nod", timeout_ms: 1800000 })
 ```
 
+一条回复或记录超过一两行，就要带 `--summary`；通知、回复卡片的标题、看板里
+显示的都是这一句，不是全文。
+
 **依赖与顺序。** `--after W13` 会把一个节点拦住，直到 W13 完成。你仍然可以提前
 答复问题；节点会以**待开始**的状态等着，轮到它再开始。
 
-**外部来源。** 把一个很薄的适配器接到 GitHub issue、客服邮箱或反馈表单上。
-它只同步*引用*（编号 + 标题，可选 url/状态/来源），绝不同步正文，绝不同步凭证。
-看板的标题栏会按来源告诉你清了没、卡在谁手上：
+**外部来源，按自己的节奏同步。** 把一个很薄的适配器接到 GitHub issue、
+Azure DevOps、客服邮箱或反馈表单上。它只同步*引用*（编号 + 标题，可选
+url/状态/来源），绝不同步正文，绝不同步凭证。注册的时候带上 `--sync-cmd
+"..." --every 10m`，你自己正在跑的 `nod monitor` 就会按这个间隔自己跑同步——
+这条命令只存在你本机上（`~/.decs/source-sync.json`），不进仓库，所以克隆
+这个仓库的人不会跑起来任何命令。看板的标题栏会按来源告诉你清了没、卡在
+谁手上：
 
 ```
 外部来源 github-issues ✗ 未处理 2 等 W7 1   support-inbox ✓清了
@@ -161,6 +192,12 @@ Monitor({ command: "nod monitor --mine", description: "nod", timeout_ms: 1800000
 
 **延迟。** 在任何东西上按 `d` 让它从眼前消失。它会离开各个工作视图，但状态不变；
 正在做它的智能体会收到「负责人延迟」，解除之前就先停手。
+
+**一次对多个节点动手。** 在看板上按 `Space` 标记行；标记了任意几个之后，
+同样那些单节点的键——延迟、启动、换人、标重要、归档——会对全部标记的节点
+一起生效。桌面 app 里 `⌘`-点、`⇧`-点或者拖一个框也是一样效果，app 还会
+同步在原地改标题/正文、缩放和平移图片、内嵌预览 Markdown/HTML——这两个
+界面具体对到哪，见下面的[开发](#开发)。
 
 ## 安装
 
@@ -254,9 +291,12 @@ nod                                  # the bench (same as nod bench); q to quit
 | `nod start / done / close <id>` | 待开始 → 执行中 → 已完成 / 已关闭（`--reason obsolete\|superseded\|merged-into:W15`） |
 | `nod ask <id> -o 1=… 2=…` | 在跑的节点需要负责人拍板 |
 | `nod hold <id> --on "Carol: icon set" --until fri` | 在等外部某人（积极延迟，紫色）；不算卡住——同 `nod defer --on` |
+| `nod add <title> --for me` · `nod assign <id> me\|ai` | 给自己派一件待办，不是给 AI 的——列在**人类工作**里 |
+| `nod add <title> --milestone [--due …]` | 一个目标，下面挂子目标，从不自己启动或完成 |
+| `nod edit <id> --due <date> --est 2h --every 3d --remind "fri 2pm"` | 到期日 · 花谁的时间 · 重复周期 · AI 的提醒 |
 | `nod progress <pct> "msg"` · `… \| nod progress --parse pytest` | 报进度（或者让一个管道自己报） |
 | `nod steps <id> "a" "b" "c"` · `nod step <id> 2` | 多步骤的活，百分比帮你算好 |
-| `nod note <id> "…"` | 追加一条记录（默认是智能体；`--human` 给负责人用） |
+| `nod note <id> "…" [--summary "…"]` | 追加一条记录（默认是智能体；`--human` 给负责人用）；超过一两行就要带摘要 |
 | `nod push <id> 2 [--note …]` | 记一条答复 |
 | `nod monitor [--mine] [--here] [--idle-exit 2h]` | 智能体的通知流 |
 | `nod read <id>` · `nod queue` | 取走答复 / 看还有哪些没取 |
@@ -284,8 +324,12 @@ nod                                  # the bench (same as nod bench); q to quit
 | `1`–`9` · `Enter` | 答复 · 取默认值 |
 | `w` | 跳到下一个卡住智能体的节点 |
 | `g` 或 `:` | 跳到一个编号 |
+| `Ctrl-L` | 跳到跨项目的主智能体，离线就启动一个 |
 | `N` | 回复但不决定（节点回到智能体手上） |
 | `d` | 延迟 / 解除延迟 |
+| `@` | 换人：你的待办 ↔ AI 的 |
+| `m` | 切换这个节点是不是里程碑 |
+| `Space` | 标记 / 取消标记一行；标记了任意几个，`d D s @ ! A` 会对全部生效 |
 | `X` · `A` | 带理由关闭 · 标记看过并归档 |
 | `M` | 挪动模式：↑/↓ 在同一个上级下面（列表里是同一组）挪，⏎ 结束；app 里直接拖 |
 | `i` · `o` | 挑选并查看图片 · 打开一个附件 |
@@ -330,6 +374,11 @@ Measured again: 1.9 s p95 from Singapore.
 
 这些标题——`## 选项`、`## 补充（…）`，以及其他几个——都是固定的词，不会被翻译：
 为什么，以及每个人怎么选自己的语言，见上面的[语言](#语言)。
+
+一个节点还可以带几个可选字段，用对应的 `nod add` / `nod edit` 参数设置，
+不用手改文件：`due`、`est`、`every`、`remind_at`、`assignee`（`human` 表示
+这是你自己的待办）、`milestone`（`true` 表示这是一个带子目标的目标）。看板
+和 app 都直接从文件头读这些字段。
 
 状态：`not_started` 待开始 · `in_progress` 执行中 · `waiting` 等待 ·
 `needs_decision` 待决策 · `decided` 已决策待 AI 取走 · `completed` 已完成 ·
@@ -405,6 +454,10 @@ npm test            # node --test
 npm run typecheck   # tsc --noEmit
 node scripts/render-screenshot.ts --out docs/screenshot.zh-Hans   # regenerate docs/screenshot.<lng>.svg/.png (mock data)
 ```
+
+桌面 app（`app/src`）和终端看板（`src/tui`）要保持功能对齐——
+[`docs/app-tui-parity.md`](docs/app-tui-parity.md) 记录每个功能在两边各自
+的落点，哪边改了都要在这份表里加一行。
 
 ## 许可
 
