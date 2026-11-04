@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "noddit"
-version = "0.2.0"
+version = "0.3.0"
 description = "Python SDK for Noddit (github.com/WeCarbon/noddit): report pytest and script progress to a Noddit node as JSON Lines events"
 readme = "README.md"
 license = "MIT"
